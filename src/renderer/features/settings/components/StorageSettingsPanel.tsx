@@ -57,6 +57,31 @@ const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
   const [encryption, setEncryption] = useState<{ enabled: boolean; available: boolean; weakBackend: boolean; backend: string } | null>(null);
   const [encryptionBusy, setEncryptionBusy] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<{ fileName: string; snapshot: AppState } | null>(null);
+  const [dbBackups, setDbBackups] = useState<Array<{ name: string; bytes: number; mtime: number }>>([]);
+
+  const reloadDbBackups = useCallback(() => {
+    const api = window.electronAPI?.db;
+    if (!api?.hotBackupList) return;
+    void api.hotBackupList().then(setDbBackups).catch(() => setDbBackups([]));
+  }, []);
+  useEffect(() => {
+    reloadDbBackups();
+  }, [reloadDbBackups]);
+
+  const handleVerifyDbBackup = async (fileName: string): Promise<void> => {
+    const api = window.electronAPI?.db;
+    if (!api?.hotBackupVerify) return;
+    const result = await api.hotBackupVerify(fileName);
+    dialogService.alert(result.ok ? t('storage.dbBackupVerifyOk') : t('storage.dbBackupVerifyFail', { detail: result.result ?? result.error ?? '' }));
+  };
+
+  const handleRestoreDbBackup = async (fileName: string): Promise<void> => {
+    const api = window.electronAPI?.db;
+    if (!api?.hotBackupRestore) return;
+    if (!(await dialogService.confirm({ message: t('storage.dbBackupRestoreConfirm', { name: fileName }), danger: true }))) return;
+    const result = await api.hotBackupRestore(fileName);
+    dialogService.alert(result.ok ? t('storage.dbBackupRestoreDone') : t('storage.dbBackupRestoreFail', { detail: result.error ?? '' }));
+  };
 
   const reloadBackups = useCallback(() => {
     void autoBackupService.getBackupHistory(storageConfig).then(setBackups).catch(() => setBackups([]));
@@ -507,6 +532,30 @@ const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
                             <Button size="sm" variant="outline" className="shrink-0" onClick={() => void handleRestoreBackup(b.filePath, b.fileName)}>
                               {t('storage.restore')}
                             </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <FieldLabel>{t('storage.dbBackupTitle')}</FieldLabel>
+                    {dbBackups.length === 0 ? (
+                      <p className="text-xs italic text-muted-foreground">{t('storage.dbBackupEmpty')}</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {dbBackups.map((b) => (
+                          <div key={b.name} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                            <div className="min-w-0">
+                              <div className="truncate font-mono text-xs text-foreground">{b.name}</div>
+                              <div className="text-2xs tabular-nums text-muted-foreground">
+                                {formatDateTime(b.mtime, i18n.language)} · {(b.bytes / 1024).toFixed(1)} KB
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 gap-2">
+                              <Button size="sm" variant="outline" onClick={() => void handleVerifyDbBackup(b.name)}>{t('storage.dbBackupVerify')}</Button>
+                              <Button size="sm" variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => void handleRestoreDbBackup(b.name)}>{t('storage.dbBackupRestore')}</Button>
+                            </div>
                           </div>
                         ))}
                       </div>

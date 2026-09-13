@@ -21,6 +21,9 @@ import { i18n } from '@/i18n';
 import { assertAiAllowed } from './aiGate';
 import { recordUsage } from './usageTracker';
 
+/** 流式空闲超时：超过该时长没有任何事件即判失败，避免丢事件导致悬挂。 */
+const STREAM_IDLE_MS = 60_000;
+
 /** 渲染端调用选项：线上选项 + 本地取消信号 + 功能归因。 */
 export interface CallOptions extends AiCallOptions {
   signal?: AbortSignal;
@@ -126,9 +129,20 @@ export async function gatewayStream(
 
   return new Promise<void>((resolve) => {
     let settled = false;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    const armIdle = (): void => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (settled) return;
+        onChunk({ content: '', error: 'stream-idle-timeout', isComplete: true, isStreaming: false });
+        void gateway.abort(requestId);
+        finish();
+      }, STREAM_IDLE_MS);
+    };
     const finish = (): void => {
       if (!settled) {
         settled = true;
+        if (idleTimer) clearTimeout(idleTimer);
         off();
         options?.signal?.removeEventListener('abort', onAbort);
         resolve();
@@ -142,6 +156,7 @@ export async function gatewayStream(
 
     const off = gateway.onStreamEvent((event: AiStreamEvent) => {
       if (event.requestId !== requestId) return;
+      armIdle();
       if (event.t === 'delta') {
         onChunk({
           content: event.accumulated,
@@ -171,6 +186,7 @@ export async function gatewayStream(
       }
     });
 
+    armIdle();
     void gateway.openStream(requestId, model, prompt, { retries: options?.retries }).catch((error: unknown) => {
       onChunk({ ...failureResponse(error), isComplete: true, isStreaming: false });
       finish();

@@ -1235,6 +1235,9 @@ export interface ElectronAPI {
     integrityCheck: () => Promise<{ ok: boolean; result: string }>;
     fullIntegrityCheck: () => Promise<{ ok: boolean; result: string }>;
     hotBackup: (keep?: number) => Promise<{ ok: boolean; path?: string; bytes?: number; error?: string }>;
+    hotBackupList: () => Promise<Array<{ name: string; bytes: number; mtime: number }>>;
+    hotBackupVerify: (fileName: string) => Promise<{ ok: boolean; result?: string; error?: string }>;
+    hotBackupRestore: (fileName: string) => Promise<{ ok: boolean; error?: string }>;
     maintenance: () => Promise<void>;
     encryptionStatus: () => Promise<{ enabled: boolean; available: boolean; weakBackend: boolean; backend: string }>;
     enableEncryption: () => Promise<{ ok: boolean; recoveryCode?: string; error?: string }>;

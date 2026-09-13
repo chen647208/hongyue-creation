@@ -50,6 +50,18 @@ function electron(): NonNullable<Window['electronAPI']> {
   return window.electronAPI;
 }
 
+/** 会话事件脱敏：写入前遮蔽常见密钥形态，避免明文密钥落盘。 */
+const SESSION_SECRET_PATTERNS: Array<[RegExp, string]> = [
+  [/sk-[A-Za-z0-9_-]{8,}/g, 'sk-***'],
+  [/AIza[0-9A-Za-z_-]{20,}/g, 'AIza***'],
+  [/(Bearer\s+)[A-Za-z0-9._-]{10,}/gi, '$1***'],
+  [/("(?:api_?key|token|secret|password|authorization)"\s*:\s*")[^"]*(")/gi, '$1***$2'],
+];
+
+export function redactSessionLine(line: string): string {
+  return SESSION_SECRET_PATTERNS.reduce((acc, [pattern, replacement]) => acc.replace(pattern, replacement), line);
+}
+
 /** jsonl 落盘：每条事件追加一行（O(1) 追加，避免整文件重写）。 */
 class FileSessionSink implements SessionSink {
   private lines: string[] = [];
@@ -63,9 +75,10 @@ class FileSessionSink implements SessionSink {
   }
 
   async append(_sessionId: string, line: string): Promise<void> {
-    this.lines.push(line);
+    const safeLine = redactSessionLine(line);
+    this.lines.push(safeLine);
     try {
-      await electron().appendFile(await this.path, `${line}\n`);
+      await electron().appendFile(await this.path, `${safeLine}\n`);
     } catch {
       // 落盘失败不阻断会话：事件仍在内存，UI 可读（end 时会再尝试）
     }

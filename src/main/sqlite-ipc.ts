@@ -147,6 +147,15 @@ export function registerSqliteIpc(): void {
     const resolved = typeof keep === 'number' ? Math.min(Math.max(1, Math.floor(keep)), 100) : DB_BACKUP_KEEP;
     return hotBackup(resolved);
   });
+  ipcMain.handle(IPC.db.hotBackupList, () => listDbBackups());
+  ipcMain.handle(IPC.db.hotBackupVerify, (_event, fileName: unknown) => {
+    if (typeof fileName !== 'string') throw new TypeError('Invalid fileName');
+    return verifyDbBackup(fileName);
+  });
+  ipcMain.handle(IPC.db.hotBackupRestore, (_event, fileName: unknown) => {
+    if (typeof fileName !== 'string') throw new TypeError('Invalid fileName');
+    return restoreDbBackup(fileName);
+  });
   ipcMain.handle(IPC.db.maintenance, () => runMaintenance());
   ipcMain.handle(IPC.db.encryptionStatus, () => encryptionStatus());
   ipcMain.handle(IPC.db.enableEncryption, () => enableDbEncryption());
@@ -212,9 +221,84 @@ export function hotBackup(keep = DB_BACKUP_KEEP): { ok: boolean; path?: string; 
   }
 }
 
+/** 备份条目。 */
+export interface DbBackupInfo {
+  name: string;
+  bytes: number;
+  mtime: number;
+}
+
+/** 校验备份文件名并解析为 backups 目录内的绝对路径（拒绝路径穿越）。 */
+function resolveDbBackupFilePath(fileName: string): string | null {
+  if (!new RegExp(`^${DB_BACKUP_PREFIX}[A-Za-z0-9._-]+\\.db$`).test(fileName)) return null;
+  const dir = path.join(app.getPath('userData'), DB_BACKUP_DIR_NAME);
+  const resolved = path.resolve(dir, fileName);
+  return resolved.startsWith(path.resolve(dir)) ? resolved : null;
+}
+
+/** 列出热备份（按时间倒序）。 */
+export function listDbBackups(): DbBackupInfo[] {
+  const dir = path.join(app.getPath('userData'), DB_BACKUP_DIR_NAME);
+  try {
+    return fs
+      .readdirSync(dir)
+      .filter((name) => name.startsWith(DB_BACKUP_PREFIX) && name.endsWith('.db'))
+      .map((name) => {
+        const stat = fs.statSync(path.join(dir, name));
+        return { name, bytes: stat.size, mtime: stat.mtimeMs };
+      })
+      .sort((a, b) => b.mtime - a.mtime);
+  } catch {
+    return [];
+  }
+}
+
+/** 只读打开备份并 quick_check。 */
+export function verifyDbBackup(fileName: string): { ok: boolean; result?: string; error?: string } {
+  const filePath = resolveDbBackupFilePath(fileName);
+  if (!filePath) return { ok: false, error: 'invalid-name' };
+  let probe: Database.Database | null = null;
+  try {
+    probe = new Database(filePath, { readonly: true });
+    const rows = probe.pragma('quick_check') as Array<Record<string, unknown>>;
+    const text = rows.map((row) => Object.values(row).join(' ')).join('; ');
+    return { ok: text.trim().toLowerCase() === 'ok', result: text };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  } finally {
+    probe?.close();
+  }
+}
+
+/** 用备份覆盖当前库：先给当前库热备份兜底，再关闭连接、替换文件；下次访问按需重开。 */
+export function restoreDbBackup(fileName: string): { ok: boolean; error?: string } {
+  const filePath = resolveDbBackupFilePath(fileName);
+  if (!filePath) return { ok: false, error: 'invalid-name' };
+  try {
+    hotBackup();
+    const dbPath = path.join(app.getPath('userData'), DB_FILE_NAME);
+    if (db) {
+      db.close();
+      db = null;
+    }
+    for (const suffix of ['', '-wal', '-shm']) {
+      try {
+        fs.unlinkSync(`${dbPath}${suffix}`);
+      } catch {
+        // 文件不存在时忽略
+      }
+    }
+    fs.copyFileSync(filePath, dbPath);
+    logger.info('db', `已从备份恢复: ${fileName}`);
+    return { ok: true };
+  } catch (error) {
+    logger.warn('db', '备份恢复失败', error);
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 /** 备份文件滚动清理：按文件名（时间序）倒序，保留最近 keep 份。 */
-function cleanupDbBackups(dir: string, keep: number): void {
-  let names: string[];
+function cleanupDbBackups(dir: string, keep: number): void {  let names: string[];
   try {
     names = fs.readdirSync(dir);
   } catch {
