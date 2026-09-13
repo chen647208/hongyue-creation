@@ -430,6 +430,23 @@ const SCRIPT_TEMPLATES: TypeTemplate[] = [
     ],
     views: ['table', 'corkboard'],
   },
+  {
+    id: 'comic.panel',
+    label: '分格',
+    labelEn: 'Panel',
+    icon: 'layout-grid',
+    category: 'novel',
+    fields: [
+      { key: 'panelNumber', label: '分格号', type: 'number' },
+      { key: 'shot', label: '景别', type: 'text' },
+      { key: 'image', label: '画面', type: 'image' },
+      { key: 'dialogue', label: '对白', type: 'richtext' },
+      { key: 'narration', label: '旁白', type: 'richtext' },
+      { key: 'status', label: '状态', type: 'enum', enum: ['draft', 'done'] },
+    ],
+    views: ['corkboard', 'table'],
+    statusLabels: 'status',
+  },
 ];
 
 export const BUILTIN_TEMPLATES: readonly TypeTemplate[] = [

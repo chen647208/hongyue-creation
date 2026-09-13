@@ -155,6 +155,12 @@ const Bookshelf: React.FC<BookshelfProps> = ({
     return filterBooksByTags(matched, selectedTags);
   }, [books, query, selectedTags]);
 
+  const [visibleCount, setVisibleCount] = useState(60);
+  useEffect(() => {
+    setVisibleCount(60);
+  }, [query, selectedTags]);
+  const visibleBooks = filtered.slice(0, visibleCount);
+
   const toggleTag = useCallback((tag: string) => {
     setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]));
   }, []);
@@ -363,7 +369,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
           />
         ) : view === 'list' ? (
           <div className="overflow-hidden rounded-lg border border-border">
-            {filtered.map((book, idx) => (
+            {visibleBooks.map((book, idx) => (
               <div
                 key={book.id}
                 role="button"
@@ -408,7 +414,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map(book => (
+            {visibleBooks.map(book => (
               <Card
                 key={book.id}
                 role="button"
@@ -522,6 +528,14 @@ const Bookshelf: React.FC<BookshelfProps> = ({
           </div>
         )}
       </div>
+
+      {filtered.length > visibleCount && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline" onClick={() => setVisibleCount((count) => count + 60)}>
+            {t('app:bookshelf.loadMore')}
+          </Button>
+        </div>
+      )}
 
       {selectMode && (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4">

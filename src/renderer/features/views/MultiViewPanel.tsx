@@ -8,12 +8,14 @@
  */
 
 /** 多视图面板：同一份作品数据可在表格/卡片/图之间切换，布局存入 ViewDefinition。 */
+import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import type { Project } from '@shared/types';
-import { LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2 } from 'lucide-react';
+import { BookOpen, LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2 } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { useGenericModelStore } from '@/app/stores/genericModelStore';
 import { useTranslation } from '@/i18n';
+import { localStore } from '@/shared/services/localStore';
 import { Button } from '@/shared/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/shared/ui/DropdownMenu';
@@ -26,6 +28,7 @@ import ViewCards from './ViewCards';
 import ViewGraph from './ViewGraph';
 import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from './viewLayout';
 import ViewOutline from './ViewOutline';
+import ViewReader from './ViewReader';
 import ViewTable from './ViewTable';
 
 interface MultiViewPanelProps {
@@ -44,6 +47,30 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   useEffect(() => {
     void useGenericModelStore.getState().load(project.id);
   }, [project.id]);
+
+  // 记住每个作品上次选中的视图（面板开合由功能开关持久化）。
+  useEffect(() => {
+    try {
+      const raw = localStore.getItem(STORAGE_KEYS.viewsSelected);
+      const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+      setActiveId(map[project.id] ?? null);
+    } catch {
+      setActiveId(null);
+    }
+  }, [project.id]);
+
+  const selectView = (id: string | null) => {
+    setActiveId(id);
+    try {
+      const raw = localStore.getItem(STORAGE_KEYS.viewsSelected);
+      const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+      if (id) map[project.id] = id;
+      else delete map[project.id];
+      localStore.setItem(STORAGE_KEYS.viewsSelected, JSON.stringify(map));
+    } catch {
+      // 存储不可用时仅内存生效
+    }
+  };
 
   const entityViews = useMemo(() => views.filter((view) => view.viewType === 'entity'), [views]);
   const activeView = entityViews.find((view) => view.id === activeId) ?? entityViews[0] ?? null;
@@ -68,13 +95,13 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
       config: serializeViewLayout(layout),
       orderIndex: entityViews.length,
     });
-    setActiveId(id);
+    selectView(id);
   };
 
   const removeView = async () => {
     if (!activeView) return;
     await useGenericModelStore.getState().deleteView(activeView.id);
-    setActiveId(null);
+    selectView(null);
   };
 
   const kindLabel = (kind: string): string => {
@@ -85,6 +112,8 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
         return t('views.kind.location');
       case 'faction':
         return t('views.kind.faction');
+      case 'knowledge':
+        return t('views.kind.knowledge');
       case 'event':
         return t('views.kind.event');
       default:
@@ -100,15 +129,29 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   };
   const displayColumns = data.columns.map((column) => ({ ...column, label: columnLabels[column.key] ?? column.key }));
 
+  const rows = layout.kindFilter && layout.kindFilter !== 'all' ? data.rows.filter((row) => row.kind === layout.kindFilter) : data.rows;
+
   const handleSelectRow = (row: ViewRow) => {
     onSelectItem?.(row.kind === 'event' ? 'timeline' : row.kind, row.id);
   };
+
+  const showColumn = (key: string) => {
+    const column = data.columns.find((item) => item.key === key);
+    if (!column) return;
+    setLayout({
+      hidden: layout.hidden.filter((hiddenKey) => hiddenKey !== key),
+      columns: [...layout.columns.filter((item) => item.key !== key), column],
+    });
+  };
+
+  const kindOrder = ['character', 'location', 'faction', 'knowledge', 'event'];
 
   const options = [
     { value: 'table' as const, icon: Table2, title: t('views.kind.table') },
     { value: 'card' as const, icon: LayoutGrid, title: t('views.kind.card') },
     { value: 'graph' as const, icon: Network, title: t('views.kind.graph') },
     { value: 'list' as const, icon: ListOrdered, title: t('views.kind.list') },
+    { value: 'reader' as const, icon: BookOpen, title: t('views.kind.reader') },
   ];
 
   return (
@@ -117,7 +160,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
         <CardTitle className="text-sm">{t('views.title')}</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           {entityViews.length > 0 && (
-            <Select value={activeView?.id ?? ''} onChange={(event) => setActiveId(event.target.value)} className="h-8 w-40 text-xs">
+            <Select value={activeView?.id ?? ''} onChange={(event) => selectView(event.target.value)} className="h-8 w-40 text-xs">
               {entityViews.map((view) => (
                 <option key={view.id} value={view.id}>{view.name}</option>
               ))}
@@ -157,9 +200,57 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-2xs">
+          <span className="text-muted-foreground">{t('views.fields')}</span>
+          <div
+            className="flex flex-wrap items-center gap-1"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              const key = event.dataTransfer.getData('text/plain');
+              if (key.startsWith('col:')) showColumn(key.slice(4));
+            }}
+          >
+            {data.columns.map((column) => (
+              <span
+                key={column.key}
+                draggable
+                title={t('views.dragColumn')}
+                onDragStart={(event) => event.dataTransfer.setData('text/plain', `col:${column.key}`)}
+                className="cursor-grab rounded border border-border px-1.5 py-0.5"
+              >
+                {displayColumns.find((item) => item.key === column.key)?.label ?? column.key}
+              </span>
+            ))}
+            <span className="rounded border border-dashed border-border px-1.5 py-0.5 text-muted-foreground">{t('views.dropColumn')}</span>
+          </div>
+          <span className="text-muted-foreground">{t('views.kinds')}</span>
+          <div
+            className="flex flex-wrap items-center gap-1"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              const kind = event.dataTransfer.getData('text/plain');
+              if (kind.startsWith('kind:')) setLayout({ kindFilter: kind.slice(5) });
+            }}
+          >
+            {kindOrder.map((kind) => (
+              <span
+                key={kind}
+                draggable
+                title={t('views.dragKind')}
+                onDragStart={(event) => event.dataTransfer.setData('text/plain', `kind:${kind}`)}
+                className="cursor-grab rounded border border-border px-1.5 py-0.5"
+              >
+                {kindLabel(kind)}
+              </span>
+            ))}
+            <button type="button" className="rounded border border-dashed border-border px-1.5 py-0.5 text-muted-foreground" onClick={() => setLayout({ kindFilter: undefined })}>
+              {t('views.allKinds')}
+            </button>
+          </div>
+        </div>
         {layout.kind === 'table' && (
           <ViewTable
-            rows={data.rows}
+            rows={rows}
             columns={displayColumns}
             hidden={layout.hidden}
             sortKey={layout.sortKey}
@@ -171,13 +262,16 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
           />
         )}
         {layout.kind === 'card' && (
-          <ViewCards rows={data.rows} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
+          <ViewCards rows={rows} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
         )}
         {layout.kind === 'graph' && (
-          <ViewGraph rows={data.rows} links={data.links} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
+          <ViewGraph rows={rows} links={data.links} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
         )}
         {layout.kind === 'list' && (
-          <ViewOutline rows={data.rows} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
+          <ViewOutline rows={rows} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
+        )}
+        {layout.kind === 'reader' && (
+          <ViewReader rows={rows} device={layout.readerDevice ?? 'desktop'} emptyText={t('views.empty')} onDeviceChange={(device) => setLayout({ readerDevice: device })} />
         )}
       </CardContent>
     </Card>

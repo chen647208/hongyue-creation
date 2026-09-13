@@ -6,15 +6,28 @@
     "save": "Save view",
     "remove": "Remove view",
     "columns": "Columns",
+    "fields": "Fields",
+    "kinds": "Types",
+    "dropColumn": "Drop to show",
+    "dragColumn": "Drag to the field area to show this column",
+    "dragKind": "Drag to the type area to filter by it",
+    "allKinds": "All",
     "defaultName": "View",
+    "reader": {
+      "desktop": "Desktop",
+      "tablet": "Tablet",
+      "phone": "Phone"
+    },
     "kind": {
       "table": "Table",
       "card": "Cards",
       "graph": "Graph",
       "list": "Outline",
+      "reader": "Reader",
       "character": "Character",
       "location": "Location",
       "faction": "Faction",
+      "knowledge": "Knowledge",
       "event": "Event"
     },
     "col": {

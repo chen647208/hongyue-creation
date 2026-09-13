@@ -6,15 +6,28 @@
     "save": "保存视图",
     "remove": "删除视图",
     "columns": "列",
+    "fields": "字段",
+    "kinds": "类型",
+    "dropColumn": "拖入显示",
+    "dragColumn": "拖到字段区显示该列",
+    "dragKind": "拖到类型区按此筛选",
+    "allKinds": "全部",
     "defaultName": "视图",
+    "reader": {
+      "desktop": "桌面",
+      "tablet": "平板",
+      "phone": "手机"
+    },
     "kind": {
       "table": "表格",
       "card": "卡片",
       "graph": "关系图",
       "list": "大纲",
+      "reader": "读者预览",
       "character": "角色",
       "location": "地点",
       "faction": "势力",
+      "knowledge": "知识",
       "event": "事件"
     },
     "col": {

@@ -11,7 +11,7 @@
 import { ENTITY_VIEW_COLUMNS } from './buildEntityView';
 import type { ViewColumn, ViewKind, ViewLayout } from './types';
 
-const KINDS: readonly ViewKind[] = ['table', 'card', 'graph', 'list'];
+const KINDS: readonly ViewKind[] = ['table', 'card', 'graph', 'list', 'reader'];
 
 export const DEFAULT_VIEW_LAYOUT: ViewLayout = {
   kind: 'card',
@@ -50,6 +50,8 @@ export function parseViewLayout(config: Record<string, unknown> | undefined): Vi
     sortKey: typeof config.sortKey === 'string' ? config.sortKey : undefined,
     sortDesc: config.sortDesc === true,
     widths: typeof config.widths === 'object' && config.widths !== null ? (config.widths as Record<string, number>) : undefined,
+    kindFilter: typeof config.kindFilter === 'string' ? config.kindFilter : undefined,
+    readerDevice: config.readerDevice === 'tablet' || config.readerDevice === 'phone' ? config.readerDevice : config.readerDevice === 'desktop' ? 'desktop' : undefined,
   };
 }
 
@@ -61,5 +63,7 @@ export function serializeViewLayout(layout: ViewLayout): Record<string, unknown>
     sortKey: layout.sortKey,
     sortDesc: layout.sortDesc,
     widths: layout.widths,
+    kindFilter: layout.kindFilter,
+    readerDevice: layout.readerDevice,
   };
 }
