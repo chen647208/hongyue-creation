@@ -77,7 +77,7 @@ const ViewTable: React.FC<ViewTableProps> = ({
   }
 
   return (
-    <div className="max-h-[440px] overflow-auto rounded-lg border border-border">
+    <div className="h-full overflow-auto rounded-lg border border-border">
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 z-10 bg-card">
           {table.getHeaderGroups().map((headerGroup) => (

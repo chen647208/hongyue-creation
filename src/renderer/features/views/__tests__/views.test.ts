@@ -100,11 +100,12 @@ describe('viewLayout 编解码', () => {
   });
 
   it('往返保持字段', () => {
-    const layout = { ...DEFAULT_VIEW_LAYOUT, kind: 'table' as const, hidden: ['detail'], sortKey: 'kind', sortDesc: true };
+    const layout = { ...DEFAULT_VIEW_LAYOUT, kind: 'table' as const, hidden: ['detail'], sortKey: 'kind', sortDesc: true, height: 560 };
     const restored = parseViewLayout(serializeViewLayout(layout));
     expect(restored.kind).toBe('table');
     expect(restored.hidden).toEqual(['detail']);
     expect(restored.sortKey).toBe('kind');
     expect(restored.sortDesc).toBe(true);
+    expect(restored.height).toBe(560);
   });
 });

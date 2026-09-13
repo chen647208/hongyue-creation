@@ -34,7 +34,7 @@ const ViewReader: React.FC<ViewReaderProps> = ({ rows, device, emptyText, onDevi
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full flex-col space-y-3">
       <SegmentedControl<ReaderDevice>
         value={device}
         onChange={onDeviceChange}
@@ -44,7 +44,7 @@ const ViewReader: React.FC<ViewReaderProps> = ({ rows, device, emptyText, onDevi
           { value: 'phone', label: t('views.reader.phone') },
         ]}
       />
-      <div className="max-h-[440px] overflow-y-auto rounded-lg border border-border bg-white p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-white p-4">
         <div className="mx-auto space-y-6" style={{ maxWidth: WIDTHS[device] }}>
           {rows.map((row) => (
             <article key={row.id} className="space-y-1">

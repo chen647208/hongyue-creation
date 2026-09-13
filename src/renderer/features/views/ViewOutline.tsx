@@ -25,7 +25,7 @@ const ViewOutline: React.FC<ViewOutlineProps> = ({ rows, kindLabel, emptyText, o
   }
 
   return (
-    <ol className="max-h-[440px] space-y-1 overflow-y-auto rounded-lg border border-border p-3">
+    <ol className="h-full space-y-1 overflow-y-auto rounded-lg border border-border p-3">
       {rows.map((row, index) => (
         <li key={row.id}>
           <button

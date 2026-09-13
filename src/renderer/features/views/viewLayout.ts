@@ -52,6 +52,7 @@ export function parseViewLayout(config: Record<string, unknown> | undefined): Vi
     widths: typeof config.widths === 'object' && config.widths !== null ? (config.widths as Record<string, number>) : undefined,
     kindFilter: typeof config.kindFilter === 'string' ? config.kindFilter : undefined,
     readerDevice: config.readerDevice === 'tablet' || config.readerDevice === 'phone' ? config.readerDevice : config.readerDevice === 'desktop' ? 'desktop' : undefined,
+    height: typeof config.height === 'number' ? config.height : undefined,
   };
 }
 
@@ -65,5 +66,6 @@ export function serializeViewLayout(layout: ViewLayout): Record<string, unknown>
     widths: layout.widths,
     kindFilter: layout.kindFilter,
     readerDevice: layout.readerDevice,
+    height: layout.height,
   };
 }

@@ -51,4 +51,6 @@ export interface ViewLayout {
   kindFilter?: string;
   /** 读者视图的设备宽度。 */
   readerDevice?: 'desktop' | 'tablet' | 'phone';
+  /** 视图内容区高度（拖拽调整，单位 px）。 */
+  height?: number;
 }

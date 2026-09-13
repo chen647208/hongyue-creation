@@ -42,7 +42,8 @@
 - 数据来源：`buildEntityView.ts` 把角色、地点、势力、事件拍平为行与关系边，列固定为类型/名称/摘要/详情。
 - 视图种类：表格（`ViewTable.tsx`，`@tanstack/react-table` 排序与列显隐）、卡片（`ViewCards.tsx`，`@tanstack/react-virtual` 按行虚拟化）、关系图（`ViewGraph.tsx`，按类型着色，边来自角色↔势力↔地点↔事件关联）、大纲（`ViewOutline.tsx`，编号列表）、读者预览（`ViewReader.tsx`，按桌面/平板/手机宽度正文排版）。
 - 拖拽分配：把字段拖入字段区显示该列，把类型拖入类型区按该类型筛选（原生 HTML5 拖放，无额外依赖）。
-- 布局持久化：视图类型、列、隐藏列、排序、类型筛选、读者设备宽度写入 `views` 表的 `ViewDefinition.config`，经 `genericModelStore` 读写；上次选中视图按作品记在 `localStore` 的 `views.selected`。
+- 布局持久化：视图类型、列、隐藏列、排序、类型筛选、读者设备宽度、内容区高度写入 `views` 表的 `ViewDefinition.config`，经 `genericModelStore` 读写；上次选中视图按作品记在 `localStore` 的 `views.selected`。
+- 视图管理：具名视图以可拖拽标签排列，拖动即重排并写回 `orderIndex`；底部拖动条调整内容区高度。
 
 ## 双轴时间线
 

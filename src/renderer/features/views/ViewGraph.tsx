@@ -47,8 +47,8 @@ const ViewGraph: React.FC<ViewGraphProps> = ({ rows, links, kindLabel, emptyText
   }
 
   return (
-    <div className="overflow-auto rounded-lg border border-border bg-card">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="h-[440px] w-full">
+    <div className="h-full overflow-auto rounded-lg border border-border bg-card">
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="h-full w-full">
         {links.map((link, index) => {
           const from = positions[link.source];
           const to = positions[link.target];

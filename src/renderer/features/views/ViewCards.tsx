@@ -40,7 +40,7 @@ const ViewCards: React.FC<ViewCardsProps> = ({ rows, kindLabel, emptyText, onSel
   }
 
   return (
-    <div ref={parentRef} className="h-[420px] overflow-y-auto">
+    <div ref={parentRef} className="h-full overflow-y-auto">
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const start = virtualRow.index * COLUMNS;

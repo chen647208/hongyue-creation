@@ -12,6 +12,8 @@
     "dragColumn": "Drag to the field area to show this column",
     "dragKind": "Drag to the type area to filter by it",
     "allKinds": "All",
+    "reorderHint": "Drag to reorder views",
+    "resize": "Drag to resize the view height",
     "defaultName": "View",
     "reader": {
       "desktop": "Desktop",

@@ -19,8 +19,8 @@ import { localStore } from '@/shared/services/localStore';
 import { Button } from '@/shared/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/shared/ui/DropdownMenu';
-import { Select } from '@/shared/ui/Select';
 import { ViewModeToggle } from '@/shared/ui/ViewModeToggle';
+import { cn } from '@/shared/utils/cn';
 
 import { buildEntityView } from './buildEntityView';
 import type { ViewRow } from './types';
@@ -41,6 +41,9 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   const views = useGenericModelStore((state) => state.views);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState(DEFAULT_VIEW_LAYOUT);
+  const [dragViewId, setDragViewId] = useState<string | null>(null);
+  const [resize, setResize] = useState<{ startY: number; base: number } | null>(null);
+  const [liveHeight, setLiveHeight] = useState<number | null>(null);
 
   const data = useMemo(() => buildEntityView(project), [project]);
 
@@ -104,6 +107,22 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     selectView(null);
   };
 
+  const reorderViews = async (fromId: string, toId: string) => {
+    const from = entityViews.findIndex((view) => view.id === fromId);
+    const to = entityViews.findIndex((view) => view.id === toId);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...entityViews];
+    const [moved] = next.splice(from, 1);
+    if (!moved) return;
+    next.splice(to, 0, moved);
+    for (let index = 0; index < next.length; index += 1) {
+      const view = next[index];
+      if (view && view.orderIndex !== index) {
+        await useGenericModelStore.getState().saveView({ ...view, orderIndex: index });
+      }
+    }
+  };
+
   const kindLabel = (kind: string): string => {
     switch (kind) {
       case 'character':
@@ -130,6 +149,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   const displayColumns = data.columns.map((column) => ({ ...column, label: columnLabels[column.key] ?? column.key }));
 
   const rows = layout.kindFilter && layout.kindFilter !== 'all' ? data.rows.filter((row) => row.kind === layout.kindFilter) : data.rows;
+  const bodyHeight = liveHeight ?? layout.height ?? 440;
 
   const handleSelectRow = (row: ViewRow) => {
     onSelectItem?.(row.kind === 'event' ? 'timeline' : row.kind, row.id);
@@ -159,12 +179,30 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-sm">{t('views.title')}</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
-          {entityViews.length > 0 && (
-            <Select value={activeView?.id ?? ''} onChange={(event) => selectView(event.target.value)} className="h-8 w-40 text-xs">
+          {entityViews.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1">
               {entityViews.map((view) => (
-                <option key={view.id} value={view.id}>{view.name}</option>
+                <button
+                  key={view.id}
+                  type="button"
+                  draggable
+                  title={t('views.reorderHint')}
+                  onDragStart={() => setDragViewId(view.id)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => {
+                    if (dragViewId) void reorderViews(dragViewId, view.id);
+                    setDragViewId(null);
+                  }}
+                  onClick={() => selectView(view.id)}
+                  className={cn(
+                    'cursor-grab rounded border px-2 py-0.5 text-2xs',
+                    activeView?.id === view.id ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground',
+                  )}
+                >
+                  {view.name}
+                </button>
               ))}
-            </Select>
+            </div>
           )}
           <Button size="sm" variant="outline" onClick={() => void createView()}>
             <Plus className="size-3.5" />
@@ -248,31 +286,52 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
             </button>
           </div>
         </div>
-        {layout.kind === 'table' && (
-          <ViewTable
-            rows={rows}
-            columns={displayColumns}
-            hidden={layout.hidden}
-            sortKey={layout.sortKey}
-            sortDesc={layout.sortDesc}
-            emptyText={t('views.empty')}
-            onSortChange={(key, desc) => setLayout({ sortKey: key, sortDesc: desc })}
-            onHiddenChange={(hidden) => setLayout({ hidden })}
-            onSelectRow={handleSelectRow}
-          />
-        )}
-        {layout.kind === 'card' && (
-          <ViewCards rows={rows} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
-        )}
-        {layout.kind === 'graph' && (
-          <ViewGraph rows={rows} links={data.links} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
-        )}
-        {layout.kind === 'list' && (
-          <ViewOutline rows={rows} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
-        )}
-        {layout.kind === 'reader' && (
-          <ViewReader rows={rows} device={layout.readerDevice ?? 'desktop'} emptyText={t('views.empty')} onDeviceChange={(device) => setLayout({ readerDevice: device })} />
-        )}
+        <div style={{ height: bodyHeight }} className="overflow-hidden">
+          {layout.kind === 'table' && (
+            <ViewTable
+              rows={rows}
+              columns={displayColumns}
+              hidden={layout.hidden}
+              sortKey={layout.sortKey}
+              sortDesc={layout.sortDesc}
+              emptyText={t('views.empty')}
+              onSortChange={(key, desc) => setLayout({ sortKey: key, sortDesc: desc })}
+              onHiddenChange={(hidden) => setLayout({ hidden })}
+              onSelectRow={handleSelectRow}
+            />
+          )}
+          {layout.kind === 'card' && (
+            <ViewCards rows={rows} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
+          )}
+          {layout.kind === 'graph' && (
+            <ViewGraph rows={rows} links={data.links} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
+          )}
+          {layout.kind === 'list' && (
+            <ViewOutline rows={rows} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
+          )}
+          {layout.kind === 'reader' && (
+            <ViewReader rows={rows} device={layout.readerDevice ?? 'desktop'} emptyText={t('views.empty')} onDeviceChange={(device) => setLayout({ readerDevice: device })} />
+          )}
+        </div>
+        <div
+          role="separator"
+          aria-label={t('views.resize')}
+          title={t('views.resize')}
+          className="mt-1 h-2 cursor-ns-resize rounded bg-border/50 hover:bg-primary/40"
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setResize({ startY: event.clientY, base: bodyHeight });
+          }}
+          onPointerMove={(event) => {
+            if (!resize) return;
+            setLiveHeight(Math.max(160, Math.min(900, resize.base + (event.clientY - resize.startY))));
+          }}
+          onPointerUp={() => {
+            if (resize && liveHeight !== null) setLayout({ height: liveHeight });
+            setResize(null);
+            setLiveHeight(null);
+          }}
+        />
       </CardContent>
     </Card>
   );

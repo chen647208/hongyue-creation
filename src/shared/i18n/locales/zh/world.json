@@ -12,6 +12,8 @@
     "dragColumn": "拖到字段区显示该列",
     "dragKind": "拖到类型区按此筛选",
     "allKinds": "全部",
+    "reorderHint": "拖拽调整视图顺序",
+    "resize": "拖动调整视图高度",
     "defaultName": "视图",
     "reader": {
       "desktop": "桌面",
