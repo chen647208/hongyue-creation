@@ -57,9 +57,9 @@ const WritingPlanPanel: React.FC = () => {
 
   return (
     <div className="h-full overflow-auto p-4">
-      <div className="flex min-w-[760px] flex-col gap-3">
+      <div className="flex flex-col gap-3">
         <p className="text-xs text-muted-foreground">{t('plan.subtitle')}</p>
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {PLAN_STAGES.map((stage) => (
             <div key={stage} className="flex min-w-0 flex-col rounded-lg border border-border bg-card p-2">
               <div className="mb-2 flex items-center justify-between">

@@ -123,6 +123,13 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     }
   };
 
+  const moveView = (id: string, delta: number) => {
+    const from = entityViews.findIndex((view) => view.id === id);
+    const target = entityViews[from + delta];
+    if (from < 0 || !target) return;
+    void reorderViews(id, target.id);
+  };
+
   const kindLabel = (kind: string): string => {
     switch (kind) {
       case 'character':
@@ -186,12 +193,23 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                   key={view.id}
                   type="button"
                   draggable
+                  aria-label={t('views.reorderHint')}
                   title={t('views.reorderHint')}
                   onDragStart={() => setDragViewId(view.id)}
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={() => {
                     if (dragViewId) void reorderViews(dragViewId, view.id);
                     setDragViewId(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (!event.altKey) return;
+                    if (event.key === 'ArrowLeft') {
+                      event.preventDefault();
+                      moveView(view.id, -1);
+                    } else if (event.key === 'ArrowRight') {
+                      event.preventDefault();
+                      moveView(view.id, 1);
+                    }
                   }}
                   onClick={() => selectView(view.id)}
                   className={cn(
@@ -238,16 +256,18 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-2xs">
-          <span className="text-muted-foreground">{t('views.fields')}</span>
-          <div
-            className="flex flex-wrap items-center gap-1"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              const key = event.dataTransfer.getData('text/plain');
-              if (key.startsWith('col:')) showColumn(key.slice(4));
-            }}
-          >
+        <details className="mb-3 text-2xs">
+          <summary className="cursor-pointer text-muted-foreground">{t('views.customize')}</summary>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-muted-foreground">{t('views.fields')}</span>
+            <div
+              className="flex flex-wrap items-center gap-1"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                const key = event.dataTransfer.getData('text/plain');
+                if (key.startsWith('col:')) showColumn(key.slice(4));
+              }}
+            >
             {data.columns.map((column) => (
               <span
                 key={column.key}
@@ -284,8 +304,9 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
             <button type="button" className="rounded border border-dashed border-border px-1.5 py-0.5 text-muted-foreground" onClick={() => setLayout({ kindFilter: undefined })}>
               {t('views.allKinds')}
             </button>
+            </div>
           </div>
-        </div>
+        </details>
         <div style={{ height: bodyHeight }} className="overflow-hidden">
           {layout.kind === 'table' && (
             <ViewTable

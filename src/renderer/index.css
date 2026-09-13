@@ -49,6 +49,15 @@
   --chart-7: #db2777;
   --chart-8: #0891b2;
   --chart-gray: #64748b;
+  --paper-bg: #fbfbf8;
+  --paper-fg: #1c1917;
+  --paper-grid: rgba(0, 0, 0, 0.06);
+  --paper-line: rgba(0, 0, 0, 0.08);
+  --paper-sepia-bg: #f6ecd9;
+  --paper-sepia-fg: #4a3f2f;
+  --reader-bg: #ffffff;
+  --reader-fg: #171717;
+  --reader-muted: #737373;
 }
 
 .dark {
@@ -83,6 +92,15 @@
   --chart-7: #f472b6;
   --chart-8: #22d3ee;
   --chart-gray: #94a3b8;
+  --paper-bg: #211f1c;
+  --paper-fg: #e8e6e3;
+  --paper-grid: rgba(255, 255, 255, 0.06);
+  --paper-line: rgba(255, 255, 255, 0.08);
+  --paper-sepia-bg: #2a2620;
+  --paper-sepia-fg: #e2d3b3;
+  --reader-bg: #211f1c;
+  --reader-fg: #e8e6e3;
+  --reader-muted: #a39e97;
 }
 
 @theme inline {
@@ -117,6 +135,13 @@
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
   --color-chart-gray: var(--chart-gray);
+  --color-paper-bg: var(--paper-bg);
+  --color-paper-fg: var(--paper-fg);
+  --color-paper-sepia-bg: var(--paper-sepia-bg);
+  --color-paper-sepia-fg: var(--paper-sepia-fg);
+  --color-reader-bg: var(--reader-bg);
+  --color-reader-fg: var(--reader-fg);
+  --color-reader-muted: var(--reader-muted);
 }
 
 @theme {

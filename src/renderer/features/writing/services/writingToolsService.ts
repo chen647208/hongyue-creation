@@ -58,18 +58,18 @@ export function paperInlineStyle(paper: PaperStyle): { backgroundColor?: string;
   switch (paper) {
     case 'grid':
       return {
-        backgroundColor: '#fbfbf8',
+        backgroundColor: 'var(--color-paper-bg)',
         backgroundImage:
-          'linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px)',
+          'linear-gradient(to right, var(--color-paper-grid) 1px, transparent 1px), linear-gradient(to bottom, var(--color-paper-grid) 1px, transparent 1px)',
         backgroundSize: '24px 24px',
       };
     case 'lined':
       return {
-        backgroundColor: '#fbfbf8',
-        backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 31px, rgba(0,0,0,0.08) 31px, rgba(0,0,0,0.08) 32px)',
+        backgroundColor: 'var(--color-paper-bg)',
+        backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 31px, var(--color-paper-line) 31px, var(--color-paper-line) 32px)',
       };
     case 'sepia':
-      return { backgroundColor: '#f6ecd9', color: '#4a3f2f' };
+      return { backgroundColor: 'var(--color-paper-sepia-bg)', color: 'var(--color-paper-sepia-fg)' };
     default:
       return {};
   }

@@ -15,6 +15,7 @@
     "removeTrack": "Remove track",
     "trackLabel": "Track {{n}}",
     "tension": "Tension curve",
+    "clipHint": "Drag, or Alt+←/→ reorder, Alt+↑/↓ change track, Alt+Shift+←/→ resize",
     "resize": "Drag to resize duration",
     "addMarker": "Add marker",
     "markerLabel": "Marker {{n}}",

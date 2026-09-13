@@ -46,17 +46,19 @@ const StructureSection: React.FC<StructureSectionProps> = ({ project, onEnterWri
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         left={
-          <SegmentedControl
-            value={sub}
-            onChange={setSub}
-            options={[
-              { value: 'outline', label: t('structureTabs.outline') },
-              { value: 'chapters', label: t('structureTabs.chapters') },
-              { value: 'plan', label: t('structureTabs.plan') },
-              { value: 'groups', label: t('structureTabs.groups') },
-              { value: 'stats', label: t('structureTabs.stats') },
-            ]}
-          />
+          <div className="max-w-[70vw] overflow-x-auto">
+            <SegmentedControl
+              value={sub}
+              onChange={setSub}
+              options={[
+                { value: 'outline', label: t('structureTabs.outline') },
+                { value: 'chapters', label: t('structureTabs.chapters') },
+                { value: 'plan', label: t('structureTabs.plan') },
+                { value: 'groups', label: t('structureTabs.groups') },
+                { value: 'stats', label: t('structureTabs.stats') },
+              ]}
+            />
+          </div>
         }
       />
       <div className="min-h-0 flex-1">

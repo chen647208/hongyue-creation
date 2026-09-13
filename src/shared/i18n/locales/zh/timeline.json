@@ -15,6 +15,7 @@
     "removeTrack": "删除轨道",
     "trackLabel": "轨道 {{n}}",
     "tension": "张力曲线",
+    "clipHint": "拖拽或 Alt+←/→ 换序、Alt+↑/↓ 换轨、Alt+Shift+←/→ 调时长",
     "resize": "拖动裁剪时长",
     "addMarker": "添加标记",
     "markerLabel": "标记 {{n}}",

@@ -37,6 +37,14 @@ const SETTINGS_KNOWN_DEBT: Record<string, number> = {
   label: 1,
 };
 
+/** 结构页（大纲/细纲编辑器）既有欠账，以基线棘轮收口。 */
+const STRUCTURE_KNOWN_DEBT: Record<string, number> = {
+  'aria-input-field-name': 1,
+  'button-name': 2,
+  'color-contrast': 2,
+  'scrollable-region-focusable': 1,
+};
+
 test('书架/工作台/设置通过 axe 棘轮审计', async () => {
   const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-a11y-'));
   const { app, page } = await launchApp(userDataDir);
@@ -47,7 +55,18 @@ test('书架/工作台/设置通过 axe 棘轮审计', async () => {
 
     await createBook(page);
     strict.push(...summary('workspace', await blockingViolations(page)));
-    expect(strict, '书架/工作台出现 axe serious/critical 问题').toEqual([]);
+
+    await page.keyboard.press('Control+4');
+    await page.waitForTimeout(500);
+    const structure = await blockingViolations(page);
+    const structureRegressions = structure.filter((v) => (STRUCTURE_KNOWN_DEBT[v.id] ?? 0) < v.nodes.length);
+    expect(summary('structure', structureRegressions), '结构页出现新的 axe serious/critical 问题').toEqual([]);
+
+    await page.keyboard.press('Control+2');
+    await page.waitForTimeout(500);
+    strict.push(...summary('world', await blockingViolations(page)));
+
+    expect(strict, '书架/工作台/世界出现 axe serious/critical 问题').toEqual([]);
 
     await page.getByRole('button', { name: /^设置$|^Settings$/ }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 30_000 });

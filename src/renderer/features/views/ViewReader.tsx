@@ -44,13 +44,13 @@ const ViewReader: React.FC<ViewReaderProps> = ({ rows, device, emptyText, onDevi
           { value: 'phone', label: t('views.reader.phone') },
         ]}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-white p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-[var(--color-reader-bg)] p-4">
         <div className="mx-auto space-y-6" style={{ maxWidth: WIDTHS[device] }}>
           {rows.map((row) => (
             <article key={row.id} className="space-y-1">
-              <h3 className="font-serif text-lg font-medium text-neutral-900">{row.title}</h3>
-              {row.cells.summary && <p className="text-sm text-neutral-500">{row.cells.summary}</p>}
-              {row.cells.detail && <p className="font-serif text-sm leading-relaxed text-neutral-800">{row.cells.detail}</p>}
+              <h3 className="font-serif text-lg font-medium text-[var(--color-reader-fg)]">{row.title}</h3>
+              {row.cells.summary && <p className="text-sm text-[var(--color-reader-muted)]">{row.cells.summary}</p>}
+              {row.cells.detail && <p className="font-serif text-sm leading-relaxed text-[var(--color-reader-fg)]">{row.cells.detail}</p>}
             </article>
           ))}
         </div>

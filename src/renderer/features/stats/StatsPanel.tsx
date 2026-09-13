@@ -64,7 +64,7 @@ const StatsPanel: React.FC = () => {
                     key={entry.date}
                     title={`${entry.date}: ${entry.words}`}
                     className="size-3 rounded-sm border border-border"
-                    style={{ backgroundColor: entry.words === 0 ? 'transparent' : `rgba(59,130,246,${0.2 + intensity * 0.8})` }}
+                    style={{ backgroundColor: entry.words === 0 ? 'transparent' : 'var(--color-primary)', opacity: entry.words === 0 ? 1 : 0.25 + intensity * 0.75 }}
                   />
                 );
               })}

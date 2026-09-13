@@ -322,8 +322,21 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                             cy={coords[index]?.y}
                             r={drag?.clipId === clip.id && drag.mode === 'tension' ? 7 : 5}
                             fill="var(--color-chart-2)"
-                            className="cursor-ns-resize"
+                            className="cursor-ns-resize focus:outline-none focus-visible:stroke-primary"
                             style={{ pointerEvents: 'auto' }}
+                            tabIndex={0}
+                            role="slider"
+                            aria-label={t('dual.tension')}
+                            aria-valuemin={0}
+                            aria-valuemax={1}
+                            aria-valuenow={clip.tension ?? 0}
+                            onKeyDown={(event) => {
+                              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+                              event.preventDefault();
+                              const delta = event.key === 'ArrowUp' ? 0.1 : -0.1;
+                              const value = Math.max(0, Math.min(1, (clip.tension ?? 0) + delta));
+                              onUpdate({ chapters: project.chapters.map((c) => (c.id === clip.entityId ? { ...c, tension: value } : c)) });
+                            }}
                             onPointerDown={(event) => {
                               event.currentTarget.setPointerCapture(event.pointerId);
                               dragOrigin.current = { clipId: clip.id, mode: 'tension', base: clip.tension ?? 0 };
@@ -368,6 +381,8 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                         key={clip.id}
                         role="button"
                         tabIndex={0}
+                        aria-label={clip.label}
+                        title={t('dual.clipHint')}
                         className={cn(
                           'absolute cursor-grab overflow-hidden rounded-md border px-2 text-left text-2xs transition-colors',
                           clip.importance === 'major' ? 'border-primary/50 bg-primary/10' : 'border-border bg-muted',
@@ -376,6 +391,36 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                         style={{ left: PADDING + (clip.start + offset) * zoom, top: trackTops[track.id] ?? storyTop, width: Math.max(28, clip.duration * zoom - 4), height: TRACK_HEIGHT }}
                         onClick={() => toggleSelect(clip.id)}
                         onDoubleClick={() => onNavigateToChapter?.(clip.entityId)}
+                        onKeyDown={(event) => {
+                          if (!event.altKey) return;
+                          const chapterId = clip.entityId;
+                          const trackId = clip.trackId ?? track.id;
+                          const list = narrativeClips.filter((entry) => (entry.trackId ?? 'main') === trackId).sort((a, b) => a.start - b.start);
+                          const index = list.findIndex((entry) => entry.entityId === chapterId);
+                          if (event.key === 'ArrowLeft' && index > 0) {
+                            event.preventDefault();
+                            onUpdate({ chapters: reorderChapters(project.chapters, model.tracks, chapterId, trackId, index - 1) });
+                          } else if (event.key === 'ArrowRight' && index < list.length - 1) {
+                            event.preventDefault();
+                            onUpdate({ chapters: reorderChapters(project.chapters, model.tracks, chapterId, trackId, index + 1) });
+                          } else if (event.key === 'ArrowUp') {
+                            event.preventDefault();
+                            const trackIndex = model.tracks.findIndex((entry) => entry.id === trackId);
+                            const target = model.tracks[trackIndex - 1];
+                            if (target) onUpdate({ chapters: reorderChapters(project.chapters, model.tracks, chapterId, target.id, 0) });
+                          } else if (event.key === 'ArrowDown') {
+                            event.preventDefault();
+                            const trackIndex = model.tracks.findIndex((entry) => entry.id === trackId);
+                            const target = model.tracks[trackIndex + 1];
+                            if (target) onUpdate({ chapters: reorderChapters(project.chapters, model.tracks, chapterId, target.id, Number.MAX_SAFE_INTEGER) });
+                          } else if (event.shiftKey && event.key === 'ArrowRight') {
+                            event.preventDefault();
+                            onUpdate({ chapters: project.chapters.map((c) => (c.id === chapterId ? { ...c, duration: Math.max(MIN_CLIP_DURATION, (c.duration ?? 1) + 0.5) } : c)) });
+                          } else if (event.shiftKey && event.key === 'ArrowLeft') {
+                            event.preventDefault();
+                            onUpdate({ chapters: project.chapters.map((c) => (c.id === chapterId ? { ...c, duration: Math.max(MIN_CLIP_DURATION, (c.duration ?? 1) - 0.5) } : c)) });
+                          }
+                        }}
                         onPointerDown={(event) => {
                           event.currentTarget.setPointerCapture(event.pointerId);
                           dragOrigin.current = { clipId: clip.id, mode: 'move', base: clip.start };
