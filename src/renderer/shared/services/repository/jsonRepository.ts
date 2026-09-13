@@ -58,6 +58,7 @@ function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
  * search 走内存子串过滤（大小写不敏感，支持中文）。
  */
 export const jsonRepository: StorageRepository = {
+  capabilities: { revisions: false, hotBackup: false, encryption: false, integrity: false },
   loadAll: () => storage.loadStateAsync(),
   loadAllSync: () => storage.loadState(),
   saveAll: (state: AppState) => withWriteLock(() => storage.saveState(state)),

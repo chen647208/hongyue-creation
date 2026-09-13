@@ -184,6 +184,8 @@ export interface ViewDefinition {
  * 增量写(saveProject/deleteProject)与检索(search)在后续阶段扩展。
  */
 export interface StorageRepository {
+  /** 后端能力标志：UI 据此隐藏不支持的按钮（如浏览器 wasm 无热备份/加密）。 */
+  capabilities?: { revisions: boolean; hotBackup: boolean; encryption: boolean; integrity: boolean };
   /**
    * 可选的后端初始化（建表迁移、首启从旧存储导入等）。
    * JSON 后端无需实现；SQLite 后端在首次 loadAll 前由 App 调用一次。

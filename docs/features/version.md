@@ -36,4 +36,4 @@
 ## 已知边界
 
 - 开发版不注册原生更新（无 `app-update.yml`），不会真实下载安装
-- 产物未做代码签名/公证；Windows/macOS 安装时的系统安全提示属预期
+- 代码签名/公证按仓库 Secrets 配置自动生效；未配置证书时产物未签名，Windows/macOS 安装时的系统安全提示属预期（见 `docs/guides/ci-and-release.md`）

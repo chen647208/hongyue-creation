@@ -138,6 +138,15 @@ export class SqliteRepository implements StorageRepository {
     })();
   }
 
+  get capabilities(): { revisions: boolean; hotBackup: boolean; encryption: boolean; integrity: boolean } {
+    return {
+      revisions: true,
+      hotBackup: typeof this.driver.hotBackup === 'function',
+      encryption: typeof this.driver.encryptionStatus === 'function',
+      integrity: typeof this.driver.all === 'function',
+    };
+  }
+
   /** 迁移前快照：已有旧版本库即将升级时先热备份一份（失败不阻断启动）。 */
   private async snapshotBeforeMigration(): Promise<void> {
     if (!this.driver.hotBackup) return;

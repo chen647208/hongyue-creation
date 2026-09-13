@@ -280,6 +280,7 @@ const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
                 >
                   <FileText className="size-3.5" /> {t('storage.exportDiagnostics')}
                 </Button>
+                {repository.capabilities?.integrity !== false && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -292,6 +293,8 @@ const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
                 >
                   <ShieldCheck className="size-3.5" /> {t('storage.integrityCheck')}
                 </Button>
+                )}
+                {repository.capabilities?.hotBackup !== false && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -303,6 +306,7 @@ const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
                 >
                   <Wrench className="size-3.5" /> {t('storage.maintenance')}
                 </Button>
+                )}
               </div>
             </div>
 
