@@ -298,7 +298,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
   return (
     <div
       className={cn(
-        'relative h-full w-full min-h-[1200px] rounded-lg border border-border bg-card p-16 font-serif text-lg leading-relaxed text-foreground shadow-sm',
+        'relative h-full w-full min-h-[1200px] min-w-[320px] rounded-lg border border-border bg-card p-16 font-serif text-lg leading-relaxed text-foreground shadow-sm',
         'selection:bg-primary/15',
         isFocusMode ? 'max-w-3xl text-xl leading-loose' : 'max-w-4xl',
       )}
@@ -315,7 +315,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
       <EditorContent
         editor={editor}
         className={cn(
-          'novel-canvas min-h-full outline-none',
+          'novel-canvas w-full min-h-full outline-none',
           !activeChapterId || (isGenerating && !isStreaming) ? 'cursor-not-allowed opacity-60' : 'cursor-text',
         )}
       />
