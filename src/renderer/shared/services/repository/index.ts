@@ -42,4 +42,4 @@ function selectRepository(): StorageRepository {
 
 export const repository: StorageRepository = selectRepository();
 
-export type { OperationLogEntry, SqlDriver, SqlRunResult,SqlValue, StorageRepository } from './types';
+export type { OperationLogEntry, RevisionStat, SqlDriver, SqlRunResult,SqlValue, StorageRepository } from './types';

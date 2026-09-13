@@ -1,4 +1,21 @@
 {
+  "stats": {
+    "calendarTitle": "码字日历",
+    "today": "今日 {{today}} 字 / 目标 {{target}} 字",
+    "ageTitle": "角色年龄（按故事时间）",
+    "ageEmpty": "需要角色的出生年份与时间线事件才能推算年龄。",
+    "character": "角色",
+    "birthYear": "出生年",
+    "clueTitle": "线索图（伏笔跨度）",
+    "clueEmpty": "暂无伏笔。先在伏笔面板填写埋设与回收章节。",
+    "clueUnset": "未设定章节",
+    "clueSpan": "跨 {{span}} 章",
+    "clueStatus": {
+      "planted": "已埋设",
+      "paidOff": "已回收",
+      "abandoned": "已放弃"
+    }
+  },
   "groups": {
     "subtitle": "自定义分组（卷/幕/单元均可）：命名分组并把章节归入；分组只影响组织与时间线聚合，不改正文。",
     "add": "新建分组",

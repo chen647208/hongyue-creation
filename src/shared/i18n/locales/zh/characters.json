@@ -76,6 +76,7 @@
   },
   "modal": {
     "nameLabel": "角色名字",
+    "randomName": "随机取名",
     "namePlaceholder": "输入角色名字",
     "roleLabel": "角色类型",
     "genderLabel": "性别",

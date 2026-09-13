@@ -19,6 +19,7 @@ import StepChapterOutline from '../../features/chapters/StepChapterOutline';
 import GroupsPanel from '../../features/groups/GroupsPanel';
 import StepOutline from '../../features/outline/StepOutline';
 import WritingPlanPanel from '../../features/plan/WritingPlanPanel';
+import StatsPanel from '../../features/stats/StatsPanel';
 
 interface StructureSectionProps {
   project: Project;
@@ -35,7 +36,7 @@ interface StructureSectionProps {
  */
 const StructureSection: React.FC<StructureSectionProps> = ({ project, onEnterWriting, initialSub, onGoSection }) => {
   const { t } = useTranslation('nav');
-  const [sub, setSub] = useViewPreference<'outline' | 'chapters' | 'plan' | 'groups'>('structure.subtab', 'outline');
+  const [sub, setSub] = useViewPreference<'outline' | 'chapters' | 'plan' | 'groups' | 'stats'>('structure.subtab', 'outline');
 
   useEffect(() => {
     if (initialSub) setSub(initialSub);
@@ -53,6 +54,7 @@ const StructureSection: React.FC<StructureSectionProps> = ({ project, onEnterWri
               { value: 'chapters', label: t('structureTabs.chapters') },
               { value: 'plan', label: t('structureTabs.plan') },
               { value: 'groups', label: t('structureTabs.groups') },
+              { value: 'stats', label: t('structureTabs.stats') },
             ]}
           />
         }
@@ -64,8 +66,10 @@ const StructureSection: React.FC<StructureSectionProps> = ({ project, onEnterWri
           <StepChapterOutline project={project} onEnterWriting={onEnterWriting} onGoSection={onGoSection} />
         ) : sub === 'plan' ? (
           <WritingPlanPanel />
-        ) : (
+        ) : sub === 'groups' ? (
           <GroupsPanel />
+        ) : (
+          <StatsPanel />
         )}
       </div>
     </div>

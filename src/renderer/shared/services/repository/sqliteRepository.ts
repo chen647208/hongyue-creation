@@ -34,7 +34,7 @@ import { logger } from '../../utils/logger';
 import { ensureBuiltinItemTypes } from './builtinTypes';
 import { jsonRepository } from './jsonRepository';
 import { META_KEYS,migrate, SCHEMA_VERSION,SETTING_KEYS } from './schema';
-import type { AttachmentMeta,CommitOptions,DbEncryptionStatus, FieldDefinition, ItemTypeDefinition, OperationLogEntry, SearchHit, SearchOptions, SequenceItem, SqlDriver, StorageRepository, ViewDefinition } from './types';
+import type { AttachmentMeta,CommitOptions,DbEncryptionStatus, FieldDefinition, ItemTypeDefinition, OperationLogEntry, RevisionStat, SearchHit, SearchOptions, SequenceItem, SqlDriver, StorageRepository, ViewDefinition } from './types';
 
 const DEFAULT_SEARCH_LIMIT = 50;
 
@@ -312,6 +312,13 @@ export class SqliteRepository implements StorageRepository {
       preview: row.preview,
       createdAt: Number(row.created_at),
     }));
+  }
+
+  /** 读取某本书的修订统计（码字日历用） */
+  async loadRevisionStats(bookId: string): Promise<RevisionStat[]> {
+    await this.ready;
+    const rows = await this.driver.all<{ node_id: string; created_at: number; len: number }>('revisions.selectStatsByBook', [bookId]);
+    return rows.map((row) => ({ nodeId: row.node_id, createdAt: Number(row.created_at), length: Number(row.len) }));
   }
 
   // ========== 文档附件（attachments + blobs）==========

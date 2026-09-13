@@ -114,8 +114,14 @@ export interface AttachmentMeta {
   createdAt: number;
 }
 
-/** 操作日志条目：一次正文修订，含作者（user / ai:<tool>）与触发原因。 */
-export interface OperationLogEntry {
+/** 修订统计行：某节点某次修订的正文长度与时间。 */
+export interface RevisionStat {
+  nodeId: string;
+  createdAt: number;
+  length: number;
+}
+
+/** 操作日志条目：一次正文修订，含作者（user / ai:<tool>）与触发原因。 */export interface OperationLogEntry {
   id: string;
   nodeId: string;
   actor: string;
@@ -233,6 +239,9 @@ export interface StorageRepository {
    * 无修订概念的后端返回空数组。
    */
   loadOperationLog?(bookId: string, limit?: number): Promise<OperationLogEntry[]>;
+
+  /** 读取某本书的修订统计（节点、时间、正文长度），用于码字日历。 */
+  loadRevisionStats?(bookId: string): Promise<RevisionStat[]>;
 
   /** 全文检索（SQLite 走 FTS5；JSON 后端走内存过滤） */
   search(query: string, options?: SearchOptions): Promise<SearchHit[]>;

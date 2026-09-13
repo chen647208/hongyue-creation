@@ -1,4 +1,21 @@
 {
+  "stats": {
+    "calendarTitle": "Writing calendar",
+    "today": "{{today}} words today / goal {{target}}",
+    "ageTitle": "Character ages (by story time)",
+    "ageEmpty": "Needs character birth years and timeline events to compute ages.",
+    "character": "Character",
+    "birthYear": "Born",
+    "clueTitle": "Clue map (foreshadow spans)",
+    "clueEmpty": "No foreshadows yet. Set planted and payoff chapters in the foreshadow panel.",
+    "clueUnset": "No chapters set",
+    "clueSpan": "spans {{span}} chapters",
+    "clueStatus": {
+      "planted": "Planted",
+      "paidOff": "Paid off",
+      "abandoned": "Abandoned"
+    }
+  },
   "groups": {
     "subtitle": "Custom groups (volume / act / unit): name a group and assign chapters. Grouping only affects organization and timeline aggregation, never the body text.",
     "add": "New group",

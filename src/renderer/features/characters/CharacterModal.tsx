@@ -29,6 +29,7 @@ import { type Character, type Project } from '../../../shared/types';
 import { exportCharacterCard } from './characterCard';
 import { BirthInfoEditor } from './components/BirthInfoEditor';
 import { WorldRelationEditor } from './components/WorldRelationEditor';
+import { generateName } from './services/nameGeneratorService';
 
 interface CharacterModalProps {
   character: Character;
@@ -64,12 +65,17 @@ const CharacterModal: React.FC<CharacterModalProps> = ({ character, project, isO
             <div className="min-w-0 flex-1">
               <div className="mb-3">
                 <Label className="mb-1 text-xs text-muted-foreground">{t('modal.nameLabel')}</Label>
-                <Input
-                  className="font-serif text-base"
-                  value={character.name}
-                  onChange={(e) => onUpdate({ name: e.target.value })}
-                  placeholder={t('modal.namePlaceholder')}
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    className="font-serif text-base"
+                    value={character.name}
+                    onChange={(e) => onUpdate({ name: e.target.value })}
+                    placeholder={t('modal.namePlaceholder')}
+                  />
+                  <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => onUpdate({ name: generateName(character.gender) })}>
+                    {t('modal.randomName')}
+                  </Button>
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div>

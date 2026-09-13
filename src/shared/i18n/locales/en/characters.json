@@ -76,6 +76,7 @@
   },
   "modal": {
     "nameLabel": "Character Name",
+    "randomName": "Random name",
     "namePlaceholder": "Enter character name",
     "roleLabel": "Role",
     "genderLabel": "Gender",

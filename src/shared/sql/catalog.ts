@@ -231,6 +231,9 @@ export const SQL = {
   'revisions.selectRecentByBook': `SELECT r.id, r.node_id, r.author, r.cause, r.created_at, substr(r.body, 1, 120) AS preview
          FROM revisions r JOIN nodes n ON n.id = r.node_id
          WHERE n.book_id = ? ORDER BY r.created_at DESC, r.seq DESC LIMIT ?`,
+  'revisions.selectStatsByBook': `SELECT r.node_id, r.created_at, length(r.body) AS len
+         FROM revisions r JOIN nodes n ON n.id = r.node_id
+         WHERE n.book_id = ? ORDER BY r.created_at ASC, r.seq ASC`,
 
   // ── entity_changes ──
   'changes.insert': `INSERT INTO entity_changes(entity_name, entity_id, hash, is_erased, instance_id, agent_id, utc_date_changed)
