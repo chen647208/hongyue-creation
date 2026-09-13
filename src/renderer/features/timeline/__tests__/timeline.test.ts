@@ -11,7 +11,7 @@ import type { Chapter, Character, Project } from '@shared/types';
 import { describe, expect, it } from 'vitest';
 
 import { checkTimelineConsistency } from '../timelineConsistency';
-import { buildTimelineModel, dateToOrdinal, snapTo } from '../timelineModel';
+import { buildTimelineModel, dateToOrdinal, reorderChapters, snapTo, splitChapter } from '../timelineModel';
 
 function makeCharacter(overrides: Partial<Character> & Pick<Character, 'id' | 'name'>): Character {
   return {
@@ -110,5 +110,48 @@ describe('timelineConsistency', () => {
     expect(codes).toContain('foreshadowOrder');
     expect(codes).toContain('missingEventLink');
     expect(codes).toContain('characterLocationConflict');
+  });
+});
+
+describe('时间线多轨与拆分', () => {
+  it('叙事片段按时长累计排布并归属轨道', () => {
+    const project = makeProject();
+    project.timelineTracks = [{ id: 'main', label: '主轨' }, { id: 'sub', label: '支线' }];
+    project.chapters = [
+      { id: 'ch1', title: 'A', summary: '', content: '', order: 0, duration: 2 },
+      { id: 'ch2', title: 'B', summary: '', content: '', order: 1, trackId: 'sub' },
+      { id: 'ch3', title: 'C', summary: '', content: '', order: 2 },
+    ];
+    const clips = buildTimelineModel(project).axes.find((axis) => axis.id === 'narrative')?.clips ?? [];
+    const a = clips.find((clip) => clip.label === 'A');
+    const c = clips.find((clip) => clip.label === 'C');
+    expect(a?.start).toBe(0);
+    expect(a?.duration).toBe(2);
+    expect(c?.start).toBe(2);
+    expect(clips.find((clip) => clip.label === 'B')?.trackId).toBe('sub');
+  });
+
+  it('移动章节到目标轨道并重排全局 order', () => {
+    const tracks = [{ id: 'main', label: '主轨' }, { id: 'sub', label: '支线' }];
+    const chapters: Chapter[] = [
+      { id: 'c1', title: '1', summary: '', content: '', order: 0 },
+      { id: 'c2', title: '2', summary: '', content: '', order: 1 },
+      { id: 'c3', title: '3', summary: '', content: '', order: 2 },
+    ];
+    const moved = reorderChapters(chapters, tracks, 'c3', 'sub', 0);
+    expect(moved.find((chapter) => chapter.id === 'c3')?.trackId).toBe('sub');
+    expect(moved.map((chapter) => chapter.id)).toEqual(['c1', 'c2', 'c3']);
+    expect(moved.map((chapter) => chapter.order)).toEqual([0, 1, 2]);
+  });
+
+  it('按分数在换行处拆分章节', () => {
+    const chapter: Chapter = { id: 'c1', title: '章', summary: '', content: '第一段。\n\n第二段。\n\n第三段。', order: 0, duration: 2 };
+    const [left, right] = splitChapter(chapter, 0.4, 'c1b');
+    expect(left.id).toBe('c1');
+    expect(right.id).toBe('c1b');
+    expect(left.content.length).toBeGreaterThan(0);
+    expect(right.content.length).toBeGreaterThan(0);
+    expect(`${left.content}${right.content}`.replace(/\s/g, '')).toBe(chapter.content.replace(/\s/g, ''));
+    expect(right.order).toBe(1);
   });
 });

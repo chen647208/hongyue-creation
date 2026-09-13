@@ -7,9 +7,9 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-/** 双轴时间线：上轴叙事顺序（章节），下轴故事时间（事件），可拖拽排序、吸附、合并、检查。 */
+/** 双轴时间线：张力曲线、多轨叙事、故事时间；可拖拽/裁剪/换轨/拆分/标记/吸附/缩放。 */
 import type { Project } from '@shared/types';
-import { AlertTriangle, Check, Flag, GitMerge, Search, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
+import { AlertTriangle, Check, Flag, GitMerge, Plus, Scissors, Search, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useGenericModelStore } from '@/app/stores/genericModelStore';
@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
 import { cn } from '@/shared/utils/cn';
 
 import { checkTimelineConsistency, type TimelineIssue } from './timelineConsistency';
-import { buildTimelineModel, snapTo, type TimelineAxisId, type TimelineClip, type TimelineModel } from './timelineModel';
+import { buildTimelineModel, MIN_CLIP_DURATION, reorderChapters, snapTo, splitChapter, type TimelineClip } from './timelineModel';
 
 interface DualAxisTimelineProps {
   project: Project;
@@ -29,13 +29,21 @@ interface DualAxisTimelineProps {
 }
 
 const RULER_HEIGHT = 26;
-const ROW_HEIGHT = 46;
-const ROW_GAP = 30;
+const TENSION_HEIGHT = 90;
+const TRACK_HEIGHT = 46;
+const TRACK_GAP = 18;
 const PADDING = 16;
+const TENSION_TOP = RULER_HEIGHT;
+const TRACKS_TOP = RULER_HEIGHT + TENSION_HEIGHT + TRACK_GAP;
 
-function clipTopForAxis(axisIndex: number, clip: TimelineClip): number {
-  const base = RULER_HEIGHT + axisIndex * (ROW_HEIGHT + ROW_GAP);
-  return base + (clip.lane ?? 0) * 16;
+type DragMode = 'move' | 'resize' | 'tension';
+
+interface DragState {
+  mode: DragMode;
+  clipId: string;
+  /** 拖拽结果值：move=目标起始刻度，resize=时长，tension=张力 0..1。 */
+  value: number;
+  targetTrackId?: string;
 }
 
 const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, onNavigateToChapter, onSelectEvent }) => {
@@ -47,58 +55,87 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
   const [playhead, setPlayhead] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [issues, setIssues] = useState<TimelineIssue[] | null>(null);
-  const [drag, setDrag] = useState<{ clipId: string; delta: number } | null>(null);
-  const dragStart = useRef<{ x: number; fromClipId: string; start: number } | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const dragOrigin = useRef<{ clipId: string; mode: DragMode; base: number } | null>(null);
 
   useEffect(() => {
     void useGenericModelStore.getState().load(project.id);
   }, [project.id]);
 
-  const model: TimelineModel = useMemo(() => buildTimelineModel(project, sequence), [project, sequence]);
-  const clipIndex = useMemo(() => {
-    const map = new Map<string, { clip: TimelineClip; axisIndex: number }>();
-    model.axes.forEach((axis, axisIndex) => axis.clips.forEach((clip) => map.set(clip.id, { clip, axisIndex })));
-    return map;
-  }, [model]);
-
-  const filterClips = (clips: TimelineClip[]): TimelineClip[] => (majorOnly ? clips.filter((clip) => clip.importance === 'major') : clips);
-  const span = Math.max(model.maxEnd, 1);
-  const contentWidth = PADDING * 2 + span * zoom;
-  const contentHeight = RULER_HEIGHT + model.axes.length * (ROW_HEIGHT + ROW_GAP);
-  const ticks = Array.from({ length: Math.ceil(span) + 1 }, (_, index) => index);
-
+  const model = useMemo(() => buildTimelineModel(project, sequence), [project, sequence]);
+  const narrativeClips = useMemo(() => model.axes.find((axis) => axis.id === 'narrative')?.clips ?? [], [model]);
+  const storyClips = useMemo(() => model.axes.find((axis) => axis.id === 'story')?.clips ?? [], [model]);
   const chaptersById = useMemo(() => new Map((project.chapters ?? []).map((chapter) => [chapter.id, chapter])), [project.chapters]);
   const markers = project.timelineMarkers ?? [];
 
-  const addMarker = () => {
-    const label = t('dual.markerLabel', { n: markers.length + 1 });
-    onUpdate({
-      timelineMarkers: [...markers, { id: `marker:${crypto.randomUUID()}`, label, axis: 'narrative', position: Math.round(playhead) }],
-    });
-  };
+  const clipIndex = useMemo(() => {
+    const map = new Map<string, { clip: TimelineClip; axis: 'narrative' | 'story' }>();
+    narrativeClips.forEach((clip) => map.set(clip.id, { clip, axis: 'narrative' }));
+    storyClips.forEach((clip) => map.set(clip.id, { clip, axis: 'story' }));
+    return map;
+  }, [narrativeClips, storyClips]);
 
-  const removeMarker = (id: string) => {
-    onUpdate({ timelineMarkers: markers.filter((marker) => marker.id !== id) });
-  };
-
-  const finishDrag = (delta: number) => {
-    if (!dragStart.current) return;
-    const fromClipId = dragStart.current.fromClipId;
-    const chapterId = fromClipId.replace('chapter:', '');
-    const ordered = [...(project.chapters ?? [])].sort((a, b) => a.order - b.order);
-    const fromIndex = ordered.findIndex((chapter) => chapter.id === chapterId);
-    const candidates = ordered.map((_, index) => index);
-    const rawTarget = dragStart.current.start + delta;
-    const target = snapEnabled ? snapTo(rawTarget, candidates, 0.4) : rawTarget;
-    const toIndex = Math.max(0, Math.min(ordered.length - 1, Math.round(target)));
-    if (fromIndex >= 0 && fromIndex !== toIndex) {
-      const next = [...ordered];
-      const [moved] = next.splice(fromIndex, 1);
-      if (!moved) return;
-      next.splice(toIndex, 0, moved);
-      onUpdate({ chapters: next.map((chapter, index) => ({ ...chapter, order: index })) });
+  const trackTops = useMemo(() => {
+    const tops: Record<string, number> = {};
+    let y = TRACKS_TOP;
+    for (const track of model.tracks) {
+      tops[track.id] = y;
+      y += TRACK_HEIGHT + TRACK_GAP;
     }
-    dragStart.current = null;
+    return tops;
+  }, [model.tracks]);
+  const storyTop = TRACKS_TOP + model.tracks.length * (TRACK_HEIGHT + TRACK_GAP);
+
+  const span = Math.max(model.maxEnd, 1);
+  const contentWidth = PADDING * 2 + span * zoom;
+  const contentHeight = storyTop + TRACK_HEIGHT + PADDING;
+  const ticks = Array.from({ length: Math.ceil(span) + 1 }, (_, index) => index);
+
+  const clipY = (clip: TimelineClip): number =>
+    clip.kind === 'event' ? storyTop + (clip.lane ?? 0) * 16 : (trackTops[clip.trackId ?? model.tracks[0]?.id ?? 'main'] ?? storyTop);
+
+  const pointFromEvent = (event: React.PointerEvent): { x: number; y: number } => {
+    const scroll = scrollRef.current;
+    if (!scroll) return { x: PADDING, y: 0 };
+    const rect = scroll.getBoundingClientRect();
+    return { x: event.clientX - rect.left + scroll.scrollLeft, y: event.clientY - rect.top + scroll.scrollTop };
+  };
+  const unitFromEvent = (event: React.PointerEvent): number => (pointFromEvent(event).x - PADDING) / zoom;
+
+  const nearestTrack = (y: number): string => {
+    let bestId = model.tracks[0]?.id ?? 'main';
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const track of model.tracks) {
+      const top = trackTops[track.id] ?? storyTop;
+      const distance = Math.abs(y - (top + TRACK_HEIGHT / 2));
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestId = track.id;
+      }
+    }
+    return bestId;
+  };
+
+  const finishDrag = (state: DragState): void => {
+    const chapterId = state.clipId.replace('chapter:', '');
+    const chapter = chaptersById.get(chapterId);
+    if (!chapter) {
+      dragOrigin.current = null;
+      setDrag(null);
+      return;
+    }
+    if (state.mode === 'resize') {
+      onUpdate({ chapters: project.chapters.map((c) => (c.id === chapterId ? { ...c, duration: Math.max(MIN_CLIP_DURATION, state.value) } : c)) });
+    } else if (state.mode === 'tension') {
+      onUpdate({ chapters: project.chapters.map((c) => (c.id === chapterId ? { ...c, tension: state.value } : c)) });
+    } else {
+      const targetTrackId = state.targetTrackId ?? chapter.trackId ?? model.tracks[0]?.id ?? 'main';
+      const list = narrativeClips.filter((clip) => (clip.trackId ?? 'main') === targetTrackId && clip.entityId !== chapterId).sort((a, b) => a.start - b.start);
+      const targetIndex = list.filter((clip) => clip.start + clip.duration / 2 < state.value).length;
+      onUpdate({ chapters: reorderChapters(project.chapters, model.tracks, chapterId, targetTrackId, targetIndex) });
+    }
+    dragOrigin.current = null;
     setDrag(null);
   };
 
@@ -128,11 +165,46 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
     setSelected([]);
   };
 
+  const addTrack = () => {
+    const id = `track:${crypto.randomUUID()}`;
+    onUpdate({ timelineTracks: [...model.tracks, { id, label: t('dual.trackLabel', { n: model.tracks.length + 1 }) }] });
+  };
+
+  const removeTrack = (trackId: string) => {
+    if (model.tracks.length <= 1) return;
+    const fallback = model.tracks.find((track) => track.id !== trackId)?.id ?? 'main';
+    onUpdate({
+      timelineTracks: model.tracks.filter((track) => track.id !== trackId),
+      chapters: project.chapters.map((chapter) => (chapter.trackId === trackId ? { ...chapter, trackId: fallback } : chapter)),
+    });
+  };
+
+  const addMarker = () => {
+    onUpdate({
+      timelineMarkers: [...markers, { id: `marker:${crypto.randomUUID()}`, label: t('dual.markerLabel', { n: markers.length + 1 }), axis: 'narrative', position: playhead }],
+    });
+  };
+
+  const removeMarker = (id: string) => {
+    onUpdate({ timelineMarkers: markers.filter((marker) => marker.id !== id) });
+  };
+
+  const splitAtPlayhead = () => {
+    const target = narrativeClips.find((clip) => playhead >= clip.start && playhead < clip.start + clip.duration);
+    if (!target) return;
+    const chapter = chaptersById.get(target.entityId);
+    if (!chapter) return;
+    const fraction = (playhead - target.start) / target.duration;
+    const [left, right] = splitChapter(chapter, fraction, `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`);
+    const next = project.chapters.flatMap((c) => (c.id === chapter.id ? [left, right] : [c])).map((c, order) => ({ ...c, order }));
+    onUpdate({ chapters: next });
+  };
+
   const toggleSelect = (clipId: string) => {
     setSelected((prev) => (prev.includes(clipId) ? prev.filter((id) => id !== clipId) : [...prev, clipId]));
   };
 
-  const axisLabel = (id: TimelineAxisId): string => (id === 'narrative' ? t('dual.axis.narrative') : t('dual.axis.story'));
+  const axisLabel = (id: 'narrative' | 'story'): string => (id === 'narrative' ? t('dual.axis.narrative') : t('dual.axis.story'));
 
   const issueText = (issue: TimelineIssue): string => {
     switch (issue.code) {
@@ -149,68 +221,51 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
     }
   };
 
+  const visibleNarrative = (clips: TimelineClip[]): TimelineClip[] => (majorOnly ? clips.filter((clip) => clip.importance === 'major') : clips);
+
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-sm">{t('dual.title')}</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setZoom((value) => Math.max(48, value - 24))} aria-label={t('dual.zoomOut')}>
-            <ZoomOut className="size-3.5" />
+          <Button size="sm" variant="outline" onClick={() => setZoom((value) => Math.max(48, value - 24))} aria-label={t('dual.zoomOut')}><ZoomOut className="size-3.5" /></Button>
+          <Button size="sm" variant="outline" onClick={() => setZoom((value) => Math.min(240, value + 24))} aria-label={t('dual.zoomIn')}><ZoomIn className="size-3.5" /></Button>
+          <Button size="sm" variant={snapEnabled ? 'default' : 'outline'} onClick={() => setSnapEnabled((value) => !value)}>{t('dual.snap')}</Button>
+          <Button size="sm" variant={majorOnly ? 'default' : 'outline'} onClick={() => setMajorOnly((value) => !value)}>{t('dual.majorOnly')}</Button>
+          <Button size="sm" variant="outline" onClick={() => setIssues(checkTimelineConsistency(project))}><Search className="size-3.5" />{t('dual.check')}</Button>
+          <Button size="sm" variant="outline" disabled={!narrativeClips.some((clip) => playhead >= clip.start && playhead < clip.start + clip.duration)} onClick={splitAtPlayhead}>
+            <Scissors className="size-3.5" />{t('dual.split')}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setZoom((value) => Math.min(240, value + 24))} aria-label={t('dual.zoomIn')}>
-            <ZoomIn className="size-3.5" />
-          </Button>
-          <Button size="sm" variant={snapEnabled ? 'default' : 'outline'} onClick={() => setSnapEnabled((value) => !value)}>
-            {t('dual.snap')}
-          </Button>
-          <Button size="sm" variant={majorOnly ? 'default' : 'outline'} onClick={() => setMajorOnly((value) => !value)}>
-            {t('dual.majorOnly')}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setIssues(checkTimelineConsistency(project))}>
-            <Search className="size-3.5" />
-            {t('dual.check')}
-          </Button>
-          <Button size="sm" variant="outline" onClick={addMarker}>
-            <Flag className="size-3.5" />
-            {t('dual.addMarker')}
-          </Button>
-          <Button size="sm" variant="outline" disabled={selected.length < 2} onClick={() => void mergeSelected()}>
-            <GitMerge className="size-3.5" />
-            {t('dual.merge')}
-          </Button>
-          <Button size="sm" variant="outline" disabled={selected.length === 0} onClick={() => void unmergeSelected()}>
-            <Undo2 className="size-3.5" />
-            {t('dual.unmerge')}
-          </Button>
+          <Button size="sm" variant="outline" disabled={selected.length < 2} onClick={() => void mergeSelected()}><GitMerge className="size-3.5" />{t('dual.merge')}</Button>
+          <Button size="sm" variant="outline" disabled={selected.length === 0} onClick={() => void unmergeSelected()}><Undo2 className="size-3.5" />{t('dual.unmerge')}</Button>
+          <Button size="sm" variant="outline" onClick={addMarker}><Flag className="size-3.5" />{t('dual.addMarker')}</Button>
+          <Button size="sm" variant="outline" onClick={addTrack}><Plus className="size-3.5" />{t('dual.addTrack')}</Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {model.axes.every((axis) => axis.clips.length === 0) ? (
+        {narrativeClips.length === 0 && storyClips.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">{t('dual.empty')}</p>
         ) : (
-          <div className="overflow-auto rounded-lg border border-border bg-card"
+          <div
+            ref={scrollRef}
+            className="overflow-auto rounded-lg border border-border bg-card"
             onWheel={(event) => {
               if (!event.altKey) return;
               setZoom((value) => Math.max(48, Math.min(240, value - event.deltaY * 0.5)));
             }}
           >
             <div className="relative" style={{ width: contentWidth, height: contentHeight }}>
+              <div className="absolute top-0 z-10 h-full w-px bg-primary" style={{ left: PADDING + playhead * zoom }} aria-hidden />
               <div
-                className="absolute top-0 z-10 h-full w-px bg-primary"
-                style={{ left: PADDING + playhead * zoom }}
-                aria-hidden
-              />
-              <div className="absolute inset-x-0 top-0 h-6 cursor-ew-resize border-b border-border" style={{ width: contentWidth }}
+                className="absolute inset-x-0 top-0 h-6 cursor-ew-resize border-b border-border"
+                style={{ width: contentWidth }}
                 onPointerMove={(event) => {
                   if (event.buttons !== 1) return;
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  setPlayhead(Math.max(0, (event.clientX - rect.left - PADDING) / zoom));
+                  setPlayhead(Math.max(0, unitFromEvent(event)));
                 }}
               >
                 {ticks.map((tick) => (
-                  <span key={tick} className="absolute top-1 text-2xs text-muted-foreground" style={{ left: PADDING + tick * zoom }}>
-                    {tick}
-                  </span>
+                  <span key={tick} className="absolute top-1 text-2xs text-muted-foreground" style={{ left: PADDING + tick * zoom }}>{tick}</span>
                 ))}
                 {markers.map((marker) => (
                   <span
@@ -218,14 +273,8 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                     title={marker.label}
                     className="absolute top-0 z-20 cursor-pointer text-primary"
                     style={{ left: PADDING + marker.position * zoom }}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setPlayhead(marker.position);
-                    }}
-                    onDoubleClick={(event) => {
-                      event.stopPropagation();
-                      removeMarker(marker.id);
-                    }}
+                    onClick={(event) => { event.stopPropagation(); setPlayhead(marker.position); }}
+                    onDoubleClick={(event) => { event.stopPropagation(); removeMarker(marker.id); }}
                   >
                     <Flag className="size-3.5 fill-current" />
                   </span>
@@ -238,60 +287,145 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                   const to = clipIndex.get(link.toClipId);
                   if (!from || !to) return null;
                   const x1 = PADDING + from.clip.start * zoom + (from.clip.duration * zoom) / 2;
-                  const y1 = clipTopForAxis(from.axisIndex, from.clip) + ROW_HEIGHT;
+                  const y1 = clipY(from.clip) + TRACK_HEIGHT;
                   const x2 = PADDING + to.clip.start * zoom + (to.clip.duration * zoom) / 2;
-                  const y2 = clipTopForAxis(to.axisIndex, to.clip);
+                  const y2 = clipY(to.clip);
                   return <path key={`${link.fromClipId}-${link.toClipId}`} d={`M${x1},${y1} C${x1},${(y1 + y2) / 2} ${x2},${(y1 + y2) / 2} ${x2},${y2}`} fill="none" stroke="var(--color-border)" strokeDasharray="4 4" />;
                 })}
+                {storyClips.length > 0 && (
+                  <text x={4} y={storyTop + 12} className="text-2xs" fill="var(--color-muted-foreground)">{axisLabel('story')}</text>
+                )}
               </svg>
 
-              {model.axes.map((axis, axisIndex) => (
-                <div key={axis.id}>
-                  <span className="absolute text-2xs font-medium text-muted-foreground" style={{ left: 4, top: RULER_HEIGHT + axisIndex * (ROW_HEIGHT + ROW_GAP) + 4 }}>
-                    {axisLabel(axis.id)}
-                  </span>
-                  {filterClips(axis.clips).map((clip) => {
-                    const selectedClip = selected.includes(clip.id);
-                    const isDragging = drag?.clipId === clip.id;
-                    const offset = isDragging ? drag.delta : 0;
+              <div className="absolute inset-x-0" style={{ top: TENSION_TOP, height: TENSION_HEIGHT }}>
+                <svg width={contentWidth} height={TENSION_HEIGHT}>
+                  {(() => {
+                    const points = visibleNarrative(narrativeClips)
+                      .filter((clip) => clip.tension !== undefined)
+                      .sort((a, b) => a.start - b.start);
+                    if (points.length < 1) return null;
+                    const coords = points.map((clip) => ({
+                      x: PADDING + clip.start * zoom + (clip.duration * zoom) / 2,
+                      y: (1 - (clip.tension ?? 0)) * (TENSION_HEIGHT - 16) + 8,
+                    }));
                     return (
-                      <button
+                      <>
+                        <polyline points={coords.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke="var(--color-chart-2)" strokeWidth={1.5} />
+                        {points.map((clip, index) => (
+                          <circle
+                            key={clip.id}
+                            cx={coords[index]?.x}
+                            cy={coords[index]?.y}
+                            r={drag?.clipId === clip.id && drag.mode === 'tension' ? 7 : 5}
+                            fill="var(--color-chart-2)"
+                            className="cursor-ns-resize"
+                            style={{ pointerEvents: 'auto' }}
+                            onPointerDown={(event) => {
+                              event.currentTarget.setPointerCapture(event.pointerId);
+                              dragOrigin.current = { clipId: clip.id, mode: 'tension', base: clip.tension ?? 0 };
+                              setDrag({ mode: 'tension', clipId: clip.id, value: clip.tension ?? 0 });
+                            }}
+                            onPointerMove={(event) => {
+                              if (dragOrigin.current?.clipId !== clip.id || dragOrigin.current.mode !== 'tension') return;
+                              const canvasY = pointFromEvent(event).y;
+                              const value = Math.max(0, Math.min(1, 1 - (canvasY - TENSION_TOP - 8) / (TENSION_HEIGHT - 16)));
+                              setDrag({ mode: 'tension', clipId: clip.id, value });
+                            }}
+                            onPointerUp={() => { if (drag) finishDrag(drag); }}
+                          />
+                        ))}
+                      </>
+                    );
+                  })()}
+                </svg>
+                <span className="absolute left-1 top-1 text-2xs text-muted-foreground">{t('dual.tension')}</span>
+              </div>
+
+              {model.tracks.map((track) => (
+                <div key={track.id}>
+                  <span className="absolute text-2xs font-medium text-muted-foreground" style={{ left: 4, top: (trackTops[track.id] ?? storyTop) + 4 }}>{track.label}</span>
+                  {model.tracks.length > 1 && (
+                    <button
+                      type="button"
+                      aria-label={t('dual.removeTrack')}
+                      className="absolute text-muted-foreground hover:text-destructive"
+                      style={{ left: 4, top: (trackTops[track.id] ?? storyTop) + 22 }}
+                      onClick={() => removeTrack(track.id)}
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  )}
+                  {visibleNarrative(narrativeClips).filter((clip) => (clip.trackId ?? 'main') === track.id).map((clip) => {
+                    const selectedClip = selected.includes(clip.id);
+                    const active = drag?.clipId === clip.id;
+                    const offset = active && drag.mode === 'move' ? drag.value - clip.start : 0;
+                    return (
+                      <div
                         key={clip.id}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         className={cn(
-                          'absolute overflow-hidden rounded-md border px-2 text-left text-2xs transition-colors',
+                          'absolute cursor-grab overflow-hidden rounded-md border px-2 text-left text-2xs transition-colors',
                           clip.importance === 'major' ? 'border-primary/50 bg-primary/10' : 'border-border bg-muted',
                           selectedClip && 'ring-2 ring-primary',
-                          axis.id === 'narrative' && 'cursor-grab',
                         )}
-                        style={{
-                          left: PADDING + (clip.start + offset) * zoom,
-                          top: clipTopForAxis(axisIndex, clip),
-                          width: Math.max(28, clip.duration * zoom - 6),
-                          height: ROW_HEIGHT,
-                        }}
+                        style={{ left: PADDING + (clip.start + offset) * zoom, top: trackTops[track.id] ?? storyTop, width: Math.max(28, clip.duration * zoom - 4), height: TRACK_HEIGHT }}
                         onClick={() => toggleSelect(clip.id)}
-                        onDoubleClick={() => (clip.kind === 'chapter' ? onNavigateToChapter?.(clip.entityId) : onSelectEvent?.(clip.entityId))}
+                        onDoubleClick={() => onNavigateToChapter?.(clip.entityId)}
                         onPointerDown={(event) => {
-                          if (axis.id !== 'narrative') return;
                           event.currentTarget.setPointerCapture(event.pointerId);
-                          dragStart.current = { x: event.clientX, fromClipId: clip.id, start: clip.start };
-                          setDrag({ clipId: clip.id, delta: 0 });
+                          dragOrigin.current = { clipId: clip.id, mode: 'move', base: clip.start };
+                          setDrag({ mode: 'move', clipId: clip.id, value: clip.start, targetTrackId: clip.trackId });
                         }}
                         onPointerMove={(event) => {
-                          if (!dragStart.current || dragStart.current.fromClipId !== clip.id) return;
-                          setDrag({ clipId: clip.id, delta: (event.clientX - dragStart.current.x) / zoom });
+                          const origin = dragOrigin.current;
+                          if (!origin || origin.clipId !== clip.id || origin.mode !== 'move') return;
+                          const point = pointFromEvent(event);
+                          const raw = (point.x - PADDING) / zoom;
+                          const candidates = narrativeClips.map((other) => other.start);
+                          const target = snapEnabled ? snapTo(raw, candidates, 0.3) : raw;
+                          setDrag({ mode: 'move', clipId: clip.id, value: target, targetTrackId: nearestTrack(point.y) });
                         }}
-                        onPointerUp={() => {
-                          if (dragStart.current?.fromClipId === clip.id) finishDrag(drag?.delta ?? 0);
-                        }}
+                        onPointerUp={() => { if (drag) finishDrag(drag); }}
                       >
                         <span className="block truncate font-medium">{clip.label}</span>
                         {clip.groupId && <span className="block truncate text-muted-foreground">{t('dual.grouped')}</span>}
-                      </button>
+                        <span
+                          role="separator"
+                          aria-label={t('dual.resize')}
+                          className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-primary/20"
+                          onPointerDown={(event) => {
+                            event.stopPropagation();
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            dragOrigin.current = { clipId: clip.id, mode: 'resize', base: clip.duration };
+                            setDrag({ mode: 'resize', clipId: clip.id, value: clip.duration });
+                          }}
+                          onPointerMove={(event) => {
+                            if (dragOrigin.current?.clipId !== clip.id || dragOrigin.current.mode !== 'resize') return;
+                            const value = Math.max(MIN_CLIP_DURATION, dragOrigin.current.base + (pointFromEvent(event).x - PADDING) / zoom - clip.start);
+                            setDrag({ mode: 'resize', clipId: clip.id, value });
+                          }}
+                          onPointerUp={(event) => {
+                            event.stopPropagation();
+                            if (drag) finishDrag(drag);
+                          }}
+                        />
+                      </div>
                     );
                   })}
                 </div>
+              ))}
+
+              {storyClips.map((clip) => (
+                <button
+                  key={clip.id}
+                  type="button"
+                  className={cn('absolute overflow-hidden rounded-md border px-2 text-left text-2xs', clip.importance === 'major' ? 'border-primary/50 bg-primary/10' : 'border-border bg-muted')}
+                  style={{ left: PADDING + clip.start * zoom, top: clipY(clip), width: Math.max(28, clip.duration * zoom - 6), height: TRACK_HEIGHT }}
+                  onDoubleClick={() => onSelectEvent?.(clip.entityId)}
+                >
+                  <span className="block truncate font-medium">{clip.label}</span>
+                </button>
               ))}
             </div>
           </div>
@@ -300,10 +434,7 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
         {issues && (
           <div className="space-y-1">
             {issues.length === 0 ? (
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Check className="size-3.5 text-primary" />
-                {t('dual.noIssues')}
-              </p>
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Check className="size-3.5 text-primary" />{t('dual.noIssues')}</p>
             ) : (
               issues.map((issue, index) => (
                 <p key={`${issue.code}-${issue.targetId ?? index}`} className={cn('flex items-start gap-1.5 text-xs', issue.severity === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
@@ -314,6 +445,7 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
             )}
           </div>
         )}
+
         {markers.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {markers.map((marker) => (

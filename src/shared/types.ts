@@ -211,6 +211,12 @@ export interface Chapter {
   timelineEventId?: string;
   /** 故事内时间点 */
   storyDate?: HistoryDate;
+  /** 时间线片段时长（相对权重，默认 1；免迁移）。 */
+  duration?: number;
+  /** 时间线张力关键帧（0..1，绘制节奏曲线；免迁移）。 */
+  tension?: number;
+  /** 所属时间线轨道 id（缺席归入主轨；免迁移）。 */
+  trackId?: string;
 }
 
 /** 章节正文快照：记录某一时刻的完整内容，可一键回退 */
@@ -741,6 +747,8 @@ export interface Project {
   extensions?: Record<string, unknown[]>;
   /** 双轴时间线标记（节拍/伏笔定位；缺席=[]，免迁移）。 */
   timelineMarkers?: TimelineMarker[];
+  /** 时间线轨道（缺席=单条主轨，免迁移）。 */
+  timelineTracks?: TimelineTrackDef[];
 }
 
 /** 时间线标记：钉在某轴的刻度上。 */
@@ -750,6 +758,12 @@ export interface TimelineMarker {
   axis: 'narrative' | 'story';
   /** 轴内刻度（叙事轴为章节序号，故事轴为日期序数）。 */
   position: number;
+}
+
+/** 时间线轨道定义。 */
+export interface TimelineTrackDef {
+  id: string;
+  label: string;
 }
 
 /** 自定义字体元数据（字形文件另存用户数据目录 fonts/ 下，不进状态 JSON）。 */

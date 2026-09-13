@@ -46,8 +46,9 @@
 ## 双轴时间线
 
 - 入口：世界分区「双轴时间线」开关卡，组件为 `src/renderer/features/timeline/DualAxisTimeline.tsx`。
-- 两轴：叙事顺序轴按章节 `order`；故事时间轴按事件日期（`HistoryDate` 折算为月刻度），同一刻度的多个事件分层显示。
-- 交互：章节片段可拖拽重排（松手写回章节 `order`）、刻度吸附、缩放（按钮与 Alt+滚轮）、播放头、重大/次要过滤；章节与事件的关联经 `chapter.timelineEventId` 画连接虚线。
+- 两轴：叙事顺序轴按章节 `order` 排布、片段宽度由 `Chapter.duration`（相对时长，默认 1）决定；故事时间轴按事件日期（`HistoryDate` 折算为月刻度），同一刻度的多个事件分层显示。
+- 交互：章节片段可拖拽重排与跨轨移动（松手写回 `order` 与 `trackId`）、右端拖动裁剪时长（`Chapter.duration`）、刻度吸附、缩放（按钮与 Alt+滚轮）、播放头、重大/次要过滤、在播放头处拆分章节；章节与事件的关联经 `chapter.timelineEventId` 画连接虚线。
+- 多轨与张力：轨道定义存 `Project.timelineTracks`，可增删轨道（删轨把章节归入其余轨）；上方张力曲线按 `Chapter.tension`（0..1）绘制，拖动节点改张力。
 - 标记：在播放头处添加标记（`Project.timelineMarkers`，钉在叙事轴），点击定位、双击或列表删除。
 - 合并：选中多个章节后写 `sequence_items`，以分组节点（`groupId`）记录包含关系；取消合并移除分组并清空 `parentId`。
 - 确定性一致性检查：`timelineConsistency.ts` 检出同一角色同刻异地、出生后登场、伏笔回收早于埋设、章节指向不存在事件，全部为本地规则，不调用模型。
