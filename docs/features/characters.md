@@ -31,3 +31,4 @@
 
 - 角色被写作/助手/一致性模块引用；关系图谱复用角色关系字段
 - 人物卡导出与全书导出是两条独立路径（前者单卡 Markdown，后者整书多格式）
+- 随机取名：编辑角色时可一键生成姓名（离线姓+名库，`features/characters/services/nameGeneratorService.ts`），按性别取字

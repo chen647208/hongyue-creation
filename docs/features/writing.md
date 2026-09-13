@@ -79,7 +79,8 @@
 
 - 入口：编辑器工具栏「写作工具」按钮，面板为 `src/renderer/features/writing/components/WritingToolsPanel.tsx`，四个页签。
 - 一键排版：`services/writingToolsService.ts` 的 `autoFormatContent` 规范省略号与破折号、合并空行、去行尾空格，可选段落首行缩进；作用于当前章或全书。
-- 自动纠错：`findProofreadIssues` 按规则检出常见错别字与重复标点，`applyProofreadFixes` 从后向前一次替换。
+- 自动纠错：`findProofreadIssues` 按规则检出常见错别字与重复标点（内置成语/易混词表），`applyProofreadFixes` 从后向前一次替换；另支持用户自备**敏感词表**（本地持久化，仅提示不自动替换）。
+- 纸张与朗读：编辑器纸张可选 纯色/网格/横线/羊皮（本地持久化）；支持朗读当前章（浏览器语音合成，可中止）。
 - 快捷词：`services/snippetStore.ts` 用 `localStore` 持久化片段，面板可增删与插入到光标处（`NovelEditorHandle.insertText`）。
 - 多平台预览：`components/ReaderPreview.tsx` 用编译产出的 HTML 在桌面/平板/手机宽度下渲染当前章节。
 - 画布宽度：窄视口（如侧栏与助手同时打开）下正文画布保持 320px 最小宽度并横向滚动，不塌缩为零宽。
@@ -90,6 +91,7 @@
 - 入口：结构分区子页签「计划」「分组/卷」。
 - 计划（`features/plan/`）：五阶段看板——选题 / 大纲 / 章节 / 修订 / 校验；条目可勾选完成、改阶段、删除，随作品落 `Project.plan`（`docs/design/20` 的计划/待办落地）。
 - 分组（`features/groups/`）：自由命名分组（卷/幕/单元均可，不预设「卷」语义），章节经 `Chapter.groupId` 归属；`Project.groups` 存定义。分组只影响组织与时间线聚合，不改正文；时间线合并使用同一 `Chapter.groupId`。
+- 统计（`features/stats/`）：码字日历与今日/目标字数（由修订记录推算每日正增量，`shared/services/writingLogService.ts`）、角色年龄表（按 `birthDate.year` 与事件年份推算）、线索图（伏笔埋设→回收的章节跨度）。
 
 ## 定稿锁定
 - 章节 `status` 取值 `draft | writing | done | final`。
