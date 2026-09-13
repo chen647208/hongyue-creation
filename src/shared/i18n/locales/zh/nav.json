@@ -12,6 +12,8 @@
   "settings": "设置",
   "structureTabs": {
     "outline": "大纲",
-    "chapters": "细纲"
+    "chapters": "细纲",
+    "plan": "计划",
+    "groups": "分组/卷"
   }
 }

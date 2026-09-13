@@ -12,6 +12,8 @@
   "settings": "Settings",
   "structureTabs": {
     "outline": "Outline",
-    "chapters": "Chapters"
+    "chapters": "Chapters",
+    "plan": "Plan",
+    "groups": "Groups"
   }
 }

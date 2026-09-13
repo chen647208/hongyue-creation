@@ -11,10 +11,10 @@
 |---|---|---|
 | `23-data-layer-storage.md` §6、`24` D3 | 正文以文件为源（每章一文件 + 清单校验，外部改单章可导入） | 正文仍在 SQLite `nodes.body`，无章节文件与清单（用户明确暂缓） |
 | `24` D1 | 追加式事件日志（JSONL）为唯一真相源，SQLite 改为其投影、可重建 | 无事件日志源；SQLite 即真相（用户明确暂缓） |
-| `20-external-benchmark.md` | 借鉴项：选题→大纲→章节→修订→校验工作流、计划/待办落盘 | 参考性结论，未立项 |
 
 ## 已完成（从本表移除）
 
+- `20-external-benchmark.md` 计划/待办：五阶段写作计划看板，随作品落盘（`features/plan/` + `Project.plan`）；泛用分组/卷（`features/groups/` + `Project.groups`/`Chapter.groupId`）。
 - `24` D2 混合检索：FTS5 + 向量 **RRF 融合**（`shared/services/searchService.ts`，向量不可用退化为 FTS）。
 - `18` 批次 F.13 类型注册表接 UI：未知类型经 `Project.extensions` 端到端往返（`core/project/bridge.ts`）。
 - `04` §13.2 设置表单 `enum` 与嵌套对象（`shared/ui/SchemaForm.tsx`）。

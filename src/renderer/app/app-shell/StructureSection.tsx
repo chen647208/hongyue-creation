@@ -16,7 +16,9 @@ import { SegmentedControl } from '@/shared/ui/ViewModeToggle';
 
 import type { Project } from '../../../shared/types';
 import StepChapterOutline from '../../features/chapters/StepChapterOutline';
+import GroupsPanel from '../../features/groups/GroupsPanel';
 import StepOutline from '../../features/outline/StepOutline';
+import WritingPlanPanel from '../../features/plan/WritingPlanPanel';
 
 interface StructureSectionProps {
   project: Project;
@@ -28,13 +30,12 @@ interface StructureSectionProps {
 }
 
 /**
- * 结构页（一页两段）：大纲 ⇄ 细纲子页签共用一页，原先两个一级分区合并。
+ * 结构页（一页三段）：大纲 ⇄ 细纲 ⇄ 计划子页签共用一页。
  * StepOutline / StepChapterOutline 已直读 store，这里只负责子页签与进写作跳转。
- * 默认落大纲（正向创作流先见大纲），细纲是第二步。
  */
 const StructureSection: React.FC<StructureSectionProps> = ({ project, onEnterWriting, initialSub, onGoSection }) => {
   const { t } = useTranslation('nav');
-  const [sub, setSub] = useViewPreference<'outline' | 'chapters'>('structure.subtab', 'outline');
+  const [sub, setSub] = useViewPreference<'outline' | 'chapters' | 'plan' | 'groups'>('structure.subtab', 'outline');
 
   useEffect(() => {
     if (initialSub) setSub(initialSub);
@@ -50,6 +51,8 @@ const StructureSection: React.FC<StructureSectionProps> = ({ project, onEnterWri
             options={[
               { value: 'outline', label: t('structureTabs.outline') },
               { value: 'chapters', label: t('structureTabs.chapters') },
+              { value: 'plan', label: t('structureTabs.plan') },
+              { value: 'groups', label: t('structureTabs.groups') },
             ]}
           />
         }
@@ -57,8 +60,12 @@ const StructureSection: React.FC<StructureSectionProps> = ({ project, onEnterWri
       <div className="min-h-0 flex-1">
         {sub === 'outline' ? (
           <StepOutline project={project} />
-        ) : (
+        ) : sub === 'chapters' ? (
           <StepChapterOutline project={project} onEnterWriting={onEnterWriting} onGoSection={onGoSection} />
+        ) : sub === 'plan' ? (
+          <WritingPlanPanel />
+        ) : (
+          <GroupsPanel />
         )}
       </div>
     </div>

@@ -12,7 +12,6 @@ import type { Project } from '@shared/types';
 import { AlertTriangle, Check, Flag, GitMerge, Plus, Scissors, Search, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useGenericModelStore } from '@/app/stores/genericModelStore';
 import { useTranslation } from '@/i18n';
 import { Button } from '@/shared/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
@@ -48,7 +47,6 @@ interface DragState {
 
 const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, onNavigateToChapter, onSelectEvent }) => {
   const { t } = useTranslation('timeline');
-  const sequence = useGenericModelStore((state) => state.sequence);
   const [zoom, setZoom] = useState(96);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [majorOnly, setMajorOnly] = useState(false);
@@ -56,14 +54,26 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
   const [selected, setSelected] = useState<string[]>([]);
   const [issues, setIssues] = useState<TimelineIssue[] | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  const [viewport, setViewport] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const dragOrigin = useRef<{ clipId: string; mode: DragMode; base: number } | null>(null);
 
+  // 视口裁剪：只渲染可见范围内的片段，长书滚动不退化。
   useEffect(() => {
-    void useGenericModelStore.getState().load(project.id);
-  }, [project.id]);
+    const element = scrollRef.current;
+    if (!element) return;
+    const update = () => setViewport({ left: element.scrollLeft, width: element.clientWidth });
+    update();
+    element.addEventListener('scroll', update);
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    observer?.observe(element);
+    return () => {
+      element.removeEventListener('scroll', update);
+      observer?.disconnect();
+    };
+  }, []);
 
-  const model = useMemo(() => buildTimelineModel(project, sequence), [project, sequence]);
+  const model = useMemo(() => buildTimelineModel(project), [project]);
   const narrativeClips = useMemo(() => model.axes.find((axis) => axis.id === 'narrative')?.clips ?? [], [model]);
   const storyClips = useMemo(() => model.axes.find((axis) => axis.id === 'story')?.clips ?? [], [model]);
   const chaptersById = useMemo(() => new Map((project.chapters ?? []).map((chapter) => [chapter.id, chapter])), [project.chapters]);
@@ -139,29 +149,18 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
     setDrag(null);
   };
 
-  const mergeSelected = async () => {
+  const mergeSelected = () => {
     const chapterIds = selected.map((id) => id.replace('chapter:', '')).filter((id) => chaptersById.has(id));
     if (chapterIds.length < 2) return;
     const groupId = `group:${crypto.randomUUID()}`;
-    const orderIndex = Math.min(...chapterIds.map((id) => chaptersById.get(id)?.order ?? 0));
-    const next = sequence.map((item) => ({ ...item }));
-    next.push({ id: `seq:${groupId}`, workId: project.id, nodeId: groupId, parentId: null, orderIndex });
-    for (const chapterId of chapterIds) {
-      const existing = next.find((item) => item.nodeId === chapterId);
-      if (existing) existing.parentId = groupId;
-      else next.push({ id: `seq:${chapterId}`, workId: project.id, nodeId: chapterId, parentId: groupId, orderIndex: chaptersById.get(chapterId)?.order ?? 0 });
-    }
-    await useGenericModelStore.getState().saveSequence(next);
+    onUpdate({ chapters: project.chapters.map((chapter) => (chapterIds.includes(chapter.id) ? { ...chapter, groupId } : chapter)) });
     setSelected([]);
   };
 
-  const unmergeSelected = async () => {
-    const groupIds = new Set(selected.map((id) => clipIndex.get(id)?.clip.groupId).filter((value): value is string => !!value));
-    if (groupIds.size === 0) return;
-    const next = sequence
-      .filter((item) => !groupIds.has(item.nodeId))
-      .map((item) => (item.parentId && groupIds.has(item.parentId) ? { ...item, parentId: null } : { ...item }));
-    await useGenericModelStore.getState().saveSequence(next);
+  const unmergeSelected = () => {
+    const chapterIds = selected.map((id) => id.replace('chapter:', '')).filter((id) => chaptersById.get(id)?.groupId);
+    if (chapterIds.length === 0) return;
+    onUpdate({ chapters: project.chapters.map((chapter) => (chapterIds.includes(chapter.id) ? { ...chapter, groupId: undefined } : chapter)) });
     setSelected([]);
   };
 
@@ -222,6 +221,11 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
   };
 
   const visibleNarrative = (clips: TimelineClip[]): TimelineClip[] => (majorOnly ? clips.filter((clip) => clip.importance === 'major') : clips);
+
+  const marginUnits = (viewport.width || span * zoom) / zoom;
+  const visibleStart = (viewport.left - PADDING) / zoom - 4;
+  const visibleEnd = (viewport.left - PADDING) / zoom + marginUnits + 4;
+  const inView = (clip: TimelineClip): boolean => clip.start + clip.duration >= visibleStart && clip.start <= visibleEnd;
 
   return (
     <Card>
@@ -301,7 +305,7 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                 <svg width={contentWidth} height={TENSION_HEIGHT}>
                   {(() => {
                     const points = visibleNarrative(narrativeClips)
-                      .filter((clip) => clip.tension !== undefined)
+                      .filter((clip) => clip.tension !== undefined && inView(clip))
                       .sort((a, b) => a.start - b.start);
                     if (points.length < 1) return null;
                     const coords = points.map((clip) => ({
@@ -355,7 +359,7 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                       <Trash2 className="size-3" />
                     </button>
                   )}
-                  {visibleNarrative(narrativeClips).filter((clip) => (clip.trackId ?? 'main') === track.id).map((clip) => {
+                  {visibleNarrative(narrativeClips).filter((clip) => (clip.trackId ?? 'main') === track.id && inView(clip)).map((clip) => {
                     const selectedClip = selected.includes(clip.id);
                     const active = drag?.clipId === clip.id;
                     const offset = active && drag.mode === 'move' ? drag.value - clip.start : 0;
@@ -416,7 +420,7 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                 </div>
               ))}
 
-              {storyClips.map((clip) => (
+              {storyClips.filter(inView).map((clip) => (
                 <button
                   key={clip.id}
                   type="button"

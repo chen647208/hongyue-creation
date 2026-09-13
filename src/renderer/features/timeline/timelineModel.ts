@@ -10,8 +10,6 @@
 /** 双轴时间线模型：叙事轴按轨道与时长排布章节，故事时间轴按事件日期。 */
 import type { Chapter, HistoryDate, Project } from '@shared/types';
 
-import type { SequenceItem } from '@/app/stores/genericModelStore';
-
 export type TimelineAxisId = 'narrative' | 'story';
 
 export interface TimelineTrack {
@@ -138,12 +136,7 @@ export function reorderChapters(
   return flattened.map((chapter, order) => ({ ...chapter, order }));
 }
 
-export function buildTimelineModel(project: Project, sequence: SequenceItem[] = []): TimelineModel {
-  const parentOf = new Map<string, string>();
-  for (const item of sequence) {
-    if (item.parentId) parentOf.set(item.nodeId, item.parentId);
-  }
-
+export function buildTimelineModel(project: Project): TimelineModel {
   const tracks: TimelineTrack[] = project.timelineTracks?.length ? project.timelineTracks : [{ id: 'main', label: '主轨' }];
   const trackIds = new Set(tracks.map((track) => track.id));
 
@@ -162,7 +155,7 @@ export function buildTimelineModel(project: Project, sequence: SequenceItem[] = 
       start,
       duration,
       importance: chapter.status === 'done' ? 'major' : 'minor',
-      groupId: parentOf.get(chapter.id),
+      groupId: chapter.groupId,
       trackId,
       tension: chapter.tension,
     };

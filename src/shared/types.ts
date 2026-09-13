@@ -217,6 +217,8 @@ export interface Chapter {
   tension?: number;
   /** 所属时间线轨道 id（缺席归入主轨；免迁移）。 */
   trackId?: string;
+  /** 所属分组/卷 id（缺席=未分组；免迁移）。 */
+  groupId?: string;
 }
 
 /** 章节正文快照：记录某一时刻的完整内容，可一键回退 */
@@ -749,6 +751,32 @@ export interface Project {
   timelineMarkers?: TimelineMarker[];
   /** 时间线轨道（缺席=单条主轨，免迁移）。 */
   timelineTracks?: TimelineTrackDef[];
+  /** 写作计划/待办（选题→大纲→章节→修订→校验；缺席=[]，免迁移）。 */
+  plan?: PlanItem[];
+  /** 泛用分组/卷（任意文体可用；缺席=[]，免迁移）。 */
+  groups?: ContentGroup[];
+}
+
+/** 写作计划阶段（对应创作工作流）。 */
+export type PlanStage = 'theme' | 'outline' | 'chapter' | 'revision' | 'check';
+
+/** 一条写作计划/待办。 */
+export interface PlanItem {
+  id: string;
+  title: string;
+  stage: PlanStage;
+  status: 'todo' | 'doing' | 'done';
+  note?: string;
+  /** 阶段内排序。 */
+  order: number;
+}
+
+/** 泛用分组/卷：章节或其它条目可归入，label 由用户命名。 */
+export interface ContentGroup {
+  id: string;
+  label: string;
+  color?: string;
+  order: number;
 }
 
 /** 时间线标记：钉在某轴的刻度上。 */

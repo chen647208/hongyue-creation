@@ -1,4 +1,27 @@
 {
+  "groups": {
+    "subtitle": "Custom groups (volume / act / unit): name a group and assign chapters. Grouping only affects organization and timeline aggregation, never the body text.",
+    "add": "New group",
+    "addPlaceholder": "Group name, press Enter",
+    "remove": "Remove group",
+    "ungrouped": "Ungrouped",
+    "empty": "No items",
+    "count": "{{count}} chapters"
+  },
+  "plan": {
+    "subtitle": "Track todos by workflow stage: theme → outline → chapter → revision → check. Items are stored with the work.",
+    "add": "Add todo",
+    "addPlaceholder": "New todo, press Enter",
+    "remove": "Remove todo",
+    "move": "Move to stage",
+    "stage": {
+      "theme": "Theme",
+      "outline": "Outline",
+      "chapter": "Chapter",
+      "revision": "Revision",
+      "check": "Check"
+    }
+  },
   "common": {
     "outputMode": "Output mode:",
     "preview": "Preview",

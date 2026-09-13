@@ -1,4 +1,27 @@
 {
+  "groups": {
+    "subtitle": "自定义分组（卷/幕/单元均可）：命名分组并把章节归入；分组只影响组织与时间线聚合，不改正文。",
+    "add": "新建分组",
+    "addPlaceholder": "分组名称，回车新建",
+    "remove": "删除分组",
+    "ungrouped": "未分组",
+    "empty": "暂无条目",
+    "count": "共 {{count}} 章"
+  },
+  "plan": {
+    "subtitle": "按创作工作流管理待办：选题 → 大纲 → 章节 → 修订 → 校验。条目随作品落盘。",
+    "add": "添加待办",
+    "addPlaceholder": "输入待办，回车添加",
+    "remove": "删除待办",
+    "move": "移动到阶段",
+    "stage": {
+      "theme": "选题",
+      "outline": "大纲",
+      "chapter": "章节",
+      "revision": "修订",
+      "check": "校验"
+    }
+  },
   "common": {
     "outputMode": "输出模式:",
     "preview": "预览",
