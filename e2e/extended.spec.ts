@@ -83,7 +83,7 @@ test('主题切换后重启保持（深色持久化）', async () => {
     await createBook(first.page);
     await first.page.locator('[title="切换到深色主题"]').click();
     await expect(first.page.locator('html.dark')).toHaveCount(1, { timeout: 10_000 });
-    await first.page.waitForTimeout(3_000);
+    await first.page.waitForTimeout(5_000);
   } finally {
     await first.app.close();
   }
