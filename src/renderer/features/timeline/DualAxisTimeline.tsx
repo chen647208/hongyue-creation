@@ -9,7 +9,7 @@
 
 /** 双轴时间线：上轴叙事顺序（章节），下轴故事时间（事件），可拖拽排序、吸附、合并、检查。 */
 import type { Project } from '@shared/types';
-import { AlertTriangle, Check, GitMerge, Search, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
+import { AlertTriangle, Check, Flag, GitMerge, Search, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useGenericModelStore } from '@/app/stores/genericModelStore';
@@ -68,6 +68,18 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
   const ticks = Array.from({ length: Math.ceil(span) + 1 }, (_, index) => index);
 
   const chaptersById = useMemo(() => new Map((project.chapters ?? []).map((chapter) => [chapter.id, chapter])), [project.chapters]);
+  const markers = project.timelineMarkers ?? [];
+
+  const addMarker = () => {
+    const label = t('dual.markerLabel', { n: markers.length + 1 });
+    onUpdate({
+      timelineMarkers: [...markers, { id: `marker:${crypto.randomUUID()}`, label, axis: 'narrative', position: Math.round(playhead) }],
+    });
+  };
+
+  const removeMarker = (id: string) => {
+    onUpdate({ timelineMarkers: markers.filter((marker) => marker.id !== id) });
+  };
 
   const finishDrag = (delta: number) => {
     if (!dragStart.current) return;
@@ -158,6 +170,10 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
             <Search className="size-3.5" />
             {t('dual.check')}
           </Button>
+          <Button size="sm" variant="outline" onClick={addMarker}>
+            <Flag className="size-3.5" />
+            {t('dual.addMarker')}
+          </Button>
           <Button size="sm" variant="outline" disabled={selected.length < 2} onClick={() => void mergeSelected()}>
             <GitMerge className="size-3.5" />
             {t('dual.merge')}
@@ -172,7 +188,12 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
         {model.axes.every((axis) => axis.clips.length === 0) ? (
           <p className="py-10 text-center text-sm text-muted-foreground">{t('dual.empty')}</p>
         ) : (
-          <div className="overflow-auto rounded-lg border border-border bg-card">
+          <div className="overflow-auto rounded-lg border border-border bg-card"
+            onWheel={(event) => {
+              if (!event.altKey) return;
+              setZoom((value) => Math.max(48, Math.min(240, value - event.deltaY * 0.5)));
+            }}
+          >
             <div className="relative" style={{ width: contentWidth, height: contentHeight }}>
               <div
                 className="absolute top-0 z-10 h-full w-px bg-primary"
@@ -189,6 +210,24 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                 {ticks.map((tick) => (
                   <span key={tick} className="absolute top-1 text-2xs text-muted-foreground" style={{ left: PADDING + tick * zoom }}>
                     {tick}
+                  </span>
+                ))}
+                {markers.map((marker) => (
+                  <span
+                    key={marker.id}
+                    title={marker.label}
+                    className="absolute top-0 z-20 cursor-pointer text-primary"
+                    style={{ left: PADDING + marker.position * zoom }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPlayhead(marker.position);
+                    }}
+                    onDoubleClick={(event) => {
+                      event.stopPropagation();
+                      removeMarker(marker.id);
+                    }}
+                  >
+                    <Flag className="size-3.5 fill-current" />
                   </span>
                 ))}
               </div>
@@ -273,6 +312,16 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                 </p>
               ))
             )}
+          </div>
+        )}
+        {markers.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {markers.map((marker) => (
+              <span key={marker.id} className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-2xs text-muted-foreground">
+                <button type="button" onClick={() => setPlayhead(marker.position)}>{marker.label}</button>
+                <button type="button" aria-label={t('dual.removeMarker')} onClick={() => removeMarker(marker.id)}>×</button>
+              </span>
+            ))}
           </div>
         )}
       </CardContent>

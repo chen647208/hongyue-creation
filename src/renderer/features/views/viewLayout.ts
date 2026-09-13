@@ -11,7 +11,7 @@
 import { ENTITY_VIEW_COLUMNS } from './buildEntityView';
 import type { ViewColumn, ViewKind, ViewLayout } from './types';
 
-const KINDS: readonly ViewKind[] = ['table', 'card', 'graph'];
+const KINDS: readonly ViewKind[] = ['table', 'card', 'graph', 'list'];
 
 export const DEFAULT_VIEW_LAYOUT: ViewLayout = {
   kind: 'card',

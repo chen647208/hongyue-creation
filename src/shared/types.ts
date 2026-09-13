@@ -739,6 +739,17 @@ export interface Project {
   tags?: string[];
   /** 插件扩展类型的数据（键为命名空间化类型 id）；核心不解释其内部结构。 */
   extensions?: Record<string, unknown[]>;
+  /** 双轴时间线标记（节拍/伏笔定位；缺席=[]，免迁移）。 */
+  timelineMarkers?: TimelineMarker[];
+}
+
+/** 时间线标记：钉在某轴的刻度上。 */
+export interface TimelineMarker {
+  id: string;
+  label: string;
+  axis: 'narrative' | 'story';
+  /** 轴内刻度（叙事轴为章节序号，故事轴为日期序数）。 */
+  position: number;
 }
 
 /** 自定义字体元数据（字形文件另存用户数据目录 fonts/ 下，不进状态 JSON）。 */

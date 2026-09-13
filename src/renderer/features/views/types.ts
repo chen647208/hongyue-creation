@@ -7,8 +7,8 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-/** 视图引擎的类型：同一份行数据可由表格/卡片/图三种视图呈现。 */
-export type ViewKind = 'table' | 'card' | 'graph';
+/** 视图引擎的类型：同一份行数据可由表格/卡片/图/大纲四种视图呈现。 */
+export type ViewKind = 'table' | 'card' | 'graph' | 'list';
 
 /** 一列：key 决定取 row.cells[key]，label 为 i18n 键。 */
 export interface ViewColumn {

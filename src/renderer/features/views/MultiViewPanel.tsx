@@ -9,7 +9,7 @@
 
 /** 多视图面板：同一份作品数据可在表格/卡片/图之间切换，布局存入 ViewDefinition。 */
 import type { Project } from '@shared/types';
-import { LayoutGrid, Network, Plus, Table2, Trash2 } from 'lucide-react';
+import { LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2 } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { useGenericModelStore } from '@/app/stores/genericModelStore';
@@ -25,6 +25,7 @@ import type { ViewRow } from './types';
 import ViewCards from './ViewCards';
 import ViewGraph from './ViewGraph';
 import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from './viewLayout';
+import ViewOutline from './ViewOutline';
 import ViewTable from './ViewTable';
 
 interface MultiViewPanelProps {
@@ -107,6 +108,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     { value: 'table' as const, icon: Table2, title: t('views.kind.table') },
     { value: 'card' as const, icon: LayoutGrid, title: t('views.kind.card') },
     { value: 'graph' as const, icon: Network, title: t('views.kind.graph') },
+    { value: 'list' as const, icon: ListOrdered, title: t('views.kind.list') },
   ];
 
   return (
@@ -173,6 +175,9 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
         )}
         {layout.kind === 'graph' && (
           <ViewGraph rows={data.rows} links={data.links} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
+        )}
+        {layout.kind === 'list' && (
+          <ViewOutline rows={data.rows} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
         )}
       </CardContent>
     </Card>
