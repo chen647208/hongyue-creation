@@ -42,6 +42,8 @@
     "bibleDesc": "Skeleton entries for worldbuilding, characters and locations",
     "storyboard": "Storyboard Template",
     "storyboardDesc": "Shot cards with image, shot size, camera movement and duration",
+    "comic": "Motion Comic Script Template",
+    "comicDesc": "Panel script with image, dialogue and narration",
     "create": "New Book"
   },
   "templates": {
@@ -55,6 +57,9 @@
     },
     "storyboard": {
       "shotTitle": "Shot {{n}}"
+    },
+    "comic": {
+      "panelTitle": "Panel {{n}}"
     },
     "bible": {
       "world": "Worldbuilding",

@@ -19,6 +19,7 @@ import { createCollaborativeExtensions } from '../../../editor/collaborative';
 import { findMatches } from '../../../editor/findReplace';
 import { createWritingPrimitives } from '../../../editor/primitives';
 import { createNovelExtensions } from '../../../editor/schema';
+import { createScreenplayFormatting } from '../../../editor/screenplay';
 import { dslToPmDoc, pmDocToDsl, type PmNode } from '../../../editor/serialization';
 import type { EditorCollaboration, NovelEditorHandle } from '../types';
 
@@ -62,6 +63,8 @@ interface TipTapCanvasProps {
   /** 生成中且非流式时锁定编辑；流式期间以只读方式回显增量。 */
   isGenerating: boolean;
   isStreaming: boolean;
+  /** 剧本自动格式化：按元素类型同步加粗/斜体标记。 */
+  screenplayFormat?: boolean;
   /** 打字机模式：光标保持在视口中部跟随滚动。 */
   typewriter?: boolean;
   /** Enter×3 连按：宿主创建新章并切换（不阻塞继续输入）。 */
@@ -78,7 +81,7 @@ interface TipTapCanvasProps {
  * 传入 collaboration 时改为 y-prosemirror 节点级绑定。
  */
 const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function TipTapCanvas(
-  { content, activeChapterId, locked, collaboration, isFocusMode, isGenerating, isStreaming, typewriter, onNewChapter, onContentChange, onMouseUp, onKeyUp, onMouseMove },
+  { content, activeChapterId, locked, collaboration, screenplayFormat, isFocusMode, isGenerating, isStreaming, typewriter, onNewChapter, onContentChange, onMouseUp, onKeyUp, onMouseMove },
   ref,
 ) {
   const { t } = useTranslation('writing');
@@ -100,6 +103,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
     () => [
       ...(collaborative ? createCollaborativeExtensions() : createNovelExtensions()),
       ...createWritingPrimitives({ onNewChapter: () => onNewChapterRef.current?.() }),
+      ...(screenplayFormat ? [createScreenplayFormatting()] : []),
       ...(fragment && awareness
         ? [
             Collaboration.configure({ fragment }),
@@ -112,7 +116,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
           ]
         : []),
     ],
-    [collaborative, fragment, awareness],
+    [collaborative, fragment, awareness, screenplayFormat],
   );
 
   const editor = useEditor(

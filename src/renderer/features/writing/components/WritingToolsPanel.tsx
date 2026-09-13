@@ -31,6 +31,8 @@ interface WritingToolsPanelProps {
   onFormatAll: (indent: boolean) => void;
   onApplyProofread: (chapterId: string, issues: ProofreadIssue[]) => void;
   onInsertSnippet: (text: string) => void;
+  screenplayFormat: boolean;
+  onToggleScreenplayFormat: (value: boolean) => void;
 }
 
 const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
@@ -40,6 +42,8 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
   onFormatAll,
   onApplyProofread,
   onInsertSnippet,
+  screenplayFormat,
+  onToggleScreenplayFormat,
 }) => {
   const { t } = useTranslation('writing');
   const [tab, setTab] = useState<ToolsTab>('format');
@@ -74,6 +78,10 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
           <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={indent} onChange={(event) => setIndent(event.target.checked)} />
             {t('tools.format.indent')}
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={screenplayFormat} onChange={(event) => onToggleScreenplayFormat(event.target.checked)} />
+            {t('tools.format.screenplay')}
           </label>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" disabled={!chapter} onClick={() => chapter && onFormatChapter(chapter.id, indent)}>

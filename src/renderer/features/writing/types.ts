@@ -296,6 +296,8 @@ export interface WritingEditorCanvasProps {
   locked?: boolean;
   /** 协作绑定：当前章节片段与在线状态。 */
   collaboration?: EditorCollaboration | null;
+  /** 剧本自动格式化。 */
+  screenplayFormat?: boolean;
   isFocusMode: boolean;
   typewriter: boolean;
   isGenerating: boolean;

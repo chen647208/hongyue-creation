@@ -42,6 +42,8 @@
     "bibleDesc": "世界观、角色、地点的设定条目骨架",
     "storyboard": "分镜模板",
     "storyboardDesc": "镜头卡片，含画面、景别、镜头运动与时长",
+    "comic": "动态漫脚本模板",
+    "comicDesc": "分格脚本，含画面、对白与旁白",
     "create": "新建书籍"
   },
   "templates": {
@@ -55,6 +57,9 @@
     },
     "storyboard": {
       "shotTitle": "镜头 {{n}}"
+    },
+    "comic": {
+      "panelTitle": "分格 {{n}}"
     },
     "bible": {
       "world": "世界观",

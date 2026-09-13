@@ -8,6 +8,22 @@
  */
 
 /** 写作工具纯函数：一键排版、规则纠错、快捷词展开。 */
+import { STORAGE_KEYS } from '@shared/constants/storageKeys';
+
+import { localStore } from '@/shared/services/localStore';
+
+/** 剧本自动格式化开关（本地持久化）。 */
+export function isScreenplayFormatEnabled(): boolean {
+  try {
+    return localStore.getItem(STORAGE_KEYS.editorScreenplayFormat) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function setScreenplayFormatEnabled(enabled: boolean): void {
+  localStore.setItem(STORAGE_KEYS.editorScreenplayFormat, enabled ? '1' : '0');
+}
 
 export interface ProofreadIssue {
   index: number;

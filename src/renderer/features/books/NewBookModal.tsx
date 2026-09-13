@@ -76,6 +76,7 @@ const NewBookModal: React.FC<NewBookModalProps> = ({
     { value: 'screenplay' as const, label: t('books:newBook.screenplay'), desc: t('books:newBook.screenplayDesc') },
     { value: 'bible' as const, label: t('books:newBook.bible'), desc: t('books:newBook.bibleDesc') },
     { value: 'storyboard' as const, label: t('books:newBook.storyboard'), desc: t('books:newBook.storyboardDesc') },
+    { value: 'comic' as const, label: t('books:newBook.comic'), desc: t('books:newBook.comicDesc') },
   ];
 
   return (

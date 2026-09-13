@@ -48,7 +48,7 @@ import { useGenerationSelections } from './hooks/useGenerationSelections';
 import { useSelectionMenu } from './hooks/useSelectionMenu';
 import { extractChapterSummary } from './services/summaryExtractionService';
 import { computeBookStats, computeChapterStats } from './services/writingStatsService';
-import { applyProofreadFixes, autoFormatContent, type ProofreadIssue } from './services/writingToolsService';
+import { applyProofreadFixes, autoFormatContent, isScreenplayFormatEnabled, type ProofreadIssue,setScreenplayFormatEnabled } from './services/writingToolsService';
 import type {
   GenerationModalState,
   NovelEditorHandle,
@@ -199,6 +199,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isForeshadowOpen, setIsForeshadowOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
+  const [screenplayFormat, setScreenplayFormat] = useState(() => isScreenplayFormatEnabled());
 
   // 章节字段写回统一见 useChapterMutations
   const { handleUpdateChapter, updateChapterContent, updateChapterSummary, updateChapterContentSummary, updateActiveChapterTitle } = useChapterMutations({
@@ -582,6 +583,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
           content={gen.isStreaming ? gen.streamingContent : (activeChapter?.content || "")}
           locked={activeChapter?.status === 'final'}
           collaboration={collaboration}
+          screenplayFormat={screenplayFormat}
           isFocusMode={isFocusMode}
           typewriter={typewriter}
           isGenerating={gen.isGenerating}
@@ -627,6 +629,11 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
         onApplyProofread={handleApplyProofread}
         onInsertSnippet={(text: string) => {
           editorRef.current?.insertText(text);
+        }}
+        screenplayFormat={screenplayFormat}
+        onToggleScreenplayFormat={(value: boolean) => {
+          setScreenplayFormatEnabled(value);
+          setScreenplayFormat(value);
         }}
         onClose={() => setIsToolsOpen(false)}
       />

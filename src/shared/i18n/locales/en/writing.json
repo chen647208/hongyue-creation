@@ -37,6 +37,7 @@
     },
     "format": {
       "indent": "Indent paragraphs with two em spaces",
+      "screenplay": "Screenplay auto-format (scene headings / cues / parentheses / transitions)",
       "current": "Format current chapter",
       "all": "Format whole book"
     },

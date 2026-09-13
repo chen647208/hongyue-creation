@@ -69,7 +69,7 @@ export function useBookActions(enterWorkspace: () => void): BookActions {
         : emptyBook(title, intro);
     } else if (templateType === 'example') {
       newBook = buildExampleProject(title, intro ?? i18n.t('books:example.intro'));
-    } else if (templateType === 'screenplay' || templateType === 'bible' || templateType === 'storyboard') {
+    } else if (templateType === 'screenplay' || templateType === 'bible' || templateType === 'storyboard' || templateType === 'comic') {
       newBook = buildTemplatedProject(title, intro ?? '', templateType);
     } else {
       newBook = emptyBook(title, intro);

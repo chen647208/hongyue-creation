@@ -21,6 +21,7 @@ export const STORAGE_KEYS = {
   versionSkipped: 'version.skipped',
   editorTypewriter: 'editor.typewriter',
   editorSnippets: 'editor.snippets',
+  editorScreenplayFormat: 'editor.screenplayFormat',
   collabEnabled: 'collab.enabled',
   collabServerUrl: 'collab.serverUrl',
   pluginsDisabled: 'plugins.disabled',
