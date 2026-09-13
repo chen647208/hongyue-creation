@@ -48,10 +48,11 @@ import { useGenerationSelections } from './hooks/useGenerationSelections';
 import { useSelectionMenu } from './hooks/useSelectionMenu';
 import { extractChapterSummary } from './services/summaryExtractionService';
 import { computeBookStats, computeChapterStats } from './services/writingStatsService';
-import { applyProofreadFixes, autoFormatContent, isScreenplayFormatEnabled, type ProofreadIssue,setScreenplayFormatEnabled } from './services/writingToolsService';
+import { applyProofreadFixes, autoFormatContent, isScreenplayFormatEnabled, type ProofreadIssue,readPaperStyle, setScreenplayFormatEnabled, writePaperStyle } from './services/writingToolsService';
 import type {
   GenerationModalState,
   NovelEditorHandle,
+  PaperStyle,
   WritingEditorProps,
 } from './types';
 import {
@@ -200,6 +201,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
   const [isForeshadowOpen, setIsForeshadowOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [screenplayFormat, setScreenplayFormat] = useState(() => isScreenplayFormatEnabled());
+  const [paper, setPaper] = useState(() => readPaperStyle());
 
   // 章节字段写回统一见 useChapterMutations
   const { handleUpdateChapter, updateChapterContent, updateChapterSummary, updateChapterContentSummary, updateActiveChapterTitle } = useChapterMutations({
@@ -584,6 +586,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
           locked={activeChapter?.status === 'final'}
           collaboration={collaboration}
           screenplayFormat={screenplayFormat}
+          paper={paper}
           isFocusMode={isFocusMode}
           typewriter={typewriter}
           isGenerating={gen.isGenerating}
@@ -634,6 +637,11 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
         onToggleScreenplayFormat={(value: boolean) => {
           setScreenplayFormatEnabled(value);
           setScreenplayFormat(value);
+        }}
+        paper={paper}
+        onPaperChange={(value: PaperStyle) => {
+          writePaperStyle(value);
+          setPaper(value);
         }}
         onClose={() => setIsToolsOpen(false)}
       />

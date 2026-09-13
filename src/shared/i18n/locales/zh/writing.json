@@ -38,13 +38,23 @@
     "format": {
       "indent": "段落首行缩进两个全角空格",
       "screenplay": "剧本自动格式化（场景头/角色/括号/转场）",
+      "paper": "纸张",
+      "paperPlain": "纯色",
+      "paperGrid": "网格",
+      "paperLined": "横线",
+      "paperSepia": "羊皮",
+      "readAloud": "朗读本章",
+      "stopRead": "停止朗读",
       "current": "排版当前章",
       "all": "排版全书"
     },
     "proofread": {
       "empty": "未发现常见错别字或重复标点。",
       "count": "发现 {{count}} 处可修正项",
-      "applyAll": "全部修正"
+      "applyAll": "全部修正",
+      "sensitive": "敏感词",
+      "sensitiveLabel": "敏感词表（自备，逗号/换行分隔）",
+      "sensitivePlaceholder": "每行或逗号分隔一个敏感词；仅提示，不自动替换"
     },
     "snippets": {
       "labelPlaceholder": "名称",

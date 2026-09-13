@@ -38,13 +38,23 @@
     "format": {
       "indent": "Indent paragraphs with two em spaces",
       "screenplay": "Screenplay auto-format (scene headings / cues / parentheses / transitions)",
+      "paper": "Paper",
+      "paperPlain": "Plain",
+      "paperGrid": "Grid",
+      "paperLined": "Lined",
+      "paperSepia": "Sepia",
+      "readAloud": "Read chapter",
+      "stopRead": "Stop reading",
       "current": "Format current chapter",
       "all": "Format whole book"
     },
     "proofread": {
       "empty": "No common typos or repeated punctuation found.",
       "count": "{{count}} fixable issues found",
-      "applyAll": "Fix all"
+      "applyAll": "Fix all",
+      "sensitive": "Sensitive",
+      "sensitiveLabel": "Sensitive words (your own list, comma/newline separated)",
+      "sensitivePlaceholder": "One word per line or comma separated; flagged only, never auto-replaced"
     },
     "snippets": {
       "labelPlaceholder": "Label",

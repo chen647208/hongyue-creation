@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { applyProofreadFixes, autoFormatContent, findProofreadIssues } from '../services/writingToolsService';
+import { applyProofreadFixes, autoFormatContent, findProofreadIssues, parseSensitiveWords } from '../services/writingToolsService';
 
 describe('writingToolsService', () => {
   it('检出常见错别字与重复标点', () => {
@@ -31,5 +31,19 @@ describe('writingToolsService', () => {
   it('可选的段落缩进跳过标题与场景行', () => {
     const formatted = autoFormatContent('# 标题\n正文', { indentParagraphs: true });
     expect(formatted).toBe('# 标题\n　　正文');
+  });
+
+  it('解析敏感词表并标记，不自动替换', () => {
+    expect(parseSensitiveWords('甲, 乙\n丙、甲')).toEqual(['甲', '乙', '丙']);
+    const text = '这里出现甲和甲两个敏感词';
+    const issues = findProofreadIssues(text, ['甲']);
+    const sensitive = issues.filter((issue) => issue.rule === 'sensitive');
+    expect(sensitive).toHaveLength(2);
+    expect(applyProofreadFixes(text, issues)).toBe(text);
+  });
+
+  it('扩充词库命中成语错别字', () => {
+    expect(findProofreadIssues('迫不急待').map((issue) => issue.suggestion)).toContain('迫不及待');
+    expect(findProofreadIssues('走头无路').map((issue) => issue.suggestion)).toContain('走投无路');
   });
 });

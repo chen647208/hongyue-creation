@@ -13,6 +13,9 @@ import type * as Y from 'yjs';
 
 import type { AIHistoryRecord, Chapter, ModelConfig, OutputMode, Project, PromptTemplate } from '../../../shared/types';
 
+/** 编辑器纸张样式。 */
+export type PaperStyle = 'plain' | 'grid' | 'lined' | 'sepia';
+
 /** 协作绑定：当前章节的 Y.XmlFragment 与在线状态。 */
 export interface EditorCollaboration {
   fragment: Y.XmlFragment;
@@ -298,6 +301,8 @@ export interface WritingEditorCanvasProps {
   collaboration?: EditorCollaboration | null;
   /** 剧本自动格式化。 */
   screenplayFormat?: boolean;
+  /** 纸张样式（背景/网格线）。 */
+  paper?: PaperStyle;
   isFocusMode: boolean;
   typewriter: boolean;
   isGenerating: boolean;

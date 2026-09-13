@@ -12,6 +12,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { templateDisplayName } from '@/i18n';
+import { speechLocale } from '@/shared/services/speechService';
 import { Button } from '@/shared/ui/Button';
 import { MarkdownView } from '@/shared/ui/Markdown';
 import { Select } from '@/shared/ui/Select';
@@ -20,7 +21,6 @@ import { Textarea } from '@/shared/ui/Textarea';
 import { cn } from '@/shared/utils/cn';
 
 import type { CardPromptTemplate, KnowledgeItem } from '../../../../shared/types';
-import { speechLocale } from '../services/speechService';
 import type { ChatMessage } from '../types';
 import SavedAttachmentsButton from './SavedAttachmentsButton';
 import SpeakButton from './SpeakButton';

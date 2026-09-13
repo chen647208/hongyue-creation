@@ -11,10 +11,9 @@ import { Mic, Square } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { createDictation, type DictationController,isDictationSupported } from '@/shared/services/speechService';
 import { Button } from '@/shared/ui/Button';
 import { logger } from '@/shared/utils/logger';
-
-import { createDictation, type DictationController,isDictationSupported } from '../services/speechService';
 
 interface SpeechInputButtonProps {
   onTranscript: (text: string) => void;

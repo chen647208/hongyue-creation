@@ -14,7 +14,7 @@ import {
   isSpeechSynthesisSupported,
   speak,
   speechLocale,
-} from '../speechService';
+} from '@/shared/services/speechService';
 
 // jsdom 不实现 Web Speech API，故这里覆盖"不支持环境"的分支与纯映射函数。
 describe('speechLocale', () => {

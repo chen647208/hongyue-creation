@@ -21,7 +21,8 @@ import { createWritingPrimitives } from '../../../editor/primitives';
 import { createNovelExtensions } from '../../../editor/schema';
 import { createScreenplayFormatting } from '../../../editor/screenplay';
 import { dslToPmDoc, pmDocToDsl, type PmNode } from '../../../editor/serialization';
-import type { EditorCollaboration, NovelEditorHandle } from '../types';
+import { paperInlineStyle } from '../services/writingToolsService';
+import type { EditorCollaboration, NovelEditorHandle, PaperStyle } from '../types';
 
 /** 远端光标渲染：竖线 + 名字标签。 */
 function renderRemoteCaret(user: { name?: string; color?: string }): HTMLElement {
@@ -65,6 +66,8 @@ interface TipTapCanvasProps {
   isStreaming: boolean;
   /** 剧本自动格式化：按元素类型同步加粗/斜体标记。 */
   screenplayFormat?: boolean;
+  /** 纸张样式（背景/网格线）。 */
+  paper?: PaperStyle;
   /** 打字机模式：光标保持在视口中部跟随滚动。 */
   typewriter?: boolean;
   /** Enter×3 连按：宿主创建新章并切换（不阻塞继续输入）。 */
@@ -81,7 +84,7 @@ interface TipTapCanvasProps {
  * 传入 collaboration 时改为 y-prosemirror 节点级绑定。
  */
 const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function TipTapCanvas(
-  { content, activeChapterId, locked, collaboration, screenplayFormat, isFocusMode, isGenerating, isStreaming, typewriter, onNewChapter, onContentChange, onMouseUp, onKeyUp, onMouseMove },
+  { content, activeChapterId, locked, collaboration, screenplayFormat, paper, isFocusMode, isGenerating, isStreaming, typewriter, onNewChapter, onContentChange, onMouseUp, onKeyUp, onMouseMove },
   ref,
 ) {
   const { t } = useTranslation('writing');
@@ -302,7 +305,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
         'selection:bg-primary/15',
         isFocusMode ? 'max-w-3xl text-xl leading-loose' : 'max-w-4xl',
       )}
-      style={{ fontFamily: 'var(--font-reading, inherit)', fontSize: 'var(--font-reading-size, 1.125rem)', lineHeight: 'var(--font-reading-lh, 1.9)' }}
+      style={{ ...paperInlineStyle(paper ?? 'plain'), fontFamily: 'var(--font-reading, inherit)', fontSize: 'var(--font-reading-size, 1.125rem)', lineHeight: 'var(--font-reading-lh, 1.9)' }}
       onMouseUp={onMouseUp}
       onKeyUp={onKeyUp}
       onMouseMove={onMouseMove}

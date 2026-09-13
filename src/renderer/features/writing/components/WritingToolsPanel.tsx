@@ -10,16 +10,20 @@
 /** 写作工具：一键排版、规则纠错、快捷词、多平台预览。 */
 import type { Chapter, Project } from '@shared/types';
 import { Plus, Trash2 } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 
 import { useTranslation } from '@/i18n';
+import { isSpeechSynthesisSupported, speak, type SpeechHandle } from '@/shared/services/speechService';
 import { Button } from '@/shared/ui/Button';
 import { Checkbox } from '@/shared/ui/Checkbox';
 import { Input } from '@/shared/ui/Input';
+import { Select } from '@/shared/ui/Select';
 import { TabBar } from '@/shared/ui/TabBar';
+import { Textarea } from '@/shared/ui/Textarea';
 
 import { createSnippet, readSnippets, saveSnippets, type Snippet } from '../services/snippetStore';
-import { findProofreadIssues, type ProofreadIssue } from '../services/writingToolsService';
+import { findProofreadIssues, parseSensitiveWords, type ProofreadIssue,readSensitiveWordsRaw, writeSensitiveWords } from '../services/writingToolsService';
+import type { PaperStyle } from '../types';
 import ReaderPreview from './ReaderPreview';
 
 type ToolsTab = 'format' | 'proofread' | 'snippets' | 'preview';
@@ -33,6 +37,8 @@ interface WritingToolsPanelProps {
   onInsertSnippet: (text: string) => void;
   screenplayFormat: boolean;
   onToggleScreenplayFormat: (value: boolean) => void;
+  paper: PaperStyle;
+  onPaperChange: (value: PaperStyle) => void;
 }
 
 const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
@@ -44,6 +50,8 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
   onInsertSnippet,
   screenplayFormat,
   onToggleScreenplayFormat,
+  paper,
+  onPaperChange,
 }) => {
   const { t } = useTranslation('writing');
   const [tab, setTab] = useState<ToolsTab>('format');
@@ -52,7 +60,27 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
   const [newLabel, setNewLabel] = useState('');
   const [newText, setNewText] = useState('');
 
-  const issues = useMemo(() => findProofreadIssues(chapter?.content ?? ''), [chapter?.content]);
+  const [sensitiveRaw, setSensitiveRaw] = useState(() => readSensitiveWordsRaw());
+  const sensitiveWords = useMemo(() => parseSensitiveWords(sensitiveRaw), [sensitiveRaw]);
+  const issues = useMemo(() => findProofreadIssues(chapter?.content ?? '', sensitiveWords), [chapter?.content, sensitiveWords]);
+
+  const speechRef = useRef<SpeechHandle | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const speechSupported = isSpeechSynthesisSupported();
+  const startReading = () => {
+    if (!chapter?.content.trim()) return;
+    try {
+      speechRef.current = speak(chapter.content.slice(0, 6000));
+      setSpeaking(true);
+    } catch {
+      setSpeaking(false);
+    }
+  };
+  const stopReading = () => {
+    speechRef.current?.cancel();
+    speechRef.current = null;
+    setSpeaking(false);
+  };
 
   const updateSnippets = (next: Snippet[]) => {
     setSnippets(next);
@@ -83,6 +111,21 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
             <Checkbox checked={screenplayFormat} onChange={(event) => onToggleScreenplayFormat(event.target.checked)} />
             {t('tools.format.screenplay')}
           </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">{t('tools.format.paper')}</span>
+            <Select value={paper} onChange={(event) => onPaperChange(event.target.value as PaperStyle)} className="h-8 w-28 text-xs">
+              <option value="plain">{t('tools.format.paperPlain')}</option>
+              <option value="grid">{t('tools.format.paperGrid')}</option>
+              <option value="lined">{t('tools.format.paperLined')}</option>
+              <option value="sepia">{t('tools.format.paperSepia')}</option>
+            </Select>
+            {speechSupported &&
+              (speaking ? (
+                <Button size="sm" variant="outline" onClick={stopReading}>{t('tools.format.stopRead')}</Button>
+              ) : (
+                <Button size="sm" variant="outline" disabled={!chapter} onClick={startReading}>{t('tools.format.readAloud')}</Button>
+              ))}
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" disabled={!chapter} onClick={() => chapter && onFormatChapter(chapter.id, indent)}>
               {t('tools.format.current')}
@@ -96,6 +139,19 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
 
       {tab === 'proofread' && (
         <div className="space-y-3">
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground">{t('tools.proofread.sensitiveLabel')}</summary>
+            <Textarea
+              value={sensitiveRaw}
+              onChange={(event) => {
+                setSensitiveRaw(event.target.value);
+                writeSensitiveWords(event.target.value);
+              }}
+              placeholder={t('tools.proofread.sensitivePlaceholder')}
+              rows={3}
+              className="mt-1 text-xs"
+            />
+          </details>
           {issues.length === 0 ? (
             <p className="text-xs text-muted-foreground">{t('tools.proofread.empty')}</p>
           ) : (
@@ -105,7 +161,11 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
                 {issues.map((issue, index) => (
                   <li key={`${issue.index}-${index}`} className="flex items-center gap-2 rounded border border-border px-2 py-1">
                     <span className="font-medium">{issue.original}</span>
-                    <span className="text-muted-foreground">→ {issue.suggestion}</span>
+                    {issue.rule === 'sensitive' ? (
+                      <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-2xs text-destructive">{t('tools.proofread.sensitive')}</span>
+                    ) : (
+                      <span className="text-muted-foreground">→ {issue.suggestion}</span>
+                    )}
                   </li>
                 ))}
               </ul>

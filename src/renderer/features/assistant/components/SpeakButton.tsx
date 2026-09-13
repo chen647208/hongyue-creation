@@ -11,10 +11,9 @@ import { Square,Volume2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { isSpeechSynthesisSupported, speak, type SpeechHandle } from '@/shared/services/speechService';
 import { Button } from '@/shared/ui/Button';
 import { logger } from '@/shared/utils/logger';
-
-import { isSpeechSynthesisSupported, speak, type SpeechHandle } from '../services/speechService';
 
 interface SpeakButtonProps {
   text: string;
