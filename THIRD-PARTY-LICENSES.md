@@ -4,7 +4,7 @@
 收录运行期依赖（package-lock.json 中排除 dev/link）的许可证声明；
 各依赖的完整许可证文本随发行包内 `node_modules` 一并分发。
 
-共 401 个运行期依赖。
+共 404 个运行期依赖。
 
 | 依赖 | 版本 | 许可证 |
 | --- | --- | --- |
@@ -85,6 +85,8 @@
 | @tiptap/extension-bullet-list | 3.31.3 | MIT |
 | @tiptap/extension-code | 3.31.3 | MIT |
 | @tiptap/extension-code-block | 3.31.3 | MIT |
+| @tiptap/extension-collaboration | 3.31.3 | MIT |
+| @tiptap/extension-collaboration-caret | 3.31.3 | MIT |
 | @tiptap/extension-document | 3.31.3 | MIT |
 | @tiptap/extension-dropcursor | 3.31.3 | MIT |
 | @tiptap/extension-floating-menu | 3.31.3 | MIT |
@@ -106,6 +108,7 @@
 | @tiptap/pm | 3.31.3 | MIT |
 | @tiptap/react | 3.31.3 | MIT |
 | @tiptap/starter-kit | 3.31.3 | MIT |
+| @tiptap/y-tiptap | 3.0.9 | MIT |
 | @types/debug | 4.1.13 | MIT |
 | @types/estree | 1.0.9 | MIT |
 | @types/estree-jsx | 1.0.5 | MIT |

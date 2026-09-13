@@ -7,10 +7,11 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import Collaboration from '@tiptap/extension-collaboration';
+import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import { EditorContent, useEditor } from '@tiptap/react';
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { redoCommand, undoCommand, yCursorPlugin, ySyncPlugin, yUndoPlugin } from 'y-prosemirror';
 
 import { cn } from '@/shared/utils/cn';
 
@@ -20,6 +21,35 @@ import { createWritingPrimitives } from '../../../editor/primitives';
 import { createNovelExtensions } from '../../../editor/schema';
 import { dslToPmDoc, pmDocToDsl, type PmNode } from '../../../editor/serialization';
 import type { EditorCollaboration, NovelEditorHandle } from '../types';
+
+/** 远端光标渲染：竖线 + 名字标签。 */
+function renderRemoteCaret(user: { name?: string; color?: string }): HTMLElement {
+  const color = user.color ?? '#0091ff';
+  const caret = document.createElement('span');
+  caret.style.borderLeft = `2px solid ${color}`;
+  caret.style.marginLeft = '-1px';
+  caret.style.marginRight = '-1px';
+  caret.style.pointerEvents = 'none';
+  caret.style.position = 'relative';
+  const label = document.createElement('span');
+  label.textContent = user.name ?? '';
+  label.style.position = 'absolute';
+  label.style.left = '-2px';
+  label.style.top = '-1.1em';
+  label.style.backgroundColor = color;
+  label.style.color = '#fff';
+  label.style.fontSize = '10px';
+  label.style.lineHeight = '1.2';
+  label.style.padding = '0 3px';
+  label.style.borderRadius = '3px';
+  label.style.whiteSpace = 'nowrap';
+  caret.appendChild(label);
+  return caret;
+}
+
+function renderRemoteSelection(user: { color?: string }): { nodeName: string; class: string; style: string } {
+  return { nodeName: 'span', class: 'collaboration-selection', style: `background-color: ${user.color ?? '#0091ff'}33` };
+}
 
 interface TipTapCanvasProps {
   content: string;
@@ -70,7 +100,17 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
     () => [
       ...(collaborative ? createCollaborativeExtensions() : createNovelExtensions()),
       ...createWritingPrimitives({ onNewChapter: () => onNewChapterRef.current?.() }),
-      ...(fragment && awareness ? [ySyncPlugin(fragment), yCursorPlugin(awareness), yUndoPlugin()] : []),
+      ...(fragment && awareness
+        ? [
+            Collaboration.configure({ fragment }),
+            CollaborationCaret.configure({
+              provider: { awareness },
+              user: { name: '协作者', color: '#0091ff' },
+              render: renderRemoteCaret,
+              selectionRender: renderRemoteSelection,
+            }),
+          ]
+        : []),
     ],
     [collaborative, fragment, awareness],
   );
@@ -163,21 +203,19 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
       undo() {
         if (!editor) return false;
         editor.commands.focus();
-        if (collaborative) return undoCommand(editor.view.state, editor.view.dispatch, editor.view);
         return editor.commands.undo();
       },
       redo() {
         if (!editor) return false;
         editor.commands.focus();
-        if (collaborative) return redoCommand(editor.view.state, editor.view.dispatch, editor.view);
         return editor.commands.redo();
       },
       canUndo() {
-        if (collaborative) return editor ? undoCommand(editor.view.state) : false;
+        if (collaborative) return Boolean(editor);
         return editor?.can().undo() ?? false;
       },
       canRedo() {
-        if (collaborative) return editor ? redoCommand(editor.view.state) : false;
+        if (collaborative) return Boolean(editor);
         return editor?.can().redo() ?? false;
       },
       harvestDarling() {
