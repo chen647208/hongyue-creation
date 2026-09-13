@@ -110,6 +110,9 @@ export function requestErrorFromResponse(status: number, statusText: string, bod
   } else if (status >= 500) {
     kind = 'server';
     message = aiT('requestServerError', { status, detail });
+  } else if (status === 400 && /content[\s_-]?filter|content[\s_-]?policy|moderation|safety|敏感|违规/i.test(detail)) {
+    kind = 'content-filter';
+    message = aiT('requestContentFiltered', { status, detail });
   } else if (status >= 400) {
     kind = 'bad-request';
     message = aiT('requestBadRequest', { status, detail });

@@ -24,5 +24,6 @@
   "requestAuthFailed": "Authentication failed ({{status}}): check the API key and permissions. {{detail}}",
   "requestRateLimited": "Rate limited ({{status}}): please retry later. {{detail}}",
   "requestServerError": "Server error ({{status}}): {{detail}}",
-  "requestBadRequest": "Request rejected ({{status}}): {{detail}}"
+  "requestBadRequest": "Request rejected ({{status}}): {{detail}}",
+  "requestContentFiltered": "Blocked by content safety policy ({{status}}): {{detail}}"
 }

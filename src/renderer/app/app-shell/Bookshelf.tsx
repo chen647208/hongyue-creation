@@ -382,7 +382,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
                     else onOpenBook(book.id);
                   }
                 }}
-                className={`group flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors hover:bg-accent/40 ${idx > 0 ? 'border-t border-border' : ''} ${selectedIds.has(book.id) ? 'bg-accent/60' : ''}`}
+                className={`cv-auto group flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors hover:bg-accent/40 ${idx > 0 ? 'border-t border-border' : ''} ${selectedIds.has(book.id) ? 'bg-accent/60' : ''}`}
               >
                 {selectMode && (
                   <span className="shrink-0 text-primary" aria-hidden="true">
@@ -427,7 +427,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
                     else onOpenBook(book.id);
                   }
                 }}
-                className={`group flex cursor-pointer flex-col gap-3 p-5 transition-colors hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedIds.has(book.id) ? 'border-primary ring-1 ring-primary' : ''}`}
+                className={`cv-auto group flex cursor-pointer flex-col gap-3 p-5 transition-colors hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedIds.has(book.id) ? 'border-primary ring-1 ring-primary' : ''}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">

@@ -69,7 +69,7 @@ export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
 }
 
-function applyWindowSecurity(win: BrowserWindow): void {
+export function applyWindowSecurity(win: BrowserWindow): void {
   // 拒绝一切弹出新窗口的行为（渲染层没有合法使用场景）
   win.webContents.setWindowOpenHandler(({ url }) => {
     logger.warn('window', `Blocked window.open: ${url}`);

@@ -98,7 +98,7 @@ export const storage = {
     if (window.electronAPI) {
       try {
         const filePath = await getStoragePath();
-        await window.electronAPI.writeFile(filePath, JSON.stringify(state, null, 2));
+        await window.electronAPI.writeFile(filePath, JSON.stringify(state));
         logger.debug('State saved to file:', filePath);
       } catch (error) {
         logger.error('Failed to save state to file:', error);
@@ -192,13 +192,13 @@ export const storage = {
         });
         
         if (!result.canceled && result.filePath) {
-          await window.electronAPI.writeFile(result.filePath, JSON.stringify(state, null, 2));
+          await window.electronAPI.writeFile(result.filePath, JSON.stringify(state));
           dialogService.alert(i18n.t('app:storage.exportAllSuccess'));
         }
       } catch (error) {
         logger.error('Failed to export data:', error);
         // 回退到浏览器下载
-        const dataStr = JSON.stringify(state, null, 2);
+        const dataStr = JSON.stringify(state);
         const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
         const exportFileDefaultName = `novalist-backup-${new Date().toISOString().split('T')[0]}.json`;
         
@@ -209,7 +209,7 @@ export const storage = {
       }
     } else {
       // 浏览器模式
-      const dataStr = JSON.stringify(state, null, 2);
+      const dataStr = JSON.stringify(state);
       const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
       const exportFileDefaultName = `novalist-backup-${new Date().toISOString().split('T')[0]}.json`;
       
@@ -319,65 +319,6 @@ export const storage = {
   },
 
   // 新增：迁移数据到新路径
-  migrateData: async (newConfig: StorageConfig): Promise<boolean> => {
-    if (!window.electronAPI) {
-      logger.error('数据迁移仅在Electron环境中可用');
-      return false;
-    }
-
-    try {
-      
-      // 如果新配置不使用自定义路径，无需迁移
-      if (!newConfig.useCustomPath || !newConfig.dataPath) {
-        // 保存新配置
-        await saveStorageConfig(newConfig);
-        return true;
-      }
-
-      // 获取当前数据文件路径
-      const currentFilePath = await getStoragePath();
-      
-      // 检查当前文件是否存在
-      const currentFileExists = await window.electronAPI.exists(currentFilePath);
-      
-      if (currentFileExists) {
-        // 读取当前数据
-        const data = await window.electronAPI.readFile(currentFilePath);
-        
-        // 创建新目录（如果不存在）
-        try {
-          // 检查目录是否存在，如果不存在则创建
-          // 注意：这里简化处理，实际可能需要递归创建目录
-          // 由于Electron API限制，我们假设目录已存在或由用户创建
-        } catch (error) {
-          logger.warn('Directory creation may be needed:', error);
-        }
-        
-        // 保存到新路径
-        const newFilePath = `${newConfig.dataPath}/${STORAGE_FILE_NAME}`;
-        await window.electronAPI.writeFile(newFilePath, data);
-        
-        // 更新配置并标记迁移时间
-        const updatedConfig: StorageConfig = {
-          ...newConfig,
-          lastMigration: new Date().toISOString()
-        };
-        await saveStorageConfig(updatedConfig);
-        
-        logger.debug(`Data migrated from ${currentFilePath} to ${newFilePath}`);
-        return true;
-      } else {
-        // 当前文件不存在，只需保存新配置
-        await saveStorageConfig(newConfig);
-        return true;
-      }
-    } catch (error) {
-      logger.error('Failed to migrate data:', error);
-      return false;
-    }
-  },
-
-  // 新增：获取当前数据文件路径
   getCurrentDataPath: async (): Promise<string> => {
     return await getStoragePath();
   },
@@ -404,13 +345,13 @@ export const storage = {
         });
         
         if (!result.canceled && result.filePath) {
-          await window.electronAPI.writeFile(result.filePath, JSON.stringify(project, null, 2));
+          await window.electronAPI.writeFile(result.filePath, JSON.stringify(project));
           dialogService.alert(i18n.t('app:book.exportSuccess', { title: project.title }));
         }
       } catch (error) {
         logger.error('Failed to export current book:', error);
         // 回退到浏览器下载
-        const dataStr = JSON.stringify(project, null, 2);
+        const dataStr = JSON.stringify(project);
         const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
         const exportFileDefaultName = `${project.title.replace(/[<>:"/\\|?*]/g, '_')}-${new Date().toISOString().split('T')[0]}.json`;
         
@@ -421,7 +362,7 @@ export const storage = {
       }
     } else {
       // 浏览器模式
-      const dataStr = JSON.stringify(project, null, 2);
+      const dataStr = JSON.stringify(project);
       const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
       const exportFileDefaultName = `${project.title.replace(/[<>:"/\\|?*]/g, '_')}-${new Date().toISOString().split('T')[0]}.json`;
       

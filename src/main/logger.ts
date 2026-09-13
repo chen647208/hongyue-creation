@@ -36,6 +36,9 @@ class MainLogger {
   private logDir: string | null = null;
   private writeChain: Promise<void> = Promise.resolve();
   private pruned = false;
+  /** 当前日志文件路径与已写字节数，避免每行 stat。 */
+  private currentFile: string | null = null;
+  private currentBytes = 0;
 
   private ensureLogFile(now: Date): string {
     if (!this.logDir) {
@@ -69,11 +72,16 @@ class MainLogger {
       }
     }
     try {
-      const stat = await fsp.stat(file).catch(() => null);
-      if (stat && stat.size > MAX_LOG_SIZE_BYTES) {
+      if (file !== this.currentFile) {
+        this.currentFile = file;
+        this.currentBytes = await fsp.stat(file).then((stat) => stat.size).catch(() => 0);
+      }
+      if (this.currentBytes > MAX_LOG_SIZE_BYTES) {
         await fsp.rename(file, `${file.slice(0, -4)}.1.log`).catch(() => undefined);
+        this.currentBytes = 0;
       }
       await fsp.appendFile(file, line, 'utf-8');
+      this.currentBytes += Buffer.byteLength(line, 'utf-8');
     } catch {
       // 写日志失败时静默降级为仅控制台输出
     }

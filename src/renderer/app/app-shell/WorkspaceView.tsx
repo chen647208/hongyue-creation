@@ -23,6 +23,7 @@ import Slot from '@/shared/ui/Slot';
 import { Spinner } from '@/shared/ui/Spinner';
 
 import { type AppTheme, type ModelConfig, type Project, type PromptTemplate } from '../../../shared/types';
+import { ErrorBoundary } from '../../shared/components/ErrorBoundary';
 import { isModelUsable } from '../../shared/utils/modelReadiness';
 import type { SectionId } from '../sections';
 import WorkspaceNav from './WorkspaceNav';
@@ -176,7 +177,9 @@ const WorkspaceSection: React.FC<WorkspaceViewProps> = ({
         </div>
       )}
       <div className="min-h-0 flex-1">
-        <React.Suspense fallback={<SectionFallback />}>{content}</React.Suspense>
+        <ErrorBoundary scope={section}>
+          <React.Suspense fallback={<SectionFallback />}>{content}</React.Suspense>
+        </ErrorBoundary>
       </div>
       <div className="flex h-6 shrink-0 items-center justify-end gap-3 border-t border-border bg-muted/20 px-3">
         <Slot id="status-bar" />

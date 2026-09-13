@@ -18,7 +18,7 @@
 import { dt } from '@/i18n';
 
 import { APP_STATE_VERSION } from '../../../shared/constants/versions';
-import { type AppState } from '../../../shared/types';
+import { type AppState, type StorageConfig } from '../../../shared/types';
 import { autoBackupService } from '../../shared/services/autoBackupService';
 import { repository } from '../../shared/services/repository';
 import { TaskScheduler } from '../../shared/services/taskScheduler';
@@ -77,6 +77,19 @@ const FLUSH_MAX_WAIT_MS = 3000;
 /** 周期任务调度器：自动备份兜底（空闲不落盘时也按间隔备份）。 */
 const scheduler = new TaskScheduler();
 
+/** 存储配置缓存：避免每次落盘都读一次配置文件。 */
+const STORAGE_CONFIG_TTL_MS = 30_000;
+let storageConfigCache: { config: StorageConfig; at: number } | null = null;
+
+async function getCachedStorageConfig(): Promise<StorageConfig> {
+  if (storageConfigCache && Date.now() - storageConfigCache.at < STORAGE_CONFIG_TTL_MS) {
+    return storageConfigCache.config;
+  }
+  const config = await repository.getStorageConfig();
+  storageConfigCache = { config, at: Date.now() };
+  return config;
+}
+
 /** 建立差分基线（首启动 hydrate 后调用；base 即磁盘现状的组合态）。 */
 export function seedPersistBaseline(base: AppState | null): void {
   lastPersisted = base;
@@ -118,7 +131,7 @@ async function doFlush(): Promise<void> {
 
 /** 自动备份：按间隔判定，成功后回写上次备份时间。落盘后与周期任务共用同一入口。 */
 async function maybeAutoBackup(): Promise<void> {
-  const config = await repository.getStorageConfig();
+  const config = await getCachedStorageConfig();
   if (!config.autoBackupEnabled || !autoBackupService.shouldPerformBackup(config)) return;
   const backedUp = await autoBackupService.performBackup(config, () => composeAppState());
   // 数据库一致副本（VACUUM INTO）：与 JSON 快照互补，含 WAL 中未 checkpoint 的数据。
@@ -126,7 +139,9 @@ async function maybeAutoBackup(): Promise<void> {
     logger.warn('数据库热备份失败:', error);
   });
   if (backedUp) {
-    await repository.updateStorageConfig({ ...config, lastAutoBackup: Date.now() });
+    const updated = { ...config, lastAutoBackup: Date.now() };
+    await repository.updateStorageConfig(updated);
+    storageConfigCache = { config: updated, at: Date.now() };
   }
 }
 

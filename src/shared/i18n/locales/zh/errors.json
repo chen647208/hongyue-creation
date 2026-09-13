@@ -24,5 +24,6 @@
   "requestAuthFailed": "鉴权失败（{{status}}）：请检查 API Key 与权限。{{detail}}",
   "requestRateLimited": "触发限流（{{status}}）：请稍后重试。{{detail}}",
   "requestServerError": "服务端错误（{{status}}）：{{detail}}",
-  "requestBadRequest": "请求被拒绝（{{status}}）：{{detail}}"
+  "requestBadRequest": "请求被拒绝（{{status}}）：{{detail}}",
+  "requestContentFiltered": "内容被安全策略拦截（{{status}}）：{{detail}}"
 }

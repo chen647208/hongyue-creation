@@ -48,7 +48,7 @@ export interface ProviderAdapter {
 }
 
 /** 请求错误分类：用于给用户分类友好文案，不影响重试判定。 */
-export type AiErrorKind = 'auth' | 'rate-limit' | 'bad-request' | 'server' | 'unknown';
+export type AiErrorKind = 'auth' | 'rate-limit' | 'bad-request' | 'content-filter' | 'server' | 'unknown';
 
 /** 请求错误：携带 HTTP 状态与可重试性判定，供重试层消费 */
 export class AIRequestError extends Error {

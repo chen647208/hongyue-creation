@@ -28,8 +28,7 @@ import { registerPluginFsIpc } from './pluginFs.js';
 import { sandboxHost } from './pluginSandbox/host.js';
 import { type CosignVerifyInput, sha256Matches, verifyCosignBlob,verifyEd25519 } from './pluginSignature.js';
 import { destroyTray, registerShellIpc } from './tray.js';
-import { getMainWindow } from './window.js';
-import { createWindow } from './window.js';
+import { applyWindowSecurity, createWindow, getMainWindow } from './window.js';
 
 /**
  * 主进程各子系统的 Provider 化（docs/design/02）。
@@ -312,6 +311,7 @@ export const dialogProvider: Provider = {
         throw new TypeError('Invalid printPdf args');
       }
       const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
+      applyWindowSecurity(win);
       try {
         await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
         const pdf = await win.webContents.printToPDF({ printBackground: true });

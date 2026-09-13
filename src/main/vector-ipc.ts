@@ -138,6 +138,14 @@ function assertEmbedding(value: unknown): asserts value is number[] {
 }
 
 /** 从 Vectra item 还原渲染层期望的文档结构 */
+const SEARCH_SNIPPET_MAX = 240;
+
+/** 语义搜索结果只回传截断片段，避免整段正文跨进程。 */
+function snippetText(value: unknown): string {
+  const text = String(value ?? '');
+  return text.length > SEARCH_SNIPPET_MAX ? text.slice(0, SEARCH_SNIPPET_MAX) : text;
+}
+
 function itemToSearchResult(item: VectraItem, score: number, fallbackProjectId: string) {
   const meta = (item.metadata ?? {}) as VectorDocumentMetadata & { projectId?: string; knowledgeItemId?: string; content?: string };
   return {
@@ -145,7 +153,7 @@ function itemToSearchResult(item: VectraItem, score: number, fallbackProjectId: 
       id: item.id,
       projectId: String(meta.projectId ?? fallbackProjectId),
       knowledgeItemId: String(meta.knowledgeItemId ?? ''),
-      content: String(meta.content ?? ''),
+      content: snippetText(meta.content),
       embedding: [] as number[], // 不跨进程回传完整向量
       metadata: {
         category: meta.category ?? 'writing',
@@ -157,7 +165,7 @@ function itemToSearchResult(item: VectraItem, score: number, fallbackProjectId: 
       },
     },
     score,
-    content: String(meta.content ?? ''),
+    content: snippetText(meta.content),
     metadata: {
       category: meta.category ?? 'writing',
       type: meta.type ?? 'text',
@@ -240,25 +248,32 @@ export function registerVectorIpc(): void {
       assertProjectId(projectId);
       assertDocumentList(documents);
       const index = await service.getIndex(projectId);
-      const ids: string[] = [];
-      for (const doc of documents) {
-        await index.insertItem({
-          id: doc.id,
-          vector: doc.embedding,
-          metadata: {
-            projectId: doc.projectId,
-            knowledgeItemId: doc.knowledgeItemId,
-            content: doc.content,
-            category: doc.metadata?.category,
-            type: doc.metadata?.type,
-            size: doc.metadata?.size,
-            addedAt: doc.metadata?.addedAt,
-            chunkIndex: doc.metadata?.chunkIndex,
-            totalChunks: doc.metadata?.totalChunks,
-          },
-        });
-        ids.push(doc.id);
-      }
+      const inserted = await Promise.all(
+        documents.map(async (doc) => {
+          try {
+            await index.insertItem({
+              id: doc.id,
+              vector: doc.embedding,
+              metadata: {
+                projectId: doc.projectId,
+                knowledgeItemId: doc.knowledgeItemId,
+                content: doc.content,
+                category: doc.metadata?.category,
+                type: doc.metadata?.type,
+                size: doc.metadata?.size,
+                addedAt: doc.metadata?.addedAt,
+                chunkIndex: doc.metadata?.chunkIndex,
+                totalChunks: doc.metadata?.totalChunks,
+              },
+            });
+            return doc.id;
+          } catch (error) {
+            logger.warn('vector', `insertItem failed ${doc.id}`, error);
+            return null;
+          }
+        }),
+      );
+      const ids = inserted.filter((id): id is string => id !== null);
       return { success: true, ids };
     } catch (e) {
       logger.error('vector', 'addDocuments failed', e);
@@ -300,10 +315,16 @@ export function registerVectorIpc(): void {
       assertProjectId(projectId);
       assertStringList(documentIds);
       const index = await service.getIndex(projectId);
+      let failed = 0;
       for (const id of documentIds) {
-        await index.deleteItem(id).catch((e: unknown) => logger.warn('vector', `Failed to delete document ${id}: ${errorMessage(e)}`));
+        try {
+          await index.deleteItem(id);
+        } catch (e) {
+          failed += 1;
+          logger.warn('vector', `Failed to delete document ${id}: ${errorMessage(e)}`);
+        }
       }
-      return { success: true };
+      return failed === 0 ? { success: true } : { success: false, error: `delete-failed:${failed}` };
     } catch (e) {
       logger.error('vector', 'deleteDocuments failed', e);
       return { success: false, error: errorMessage(e) };
