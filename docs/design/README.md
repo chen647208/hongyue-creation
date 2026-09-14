@@ -41,6 +41,10 @@
 34. **[41 非虚构与引用](41-nonfiction-and-reference.md)** — 引文/脚注/参考文献、对照视图
 35. **[42 分支叙事与绘本](42-branching-and-picturebook.md)** — 分支与变量、完整性校验、图位与页
 36. **[43 无障碍与国际化品质](43-accessibility-and-i18n.md)** — 全量 axe、对比度 AA、中英对齐校验
+37. **[44 创作范式地图与跨域能力](44-paradigms-and-cross-domain.md)** — 各领域范式地图、跨域可迁移机制、本仓落点与分档
+38. **[45 查询、块引用与素材隔离](45-query-blocks-and-materials.md)** — 保存的动态视图、块级引用与嵌入、素材隔离
+39. **[46 时间线深化与版本](46-timeline-and-versioning.md)** — 非破坏操作、草稿矩阵与成稿轨道、试错快照与正式历史
+40. **[47 跨域视图与脚本层](47-cross-domain-views-and-scripting.md)** — 图 DSL 视图、可编程画布、图表视图、宏/脚本层
 
 ## 一页纸总览
 
