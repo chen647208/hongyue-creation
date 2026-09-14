@@ -84,6 +84,11 @@ class DialogService {
     this.emit();
   }
 
+  /** 当前是否有全局对话框在展示（用于让功能弹窗让位，不响应外部点击/ Esc 关闭）。 */
+  isOpen(): boolean {
+    return this.queue.length > 0;
+  }
+
   /** 订阅当前队列快照（含立即回调一次），返回取消订阅函数。 */
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);

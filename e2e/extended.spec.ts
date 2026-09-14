@@ -172,9 +172,8 @@ test('数据库损坏：启动给出加载失败提示，不静默当空书库',
   writeFileSync(join(userDataDir, 'hongyue.db'), 'this is not a sqlite database');
   const { app, page } = await launchApp(userDataDir);
   try {
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/加载失败|完整性检查未通过|load failed|integrity/i).first()).toBeVisible({ timeout: 10_000 });
+    const alert = page.getByRole('dialog').filter({ hasText: /加载失败|完整性检查未通过|load failed|integrity/i });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
   } finally {
     await app.close();
     cleanupUserDataDir(userDataDir);
@@ -192,6 +191,34 @@ test('设置：打开数据存储页显示存储管理', async () => {
     await page.getByRole('button', { name: '数据存储' }).click();
     await expect(page.getByText('数据存储管理')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: /检查完整性|完整性/ })).toBeVisible();
+  } finally {
+    await app.close();
+    cleanupUserDataDir(userDataDir);
+  }
+});
+
+test('数据库加密：状态可见，启用需二次确认（可取消）', async () => {
+  const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-e2e-encrypt-'));
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    await createBook(page);
+    await page.getByRole('button', { name: '设置' }).first().click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: '数据存储' }).click();
+
+    // 加密区块始终可见：标题 + 状态/操作
+    await expect(page.getByText('数据库加密')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: '用恢复码解锁' })).toBeVisible();
+
+    const enable = page.getByRole('button', { name: '启用加密' });
+    if (await enable.isVisible().catch(() => false)) {
+      await enable.click();
+      const confirmEnable = page.getByRole('dialog').filter({ hasText: /启用后数据库会立即加密/ });
+      await expect(confirmEnable).toBeVisible({ timeout: 20_000 });
+      // 取消：不启用
+      await confirmEnable.getByRole('button', { name: '取消' }).click();
+      await expect(confirmEnable).toBeHidden({ timeout: 10_000 });
+    }
   } finally {
     await app.close();
     cleanupUserDataDir(userDataDir);

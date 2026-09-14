@@ -9,6 +9,7 @@
 
 import { AlertTriangle, CircleAlert, CircleCheck, Info, type LucideIcon,SquarePen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useTranslation } from '@/i18n';
 
@@ -70,9 +71,9 @@ const DialogHost: React.FC = () => {
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-modal flex animate-fade-in items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      className="pointer-events-auto fixed inset-0 z-alert flex animate-fade-in items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       role="presentation"
       onKeyDown={onKeyDown}
     >
@@ -134,7 +135,8 @@ const DialogHost: React.FC = () => {
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

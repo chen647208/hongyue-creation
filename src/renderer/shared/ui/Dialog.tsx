@@ -11,6 +11,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import * as React from 'react';
 
+import { dialogService } from '../services/dialogService';
 import { cn } from '../utils/cn';
 
 export const Dialog = DialogPrimitive.Root;
@@ -41,6 +42,10 @@ export const DialogContent = React.forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      onPointerDownOutside={(event) => { if (dialogService.isOpen()) event.preventDefault(); }}
+      onInteractOutside={(event) => { if (dialogService.isOpen()) event.preventDefault(); }}
+      onFocusOutside={(event) => { if (dialogService.isOpen()) event.preventDefault(); }}
+      onEscapeKeyDown={(event) => { if (dialogService.isOpen()) event.preventDefault(); }}
       className={cn(
         'fixed left-1/2 top-1/2 z-modal grid max-h-[calc(100vh-4rem)] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4',
         'overflow-y-auto border bg-background p-6 shadow-lg',

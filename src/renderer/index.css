@@ -264,6 +264,8 @@
   .z-overlay { z-index: 100; }
   .z-modal { z-index: 10001; }
   .z-popover { z-index: 10002; }
+  /* 全局提示/确认：始终盖在功能弹窗之上 */
+  .z-alert { z-index: 10003; }
   /* 小说 DSL 富文本画布：TipTap ProseMirror 排版基线 + 语义节点样式 */
   .novel-canvas .ProseMirror {
     min-height: 100%;

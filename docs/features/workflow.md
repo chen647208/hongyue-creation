@@ -56,6 +56,8 @@
 ## 数据流说明
 
 - 当前项目主状态由双 store 持有（`app/stores/projectStore.ts` + `settingsStore.ts`）
+- 启动按骨架载入：`loadAll` 只取书库骨架（非活动书 `hydrated:false`，正文留空并带字数缓存），随后补载活动书正文；打开其它书时经 `loadBookContent` 补载。导出、自动/手动备份、复制书在动手前先补载全部正文，避免落出空书
+- 派生索引按需重建：冷启动只重建活动书索引，其余书在打开时重建
 - 各步骤组件通过 `project` 和 `onUpdate` 接收数据与回写修改
 - 书籍切换、本地持久化和初始化加载由 `persistenceBridge.ts` 差分落盘配合完成
 

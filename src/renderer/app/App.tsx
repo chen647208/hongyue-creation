@@ -33,7 +33,7 @@ import { useViewPreference } from '../shared/hooks/useViewPreference';
 import { exportCover } from '../shared/services/coverService';
 import { dialogService } from '../shared/services/dialogService';
 import { eventToKeybinding, resolveKeybindings } from '../shared/services/keybindings';
-import { getStorageBackendStatus } from '../shared/services/repository';
+import { getStorageBackendStatus,repository } from '../shared/services/repository';
 import { registerAssistantRuntime } from './app-shell/assistantRuntimeSetup';
 import { BookshelfScreen } from './app-shell/BookshelfScreen';
 import CommandPalette from './app-shell/CommandPalette';
@@ -48,6 +48,7 @@ import { useCollaborationSync } from './collaboration/collaborationService';
 import { isSectionVisible } from './sectionFeatures';
 import type { SectionId } from './sections';
 import { WORKSPACE_SECTIONS } from './sections';
+import { composeAppState } from './stores/persistenceBridge';
 import { selectActiveProject,useProjectStore } from './stores/projectStore';
 import { useSettingsStore, useUsableModel } from './stores/settingsStore';
 import { useAppBootstrap } from './useAppBootstrap';
@@ -279,12 +280,20 @@ const App: React.FC = () => {
   ) : null;
 
   if (getStorageBackendStatus().mismatch) {
+    const exportFallback = (): void => {
+      void repository.exportAll(composeAppState()).catch((error: unknown) => {
+        dialogService.alert(t('storageBackendExportFailed', { message: error instanceof Error ? error.message : String(error) }));
+      });
+    };
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center">
         <DialogHost />
         <h1 className="text-lg font-semibold text-foreground">{t('storageBackendBlockTitle')}</h1>
         <p role="alert" className="max-w-md text-sm text-muted-foreground">{t('storageBackendBlockBody')}</p>
-        <Button onClick={() => window.location.reload()}>{t('storageBackendRetry')}</Button>
+        <div className="flex gap-2">
+          <Button onClick={() => window.location.reload()}>{t('storageBackendRetry')}</Button>
+          <Button variant="outline" onClick={exportFallback}>{t('storageBackendExport')}</Button>
+        </div>
       </div>
     );
   }

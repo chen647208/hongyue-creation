@@ -43,6 +43,8 @@
 - 诊断：`main/app/diagnosticsCore.ts`（收集日志/窗口几何/存储配置/环境信息 + `health.json` 健康检查）+ `diagnostics.ts`（IPC + zip 另存）；存储面板「导出诊断包」；主进程 `crashReporter` 本地留存转储
 - 存储安全：启动执行快速 `quick_check`；存储面板完整性检查执行深度 `integrity_check`；自动备份在 JSON 快照之外生成数据库热备份（`VACUUM INTO`，滚动保留），且库级加密开启时 JSON 快照落密文；库级 AES-256 加密默认关闭，可在存储面板启停并导出/应用恢复码（密钥走系统钥匙串），细节见 `docs/design/25-data-safety.md`
 - 保存语义：语言/主题/字体直写即时生效；模型与密钥类暂存按保存落盘（防半配置生效），关闭直接丢弃
+- 存储后端：哨兵键记录上次后端（`sqlite-opfs` / `sqlite-ipc` / `json-local`）；期望 OPFS 但当前不可用时进入阻断页（重试 / 导出备份），不静默当空库；localStorage → OPFS 为单向一次性迁移（写新库 → 校验书数/章节数 → 留 legacy 副本 → 写哨兵 → 清旧键，任一步失败保留原数据），实现见 `shared/services/repository/migration.ts`
+- 密钥边界：模型拉表与向量嵌入经主进程 `ai:http` 网关发起，Key 由主进程从系统钥匙串解引用并按声明的头/查询参数注入，渲染端不经手明文
 
 ## 界面功能开关
 
