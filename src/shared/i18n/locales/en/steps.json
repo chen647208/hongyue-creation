@@ -180,6 +180,19 @@
     "displayLabel": "Display",
     "displayPlaceholder": "Year 1 of the Third Era",
     "linkedEvent": "Linked Event",
-    "noTimeline": "No timeline set yet"
+    "noTimeline": "No timeline set yet",
+    "extractFromText": "Extract Outline from Text",
+    "extracting": "Extracting...",
+    "extractChapter": "Extract outline from this chapter",
+    "extractNoContent": "Selected chapters have no body text to extract from.",
+    "extractEmpty": "Could not parse any outline from the text. Please retry.",
+    "extractFailed": "Extraction failed: {{error}}",
+    "draftTitle": "Outline draft (pending confirmation)",
+    "draftHint": "On confirm, drafts fill empty outlines only. Chapters that already have an outline are never overwritten.",
+    "draftApply": "Apply selected",
+    "draftDiscard": "Discard",
+    "draftSkipped": "Already has outline, skipped",
+    "draftApplied": "Wrote outlines for {{count}} chapters",
+    "draftNoneSelected": "No outline to write (chapters with an existing outline are never overwritten)."
   }
 }

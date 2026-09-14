@@ -34,6 +34,12 @@ export const KNOWLEDGE_SNIPPET_TRUNCATE = 8000;
 /** 正文写作提示词里的参考资料截断（字符） */
 export const PROMPT_KNOWLEDGE_TRUNCATE = 10000;
 
+/** 从正文提取细纲：单章正文送模型的字符上限 */
+export const EXTRACT_OUTLINE_PER_CHAPTER_LIMIT = 6000;
+
+/** 从正文提取细纲：每章细纲目标字数（提示词用） */
+export const EXTRACT_OUTLINE_SUMMARY_TARGET = 150;
+
 /** 助手附件内容截断（字符，超长标注已截断） */
 export const ATTACHMENT_TRUNCATE = 15000;
 

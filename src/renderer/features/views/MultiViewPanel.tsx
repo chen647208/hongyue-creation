@@ -19,15 +19,18 @@ import { localStore } from '@/shared/services/localStore';
 import { Button } from '@/shared/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/shared/ui/DropdownMenu';
+import { Input } from '@/shared/ui/Input';
+import { Select } from '@/shared/ui/Select';
 import { ViewModeToggle } from '@/shared/ui/ViewModeToggle';
 import { cn } from '@/shared/utils/cn';
 
 import { buildEntityView } from './buildEntityView';
-import type { ViewRow } from './types';
+import type { AggregationKind, ConditionOperator, QueryLeaf, ViewRow } from './types';
 import ViewCards from './ViewCards';
 import ViewGraph from './ViewGraph';
 import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from './viewLayout';
 import ViewOutline from './ViewOutline';
+import { aggregateRows, applyViewQuery } from './viewQuery';
 import ViewReader from './ViewReader';
 import ViewTable from './ViewTable';
 
@@ -44,6 +47,11 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   const [dragViewId, setDragViewId] = useState<string | null>(null);
   const [resize, setResize] = useState<{ startY: number; base: number } | null>(null);
   const [liveHeight, setLiveHeight] = useState<number | null>(null);
+  const [condField, setCondField] = useState('title');
+  const [condOperator, setCondOperator] = useState<ConditionOperator>('contains');
+  const [condValue, setCondValue] = useState('');
+  const [aggField, setAggField] = useState('title');
+  const [aggKind, setAggKind] = useState<AggregationKind>('count');
 
   const data = useMemo(() => buildEntityView(project), [project]);
 
@@ -153,9 +161,90 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     summary: t('views.col.summary'),
     detail: t('views.col.detail'),
   };
-  const displayColumns = data.columns.map((column) => ({ ...column, label: columnLabels[column.key] ?? column.key }));
+  const queryFieldLabels: Record<string, string> = {
+    kind: t('views.query.fields.kind'),
+    title: t('views.query.fields.title'),
+    summary: t('views.query.fields.summary'),
+    detail: t('views.query.fields.detail'),
+    name: t('views.query.fields.name'),
+    gender: t('views.query.fields.gender'),
+    age: t('views.query.fields.age'),
+    role: t('views.query.fields.role'),
+    occupation: t('views.query.fields.occupation'),
+    factionId: t('views.query.fields.factionId'),
+    currentLocationId: t('views.query.fields.currentLocationId'),
+    type: t('views.query.fields.type'),
+    controlledBy: t('views.query.fields.controlledBy'),
+    memberCount: t('views.query.fields.memberCount'),
+    date: t('views.query.fields.date'),
+    year: t('views.query.fields.year'),
+    month: t('views.query.fields.month'),
+    day: t('views.query.fields.day'),
+  };
+  const queryFieldLabel = (field: string): string => queryFieldLabels[field] ?? field;
+  const conditionOperatorLabels: Record<ConditionOperator, string> = {
+    eq: t('views.query.op.eq'),
+    neq: t('views.query.op.neq'),
+    contains: t('views.query.op.contains'),
+    notContains: t('views.query.op.notContains'),
+    gt: t('views.query.op.gt'),
+    gte: t('views.query.op.gte'),
+    lt: t('views.query.op.lt'),
+    lte: t('views.query.op.lte'),
+    empty: t('views.query.op.empty'),
+    notEmpty: t('views.query.op.notEmpty'),
+  };
+  const aggregationKindLabels: Record<AggregationKind, string> = {
+    count: t('views.query.agg.count'),
+    sum: t('views.query.agg.sum'),
+    avg: t('views.query.agg.avg'),
+    longest: t('views.query.agg.longest'),
+    latest: t('views.query.agg.latest'),
+  };
+  const projection = useMemo(
+    () =>
+      applyViewQuery(data, {
+        conditions: layout.conditions,
+        computed: layout.computed,
+        aggregations: layout.aggregations,
+      }),
+    [data, layout.conditions, layout.computed, layout.aggregations],
+  );
+  const displayColumns = projection.columns.map((column) => ({ ...column, label: columnLabels[column.key] ?? column.label }));
 
-  const rows = layout.kindFilter && layout.kindFilter !== 'all' ? data.rows.filter((row) => row.kind === layout.kindFilter) : data.rows;
+  const availableFields = useMemo(() => {
+    const keys = new Set<string>();
+    for (const row of data.rows) {
+      for (const key of Object.keys(row.cells)) keys.add(key);
+      for (const key of Object.keys(row.values ?? {})) keys.add(key);
+    }
+    return [...keys];
+  }, [data]);
+
+  const rows = layout.kindFilter && layout.kindFilter !== 'all' ? projection.rows.filter((row) => row.kind === layout.kindFilter) : projection.rows;
+  const aggregations = useMemo(() => aggregateRows(rows, layout.aggregations), [rows, layout.aggregations]);
+  const conditionLeaves = layout.conditions?.type === 'and' ? layout.conditions.children.filter((child): child is QueryLeaf => child.type === 'leaf') : [];
+
+  const addCondition = () => {
+    const leaf: QueryLeaf = { type: 'leaf', field: condField, operator: condOperator };
+    if (condOperator !== 'empty' && condOperator !== 'notEmpty') leaf.value = condValue;
+    setLayout({ conditions: { type: 'and', children: [...conditionLeaves, leaf] } });
+  };
+
+  const removeCondition = (index: number) => {
+    const next = conditionLeaves.filter((_, position) => position !== index);
+    setLayout({ conditions: next.length > 0 ? { type: 'and', children: next } : undefined });
+  };
+
+  const addAggregation = () => {
+    setLayout({ aggregations: [...(layout.aggregations ?? []), { field: aggField, kind: aggKind }] });
+  };
+
+  const removeAggregation = (index: number) => {
+    const next = (layout.aggregations ?? []).filter((_, position) => position !== index);
+    setLayout({ aggregations: next.length > 0 ? next : undefined });
+  };
+
   const bodyHeight = liveHeight ?? layout.height ?? 440;
 
   const handleSelectRow = (row: ViewRow) => {
@@ -163,7 +252,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   };
 
   const showColumn = (key: string) => {
-    const column = data.columns.find((item) => item.key === key);
+    const column = projection.columns.find((item) => item.key === key);
     if (!column) return;
     setLayout({
       hidden: layout.hidden.filter((hiddenKey) => hiddenKey !== key),
@@ -268,7 +357,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                 if (key.startsWith('col:')) showColumn(key.slice(4));
               }}
             >
-            {data.columns.map((column) => (
+            {projection.columns.map((column) => (
               <span
                 key={column.key}
                 draggable
@@ -306,7 +395,89 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
             </button>
             </div>
           </div>
+          <div className="mt-3 space-y-2 border-t border-border pt-3">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">{t('views.query.conditions')}</span>
+              {conditionLeaves.length === 0 && <span className="text-muted-foreground/70">{t('views.query.noConditions')}</span>}
+            </div>
+            {conditionLeaves.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1">
+                {conditionLeaves.map((leaf, index) => (
+                  <span key={`${leaf.field}-${index}`} className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5">
+                    {`${queryFieldLabel(leaf.field)} ${conditionOperatorLabels[leaf.operator]}${leaf.value !== undefined ? ` ${leaf.value}` : ''}`}
+                    <button
+                      type="button"
+                      aria-label={t('views.query.removeCondition')}
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => removeCondition(index)}
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-1">
+              <Select value={condField} onChange={(event) => setCondField(event.target.value)} className="h-7 w-auto text-2xs" aria-label={t('views.query.field')}>
+                {availableFields.map((field) => (
+                  <option key={field} value={field}>{queryFieldLabel(field)}</option>
+                ))}
+              </Select>
+              <Select value={condOperator} onChange={(event) => setCondOperator(event.target.value as ConditionOperator)} className="h-7 w-auto text-2xs" aria-label={t('views.query.operator')}>
+                {(Object.keys(conditionOperatorLabels) as ConditionOperator[]).map((operator) => (
+                  <option key={operator} value={operator}>{conditionOperatorLabels[operator]}</option>
+                ))}
+              </Select>
+              {condOperator !== 'empty' && condOperator !== 'notEmpty' && (
+                <Input
+                  value={condValue}
+                  onChange={(event) => setCondValue(event.target.value)}
+                  placeholder={t('views.query.valuePlaceholder')}
+                  aria-label={t('views.query.value')}
+                  className="h-7 max-w-32 text-2xs"
+                />
+              )}
+              <Button size="sm" variant="outline" className="h-7" onClick={addCondition}>
+                <Plus className="size-3" />
+                {t('views.query.addCondition')}
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-muted-foreground">{t('views.query.aggregations')}</span>
+              <Select value={aggField} onChange={(event) => setAggField(event.target.value)} className="h-7 w-auto text-2xs" aria-label={t('views.query.field')}>
+                {availableFields.map((field) => (
+                  <option key={field} value={field}>{queryFieldLabel(field)}</option>
+                ))}
+              </Select>
+              <Select value={aggKind} onChange={(event) => setAggKind(event.target.value as AggregationKind)} className="h-7 w-auto text-2xs" aria-label={t('views.query.aggregationKind')}>
+                {(Object.keys(aggregationKindLabels) as AggregationKind[]).map((kind) => (
+                  <option key={kind} value={kind}>{aggregationKindLabels[kind]}</option>
+                ))}
+              </Select>
+              <Button size="sm" variant="outline" className="h-7" onClick={addAggregation}>
+                <Plus className="size-3" />
+                {t('views.query.addAggregation')}
+              </Button>
+            </div>
+          </div>
         </details>
+        {aggregations.length > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-2xs">
+            {aggregations.map((result, index) => (
+              <span key={`${result.field}-${result.kind}-${index}`} className="flex items-center gap-1 rounded border border-border bg-muted/40 px-2 py-0.5">
+                {`${queryFieldLabel(result.field)} · ${aggregationKindLabels[result.kind]}：${result.value}`}
+                <button
+                  type="button"
+                  aria-label={t('views.query.removeAggregation')}
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => removeAggregation(index)}
+                >
+                  <Trash2 className="size-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div style={{ height: bodyHeight }} className="overflow-hidden">
           {layout.kind === 'table' && (
             <ViewTable

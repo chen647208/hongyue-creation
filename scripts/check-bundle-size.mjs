@@ -14,8 +14,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** 预算（KB，当前基线约 3204KB）。 */
-const BUDGET_KB = 3450;
+/** 预算（KB，当前基线约 3455KB；接入视图查询、角色登场、章纲提取后复核上调）。 */
+const BUDGET_KB = 3500;
 const DIR = path.resolve(process.cwd(), 'build/renderer');
 
 if (!fs.existsSync(DIR)) {

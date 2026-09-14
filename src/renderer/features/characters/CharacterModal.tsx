@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { Brain, Check, Download, Eye, IdCard, LineChart, ScrollText, Share2, Shield, UserRound } from 'lucide-react';
+import { BookOpen, Brain, Check, Download, Eye, IdCard, LineChart, ScrollText, Share2, Shield, UserRound } from 'lucide-react';
 import React from 'react';
 
 import { useTranslation } from '@/i18n';
@@ -29,6 +29,7 @@ import { type Character, type Project } from '../../../shared/types';
 import { exportCharacterCard } from './characterCard';
 import { BirthInfoEditor } from './components/BirthInfoEditor';
 import { WorldRelationEditor } from './components/WorldRelationEditor';
+import { findCharacterAppearances } from './services/characterAppearance';
 import { generateName } from './services/nameGeneratorService';
 
 interface CharacterModalProps {
@@ -37,6 +38,8 @@ interface CharacterModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (updates: Partial<Character>) => void;
+  /** 跳转到某章（角色登场章节列表）；省略时列表只读展示 */
+  onNavigateToChapter?: (chapterId: string) => void;
 }
 
 /** 分区标题：图标 + 大写小标签，中性色。 */
@@ -49,8 +52,12 @@ function SectionTitle({ icon: Icon, children }: { icon: React.ComponentType<{ cl
   );
 }
 
-const CharacterModal: React.FC<CharacterModalProps> = ({ character, project, isOpen, onClose, onUpdate }) => {
+const CharacterModal: React.FC<CharacterModalProps> = ({ character, project, isOpen, onClose, onUpdate, onNavigateToChapter }) => {
   const { t } = useTranslation('characters');
+  const appearances = React.useMemo(
+    () => findCharacterAppearances(character.name, project.chapters ?? []),
+    [character.name, project.chapters],
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
@@ -180,6 +187,31 @@ const CharacterModal: React.FC<CharacterModalProps> = ({ character, project, isO
                   onChange={(e) => onUpdate({ personality: e.target.value })}
                   placeholder={t('modal.personality.placeholder')}
                 />
+              </section>
+
+              <section>
+                <SectionTitle icon={BookOpen}>{t('appearances.title')}</SectionTitle>
+                {appearances.length === 0 ? (
+                  <p className="text-xs italic text-muted-foreground">{t('appearances.empty')}</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {appearances.map((item) => (
+                      <Button
+                        key={item.chapterId}
+                        variant="outline"
+                        size="sm"
+                        className="h-auto w-full justify-between gap-3 px-3 py-2 text-left font-normal"
+                        onClick={() => onNavigateToChapter?.(item.chapterId)}
+                        disabled={!onNavigateToChapter}
+                        title={t('appearances.hint')}
+                      >
+                        <span className="min-w-0 flex-1 truncate font-serif">{item.title || t('appearances.untitled')}</span>
+                        <span className="shrink-0 text-2xs text-muted-foreground">{t('appearances.order', { n: item.order + 1 })}</span>
+                        <span className="shrink-0 text-2xs text-muted-foreground">{t('appearances.mentions', { n: item.mentions })}</span>
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </section>
             </div>
 

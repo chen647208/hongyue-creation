@@ -108,4 +108,41 @@ describe('viewLayout 编解码', () => {
     expect(restored.sortDesc).toBe(true);
     expect(restored.height).toBe(560);
   });
+
+  it('旧配置缺查询字段时按无条件/无计算列/无聚合读取', () => {
+    const restored = parseViewLayout({ kind: 'card', columns: [], hidden: [] });
+    expect(restored.conditions).toBeUndefined();
+    expect(restored.computed).toBeUndefined();
+    expect(restored.aggregations).toBeUndefined();
+  });
+
+  it('往返保持查询字段', () => {
+    const layout = {
+      ...DEFAULT_VIEW_LAYOUT,
+      conditions: {
+        type: 'and' as const,
+        children: [
+          { type: 'leaf' as const, field: 'kind', operator: 'eq' as const, value: 'character' },
+          { type: 'leaf' as const, field: 'summary', operator: 'empty' as const },
+        ],
+      },
+      computed: [{ key: 'computed:double', label: '双倍年龄', operator: 'add' as const, operands: ['age', 'age'] }],
+      aggregations: [{ field: 'age', kind: 'avg' as const }],
+    };
+    const restored = parseViewLayout(serializeViewLayout(layout));
+    expect(restored.conditions).toEqual(layout.conditions);
+    expect(restored.computed).toEqual(layout.computed);
+    expect(restored.aggregations).toEqual(layout.aggregations);
+  });
+
+  it('丢弃非法查询字段', () => {
+    const restored = parseViewLayout({
+      conditions: { type: 'leaf', field: 'x', operator: 'bogus', value: 1 },
+      computed: [{ key: 'c', operator: 'bogus', operands: [] }],
+      aggregations: [{ field: '', kind: 'nope' }],
+    });
+    expect(restored.conditions).toBeUndefined();
+    expect(restored.computed).toBeUndefined();
+    expect(restored.aggregations).toBeUndefined();
+  });
 });

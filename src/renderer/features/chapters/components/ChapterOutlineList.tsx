@@ -8,7 +8,7 @@
  */
 
 /** 章节细纲列表（表格/卡片两种视图，从 StepChapterOutline 抽出）。 */
-import { ChevronDown, ChevronUp, PenTool, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileSearch, PenTool, Trash2 } from 'lucide-react';
 import React from 'react';
 
 import { useTranslation } from '@/i18n';
@@ -33,6 +33,10 @@ export interface ChapterOutlineListProps {
   project: Project;
   onUpdate: (updates: Partial<Project>) => void;
   renderRelationEditor: (chapter: Chapter) => React.ReactNode;
+  /** 从该章既有正文提取细纲草稿；未提供则不显示入口。 */
+  onExtractOutline?: (chapter: Chapter) => void;
+  /** 提取中或无可用模型时禁用。 */
+  extractOutlineDisabled?: boolean;
 }
 
 export const ChapterOutlineList: React.FC<ChapterOutlineListProps> = ({
@@ -49,6 +53,8 @@ export const ChapterOutlineList: React.FC<ChapterOutlineListProps> = ({
   project,
   onUpdate,
   renderRelationEditor,
+  onExtractOutline,
+  extractOutlineDisabled,
 }) => {
   const { t } = useTranslation(['steps', 'common']);
 
@@ -80,6 +86,18 @@ export const ChapterOutlineList: React.FC<ChapterOutlineListProps> = ({
               <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" disabled={idx === chapters.length - 1} onClick={() => moveChapter(chap.id, 1)} title={t('steps:chapters.moveDown')}>
                 <ChevronDown className="size-4" />
               </Button>
+              {onExtractOutline && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 text-muted-foreground"
+                  disabled={extractOutlineDisabled}
+                  onClick={() => onExtractOutline(chap)}
+                  title={t('steps:chapters.extractChapter')}
+                >
+                  <FileSearch className="size-3.5" />
+                </Button>
+              )}
               <Button size="sm" onClick={() => onEnterWriting(chap.id)}>
                 <PenTool className="size-3.5" /> {t('steps:chapters.writeThis')}
               </Button>
@@ -123,6 +141,18 @@ export const ChapterOutlineList: React.FC<ChapterOutlineListProps> = ({
               <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" disabled={idx === chapters.length - 1} onClick={() => moveChapter(chap.id, 1)} title={t('steps:chapters.moveDown')}>
                 <ChevronDown className="size-4" />
               </Button>
+              {onExtractOutline && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 text-muted-foreground"
+                  disabled={extractOutlineDisabled}
+                  onClick={() => onExtractOutline(chap)}
+                  title={t('steps:chapters.extractChapter')}
+                >
+                  <FileSearch className="size-3.5" />
+                </Button>
+              )}
               <Button size="sm" onClick={() => onEnterWriting(chap.id)}>
                 <PenTool className="size-3.5" /> {t('steps:chapters.writeThis')}
               </Button>

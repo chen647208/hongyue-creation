@@ -40,6 +40,7 @@ export function buildEntityView(project: Project): EntityViewData {
   const characterName = new Map(characters.map((character) => [character.id, character.name]));
 
   for (const character of characters) {
+    const ageNumber = Number(character.age);
     rows.push({
       id: character.id,
       kind: 'character',
@@ -49,6 +50,19 @@ export function buildEntityView(project: Project): EntityViewData {
         title: character.name,
         summary: character.occupation || character.role,
         detail: character.currentLocationId ? (locationName.get(character.currentLocationId) ?? '') : '',
+      },
+      values: {
+        kind: 'character',
+        title: character.name,
+        name: character.name,
+        summary: character.occupation || character.role,
+        detail: character.currentLocationId ? (locationName.get(character.currentLocationId) ?? '') : '',
+        gender: character.gender,
+        age: Number.isFinite(ageNumber) && character.age.trim() !== '' ? ageNumber : null,
+        role: character.role,
+        occupation: character.occupation,
+        factionId: character.factionId ?? '',
+        currentLocationId: character.currentLocationId ?? '',
       },
     });
     if (character.factionId && factionName.has(character.factionId)) {
@@ -70,6 +84,15 @@ export function buildEntityView(project: Project): EntityViewData {
         summary: location.type,
         detail: location.controlledBy ? (factionName.get(location.controlledBy) ?? '') : '',
       },
+      values: {
+        kind: 'location',
+        title: location.name,
+        name: location.name,
+        summary: location.type,
+        detail: location.controlledBy ? (factionName.get(location.controlledBy) ?? '') : '',
+        type: location.type,
+        controlledBy: location.controlledBy ?? '',
+      },
     });
     if (location.controlledBy && factionName.has(location.controlledBy)) {
       links.push({ source: location.id, target: location.controlledBy, label: 'controls' });
@@ -88,6 +111,15 @@ export function buildEntityView(project: Project): EntityViewData {
         summary: faction.type,
         detail: memberCount > 0 ? String(memberCount) : '',
       },
+      values: {
+        kind: 'faction',
+        title: faction.name,
+        name: faction.name,
+        summary: faction.type,
+        detail: memberCount > 0 ? String(memberCount) : '',
+        type: faction.type,
+        memberCount,
+      },
     });
     if (faction.leaderId && characterName.has(faction.leaderId)) {
       links.push({ source: faction.leaderId, target: faction.id, label: 'leads' });
@@ -104,6 +136,18 @@ export function buildEntityView(project: Project): EntityViewData {
         title: event.title,
         summary: formatDate(event.date),
         detail: event.description,
+      },
+      values: {
+        kind: 'event',
+        title: event.title,
+        name: event.title,
+        summary: formatDate(event.date),
+        detail: event.description,
+        type: event.type,
+        date: event.date,
+        year: event.date?.year ?? null,
+        month: event.date?.month ?? null,
+        day: event.date?.day ?? null,
       },
     });
     for (const id of event.relatedCharacterIds ?? []) {

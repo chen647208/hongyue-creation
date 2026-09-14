@@ -138,6 +138,7 @@ const WorkspaceSection: React.FC<WorkspaceViewProps> = ({
           focusCharacterId={focusCharacterId}
           onFocusHandled={() => onNavigateToCharacter('')}
           onGoSection={onSectionChange}
+          onNavigateToChapter={onNavigateToChapter}
         />
       );
       break;

@@ -38,6 +38,59 @@
       "title": "名称",
       "summary": "摘要",
       "detail": "详情"
+    },
+    "query": {
+      "conditions": "筛选条件",
+      "noConditions": "暂无筛选条件，显示全部",
+      "removeCondition": "移除条件",
+      "field": "字段",
+      "operator": "操作符",
+      "value": "值",
+      "valuePlaceholder": "比较值",
+      "addCondition": "添加条件",
+      "aggregations": "聚合",
+      "aggregationKind": "聚合方式",
+      "addAggregation": "添加聚合",
+      "removeAggregation": "移除聚合",
+      "fields": {
+        "kind": "类型",
+        "title": "名称",
+        "summary": "摘要",
+        "detail": "详情",
+        "name": "名称",
+        "gender": "性别",
+        "age": "年龄",
+        "role": "角色类型",
+        "occupation": "职业",
+        "factionId": "所属势力",
+        "currentLocationId": "当前地点",
+        "type": "分类",
+        "controlledBy": "控制势力",
+        "memberCount": "成员数",
+        "date": "日期",
+        "year": "年",
+        "month": "月",
+        "day": "日"
+      },
+      "op": {
+        "eq": "等于",
+        "neq": "不等于",
+        "contains": "包含",
+        "notContains": "不包含",
+        "gt": "大于",
+        "gte": "大于等于",
+        "lt": "小于",
+        "lte": "小于等于",
+        "empty": "为空",
+        "notEmpty": "非空"
+      },
+      "agg": {
+        "count": "计数",
+        "sum": "求和",
+        "avg": "均值",
+        "longest": "最长",
+        "latest": "最新"
+      }
     }
   },
   "faction": {

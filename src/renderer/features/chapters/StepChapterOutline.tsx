@@ -6,7 +6,7 @@
  * 本程序为自由软件：您可依据 GNU Affero 通用公共许可证第 3 版（AGPL-3.0-only）修改与分发；
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
-import { BookOpen, BookOpenText, Check, CheckCheck, ChevronDown, ChevronRight, Clock, FastForward, FileOutput, Flag, Globe2, Layers, LayoutGrid, LayoutList, ListOrdered, MapPin, WandSparkles, XCircle } from 'lucide-react';
+import { BookOpen, BookOpenText, Check, CheckCheck, ChevronDown, ChevronRight, Clock, FastForward, FileOutput, FileSearch, Flag, Globe2, Layers, LayoutGrid, LayoutList, ListOrdered, MapPin, WandSparkles, XCircle } from 'lucide-react';
 import React, { useMemo,useState } from 'react';
 
 import { type CommitOptions,useProjectStore } from '@/app/stores/projectStore';
@@ -31,7 +31,9 @@ import { isModelUsable } from '@/shared/utils/modelReadiness';
 
 import { isVirtualChapter } from '../../../shared/constants/chapters';
 import { type Chapter,type Project } from '../../../shared/types';
+import { ChapterOutlineDraftPanel } from './components/ChapterOutlineDraftPanel';
 import { ChapterOutlineList } from './components/ChapterOutlineList';
+import { useChapterOutlineExtraction } from './hooks/useChapterOutlineExtraction';
 import { useChapterOutlineGeneration } from './hooks/useChapterOutlineGeneration';
 
 interface StepChapterOutlineProps {
@@ -135,6 +137,11 @@ const StepChapterOutline: React.FC<StepChapterOutlineProps> = ({ project, onEnte
     project, prompts, selectedPromptId, selectedKnowledgeIds, activeModel, onUpdate, t,
   });
 
+  // 从既有正文提取细纲草稿（与「大纲→细纲」方向互补，确认后才写入）
+  const { extracting, draft, tokens: extractTokens, extract, applyDraft, discardDraft } = useChapterOutlineExtraction({
+    project, activeModel, onUpdate, t,
+  });
+
   return (
     <div className="mx-auto flex h-full w-full max-w-7xl flex-col gap-5 overflow-hidden p-8">
       <Card className="z-20 flex shrink-0 flex-wrap items-center justify-between gap-4 p-5">
@@ -232,6 +239,15 @@ const StepChapterOutline: React.FC<StepChapterOutlineProps> = ({ project, onEnte
             {chapterPrompts.map(p => <option key={p.id} value={p.id}>{templateDisplayName(p)}</option>)}
           </Select>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => extract(project.chapters)}
+              disabled={extracting || loading || continueLoading || !isModelUsable(activeModel)}
+              title={!isModelUsable(activeModel) ? t('steps:common.noModel') : undefined}
+            >
+              {extracting ? <Spinner className="size-4" /> : <FileSearch className="size-4" />}
+              {extracting ? t('steps:chapters.extracting') : t('steps:chapters.extractFromText')}
+            </Button>
             <Button onClick={() => generateChapters(false)} disabled={loading || continueLoading || !isModelUsable(activeModel)} title={!isModelUsable(activeModel) ? t('steps:common.noModel') : undefined}>
               {loading ? <Spinner className="size-4" /> : <WandSparkles className="size-4" />}
               {loading ? t('steps:chapters.generating') : t('steps:chapters.regenerate')}
@@ -310,6 +326,18 @@ const StepChapterOutline: React.FC<StepChapterOutlineProps> = ({ project, onEnte
             </div>
           </div>
 
+          {draft && (
+            <div className="shrink-0 px-5 pt-5">
+              <ChapterOutlineDraftPanel
+                drafts={draft}
+                chapters={project.chapters}
+                tokens={extractTokens}
+                onApply={applyDraft}
+                onDiscard={discardDraft}
+              />
+            </div>
+          )}
+
           <div className="flex-1 space-y-4 overflow-y-auto p-5">
             {(() => {
               // 过滤掉虚拟章节（order < 0的章节）
@@ -348,6 +376,8 @@ const StepChapterOutline: React.FC<StepChapterOutlineProps> = ({ project, onEnte
                   onEnterWriting={onEnterWriting}
                   project={project}
                   onUpdate={onUpdate}
+                  onExtractOutline={(chap) => extract([chap])}
+                  extractOutlineDisabled={extracting || loading || continueLoading || !isModelUsable(activeModel)}
                   renderRelationEditor={(chap) => (
                     <ChapterWorldRelationEditor
                       chapter={chap}

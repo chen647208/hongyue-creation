@@ -38,6 +38,59 @@
       "title": "Name",
       "summary": "Summary",
       "detail": "Detail"
+    },
+    "query": {
+      "conditions": "Filters",
+      "noConditions": "No filters, showing all",
+      "removeCondition": "Remove filter",
+      "field": "Field",
+      "operator": "Operator",
+      "value": "Value",
+      "valuePlaceholder": "Compare value",
+      "addCondition": "Add filter",
+      "aggregations": "Aggregates",
+      "aggregationKind": "Aggregate",
+      "addAggregation": "Add aggregate",
+      "removeAggregation": "Remove aggregate",
+      "fields": {
+        "kind": "Type",
+        "title": "Name",
+        "summary": "Summary",
+        "detail": "Detail",
+        "name": "Name",
+        "gender": "Gender",
+        "age": "Age",
+        "role": "Role",
+        "occupation": "Occupation",
+        "factionId": "Faction",
+        "currentLocationId": "Current location",
+        "type": "Category",
+        "controlledBy": "Controlling faction",
+        "memberCount": "Members",
+        "date": "Date",
+        "year": "Year",
+        "month": "Month",
+        "day": "Day"
+      },
+      "op": {
+        "eq": "equals",
+        "neq": "not equals",
+        "contains": "contains",
+        "notContains": "not contains",
+        "gt": "greater than",
+        "gte": "greater or equal",
+        "lt": "less than",
+        "lte": "less or equal",
+        "empty": "is empty",
+        "notEmpty": "is not empty"
+      },
+      "agg": {
+        "count": "Count",
+        "sum": "Sum",
+        "avg": "Average",
+        "longest": "Longest",
+        "latest": "Latest"
+      }
     }
   },
   "faction": {

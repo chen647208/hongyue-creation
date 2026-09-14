@@ -180,6 +180,19 @@
     "displayLabel": "显示",
     "displayPlaceholder": "第三纪元元年",
     "linkedEvent": "关联事件",
-    "noTimeline": "尚未设置时间线"
+    "noTimeline": "尚未设置时间线",
+    "extractFromText": "从正文提取细纲",
+    "extracting": "提取中...",
+    "extractChapter": "从本章正文提取细纲",
+    "extractNoContent": "所选章节没有正文，无法提取细纲。",
+    "extractEmpty": "未能从正文中解析出细纲，请重试。",
+    "extractFailed": "提取失败: {{error}}",
+    "draftTitle": "细纲草稿（待确认）",
+    "draftHint": "确认后写入空白细纲；已有细纲的章节不会被覆盖。",
+    "draftApply": "应用选中",
+    "draftDiscard": "放弃",
+    "draftSkipped": "已有细纲，跳过",
+    "draftApplied": "已写入 {{count}} 章细纲",
+    "draftNoneSelected": "没有可写入的细纲（已有细纲的章节不会被覆盖）。"
   }
 }

@@ -14,12 +14,22 @@
 - `characterKinds.ts`：角色定位/性别/时间线重要度枚举归一化
 - `displayLabels.ts`：枚举 → 界面语言的显示名
 - `characterCard.ts`：人物卡 Markdown 构建与导出（纯构建 + 另存为）
+- `services/characterAppearance.ts`：按角色名匹配章节正文，产出登场章节列表（纯函数）
 
 ## 主要职责
 
 - 角色编辑：姓名/性别/年龄/定位/外观/性格/背景/动机/能力/弱点/成长弧线/关系
 - 存储只用英文枚举 id（`protagonist` 等），显示层经 `displayLabels` 译出
 - 入库时 `normalizeProjectKinds` 幂等归一化老数据的中文枚举值
+
+## 登场章节
+
+- 角色编辑弹窗的「登场章节」区块按角色名在本书章节正文中匹配（大小写敏感的连续子串），
+  列出命中章节的标题与顺序，点击跳转到该章写作页。
+- 匹配与排序由 `findCharacterAppearances(name, chapters)` 纯函数完成：按 `order` 升序，
+  同序按章节数组顺序稳定排列；空名不匹配任何章节。
+- 索引器只记录 `@标签` 与 wiki 硬链接引用，不含纯文本提及，无法单独回答登场章节；
+  组件按「角色名 + 章节数组」缓存扫描结果，避免重复全文扫描。
 
 ## 人物卡导出
 

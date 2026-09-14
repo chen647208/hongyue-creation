@@ -163,6 +163,14 @@
     "none": "-- None --",
     "selectLevel": "-- Select Level --"
   },
+  "appearances": {
+    "title": "Appearances",
+    "empty": "This character has not appeared in any chapter yet",
+    "untitled": "Untitled chapter",
+    "order": "Chapter {{n}}",
+    "mentions": "{{n}}×",
+    "hint": "Click to open this chapter"
+  },
   "diagram": {
     "title": "Destiny Map",
     "subtitle": "A web of intertwined fates",

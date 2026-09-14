@@ -9,9 +9,37 @@
 
 /** 视图布局的默认值与编解码：config 为自由结构，读取时逐字段校验。 */
 import { ENTITY_VIEW_COLUMNS } from './buildEntityView';
-import type { ViewColumn, ViewKind, ViewLayout } from './types';
+import type {
+  AggregationKind,
+  ComputedColumn,
+  ConditionOperator,
+  FormulaOperator,
+  QueryCondition,
+  QueryLeaf,
+  ViewAggregation,
+  ViewColumn,
+  ViewKind,
+  ViewLayout,
+} from './types';
 
 const KINDS: readonly ViewKind[] = ['table', 'card', 'graph', 'list', 'reader'];
+
+const CONDITION_OPERATORS: readonly ConditionOperator[] = [
+  'eq',
+  'neq',
+  'contains',
+  'notContains',
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'empty',
+  'notEmpty',
+];
+
+const FORMULA_OPERATORS: readonly FormulaOperator[] = ['add', 'subtract', 'multiply', 'divide', 'min', 'max', 'concat'];
+
+const AGGREGATION_KINDS: readonly AggregationKind[] = ['count', 'sum', 'avg', 'longest', 'latest'];
 
 export const DEFAULT_VIEW_LAYOUT: ViewLayout = {
   kind: 'card',
@@ -23,6 +51,73 @@ export const DEFAULT_VIEW_LAYOUT: ViewLayout = {
 
 function isViewKind(value: unknown): value is ViewKind {
   return typeof value === 'string' && (KINDS as readonly string[]).includes(value);
+}
+
+function isConditionOperator(value: unknown): value is ConditionOperator {
+  return typeof value === 'string' && (CONDITION_OPERATORS as readonly string[]).includes(value);
+}
+
+function isFormulaOperator(value: unknown): value is FormulaOperator {
+  return typeof value === 'string' && (FORMULA_OPERATORS as readonly string[]).includes(value);
+}
+
+function isAggregationKind(value: unknown): value is AggregationKind {
+  return typeof value === 'string' && (AGGREGATION_KINDS as readonly string[]).includes(value);
+}
+
+function parseCondition(value: unknown): QueryCondition | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const node = value as Record<string, unknown>;
+  if (node.type === 'and' || node.type === 'or' || node.type === 'not') {
+    const children = Array.isArray(node.children)
+      ? node.children.map((child) => parseCondition(child)).filter((child): child is QueryCondition => child !== undefined)
+      : [];
+    return { type: node.type, children };
+  }
+  if (node.type === 'leaf' && typeof node.field === 'string' && node.field !== '' && isConditionOperator(node.operator)) {
+    const leaf: QueryLeaf = { type: 'leaf', field: node.field, operator: node.operator };
+    if (typeof node.value === 'string' || typeof node.value === 'number') leaf.value = node.value;
+    return leaf;
+  }
+  return undefined;
+}
+
+function parseComputedColumns(value: unknown): ComputedColumn[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const columns: ComputedColumn[] = [];
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) continue;
+    const record = item as Record<string, unknown>;
+    const operands = Array.isArray(record.operands)
+      ? record.operands.filter((operand): operand is string => typeof operand === 'string' && operand !== '')
+      : [];
+    if (typeof record.key !== 'string' || record.key === '' || !isFormulaOperator(record.operator) || operands.length === 0) {
+      continue;
+    }
+    const column: ComputedColumn = {
+      key: record.key,
+      label: typeof record.label === 'string' ? record.label : record.key,
+      operator: record.operator,
+      operands,
+    };
+    if (typeof record.width === 'number') column.width = record.width;
+    columns.push(column);
+  }
+  return columns.length > 0 ? columns : undefined;
+}
+
+function parseAggregations(value: unknown): ViewAggregation[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const aggregations: ViewAggregation[] = [];
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) continue;
+    const record = item as Record<string, unknown>;
+    if (typeof record.field !== 'string' || record.field === '' || !isAggregationKind(record.kind)) continue;
+    const aggregation: ViewAggregation = { field: record.field, kind: record.kind };
+    if (typeof record.label === 'string') aggregation.label = record.label;
+    aggregations.push(aggregation);
+  }
+  return aggregations.length > 0 ? aggregations : undefined;
 }
 
 function parseColumns(value: unknown): ViewColumn[] {
@@ -53,6 +148,9 @@ export function parseViewLayout(config: Record<string, unknown> | undefined): Vi
     kindFilter: typeof config.kindFilter === 'string' ? config.kindFilter : undefined,
     readerDevice: config.readerDevice === 'tablet' || config.readerDevice === 'phone' ? config.readerDevice : config.readerDevice === 'desktop' ? 'desktop' : undefined,
     height: typeof config.height === 'number' ? config.height : undefined,
+    conditions: parseCondition(config.conditions),
+    computed: parseComputedColumns(config.computed),
+    aggregations: parseAggregations(config.aggregations),
   };
 }
 
@@ -67,5 +165,8 @@ export function serializeViewLayout(layout: ViewLayout): Record<string, unknown>
     kindFilter: layout.kindFilter,
     readerDevice: layout.readerDevice,
     height: layout.height,
+    conditions: layout.conditions,
+    computed: layout.computed,
+    aggregations: layout.aggregations,
   };
 }

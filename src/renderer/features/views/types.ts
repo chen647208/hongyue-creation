@@ -10,19 +10,86 @@
 /** 视图引擎的类型：同一份行数据可由表格/卡片/图/大纲/读者五种视图呈现。 */
 export type ViewKind = 'table' | 'card' | 'graph' | 'list' | 'reader';
 
-/** 一列：key 决定取 row.cells[key]，label 为 i18n 键。 */
+/** 一列：key 决定取 row.cells[key]，label 为 i18n 键或计算列的用户标签。 */
 export interface ViewColumn {
   key: string;
   label: string;
   width?: number;
 }
 
-/** 一行：cells 为已拍平的显示文本；kind 用于分组、着色与图标。 */
+/** 一行：cells 为已拍平的显示文本；values 为原始字段（条件与公式取数用）。 */
 export interface ViewRow {
   id: string;
   kind: string;
   title: string;
   cells: Record<string, string>;
+  values?: Record<string, unknown>;
+}
+
+/** 集合条件的比较操作符。 */
+export type ConditionOperator =
+  | 'eq'
+  | 'neq'
+  | 'contains'
+  | 'notContains'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'empty'
+  | 'notEmpty';
+
+/** 条件叶子：字段、操作符与比较值。 */
+export interface QueryLeaf {
+  type: 'leaf';
+  field: string;
+  operator: ConditionOperator;
+  value?: string | number;
+}
+
+/** 条件分组：与或非，children 可再嵌套分组。 */
+export interface QueryGroup {
+  type: 'and' | 'or' | 'not';
+  children: QueryCondition[];
+}
+
+/** 集合条件：叶子或分组，可序列化进 ViewDefinition.config。 */
+export type QueryCondition = QueryLeaf | QueryGroup;
+
+/** 计算列的操作符：四则、极值与文本拼接。 */
+export type FormulaOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'min' | 'max' | 'concat';
+
+/** 计算列：对 operands 中的字段做简单计算，结果写入 row.cells[key]。 */
+export interface ComputedColumn {
+  key: string;
+  label: string;
+  operator: FormulaOperator;
+  operands: string[];
+  width?: number;
+}
+
+/** 聚合方式：计数、求和、均值、最长文本长度、最新日期。 */
+export type AggregationKind = 'count' | 'sum' | 'avg' | 'longest' | 'latest';
+
+/** 聚合定义：对某字段按 kind 汇总。 */
+export interface ViewAggregation {
+  field: string;
+  kind: AggregationKind;
+  label?: string;
+}
+
+/** 聚合结果：供视图面板展示。 */
+export interface AggregationResult {
+  field: string;
+  kind: AggregationKind;
+  value: number | string;
+}
+
+/** 视图查询：集合条件、计算列与聚合的合集。 */
+export interface ViewQuery {
+  conditions?: QueryCondition;
+  computed?: ComputedColumn[];
+  aggregations?: ViewAggregation[];
 }
 
 /** 图中一条边：source/target 为行 id。 */
@@ -53,4 +120,10 @@ export interface ViewLayout {
   readerDevice?: 'desktop' | 'tablet' | 'phone';
   /** 视图内容区高度（拖拽调整，单位 px）。 */
   height?: number;
+  /** 集合条件（缺席=不过滤）。 */
+  conditions?: QueryCondition;
+  /** 计算列（缺席=无计算列）。 */
+  computed?: ComputedColumn[];
+  /** 聚合定义（缺席=无聚合）。 */
+  aggregations?: ViewAggregation[];
 }

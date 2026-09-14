@@ -163,6 +163,14 @@
     "none": "-- 无 --",
     "selectLevel": "-- 选择等级 --"
   },
+  "appearances": {
+    "title": "登场章节",
+    "empty": "正文中尚未出现此角色",
+    "untitled": "未命名章节",
+    "order": "第 {{n}} 章",
+    "mentions": "{{n}} 次",
+    "hint": "点击跳转到该章"
+  },
   "diagram": {
     "title": "人物命运图谱",
     "subtitle": "关系交织的命运之网",

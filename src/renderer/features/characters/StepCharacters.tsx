@@ -39,6 +39,8 @@ interface StepCharactersProps {
   onFocusHandled?: () => void;
   /** 跨页接力：缺简介时回灵感页补充，由工作台注入 */
   onGoSection?: (next: 'inspiration' | 'world') => void;
+  /** 跳转到某章（角色登场章节列表）；由工作台注入 */
+  onNavigateToChapter?: (chapterId: string) => void;
 }
 
 const StepCharacters: React.FC<StepCharactersProps> = ({
@@ -47,6 +49,7 @@ const StepCharacters: React.FC<StepCharactersProps> = ({
   focusCharacterId,
   onFocusHandled,
   onGoSection,
+  onNavigateToChapter,
 }) => {
   // 直读 store：模型/提示词/更新动作不再经 App→View 层层透传
   const prompts = useSettingsStore((s) => s.prompts);
@@ -478,6 +481,10 @@ const StepCharacters: React.FC<StepCharactersProps> = ({
           isOpen={!!modalCharacterId}
           onClose={handleCloseModal}
           onUpdate={(updates) => handleModalUpdate(modalCharacter.id, updates)}
+          onNavigateToChapter={(chapterId) => {
+            handleCloseModal();
+            onNavigateToChapter?.(chapterId);
+          }}
         />
       )}
     </div>
