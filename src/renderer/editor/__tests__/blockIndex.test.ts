@@ -40,6 +40,15 @@ describe('blockText 摘要纯函数', () => {
     expect(blockText({ type: 'keywordLine', attrs: { keyword: 'pov', value: '林渊' } })).toBe('# @pov: 林渊');
     expect(blockText({ type: 'darlingSlot', attrs: { text: '被弃的桥段' } })).toBe('被弃的桥段');
   });
+
+  it('块引用与嵌入按原语法入摘要', () => {
+    expect(blockText({ type: 'blockEmbed', attrs: { id: 'a1' } })).toBe('!((^a1))');
+    const para: PmNode = {
+      type: 'paragraph',
+      content: [{ type: 'text', text: '见' }, { type: 'blockRef', attrs: { id: 'b2' } }],
+    };
+    expect(blockText(para)).toBe('见((^b2))');
+  });
 });
 
 describe('listBlocks / findBlockById / collectBlockIds', () => {

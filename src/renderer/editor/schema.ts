@@ -13,6 +13,7 @@
  * 节点名与 serialization.ts 的 PM-JSON 契约严格对齐：
  *   doc/paragraph/heading(1-3)/hardBreak/text 由 StarterKit 提供；
  *   sceneBreak/keywordLine/chapterRef/placeholder/darlingSlot/ghostNote/dialogueBlock 自定义；
+ *   blockRef/blockEmbed（块引用与块嵌入，见 @core/dsl/blockRef）自定义；
  *   marks: quoteStyle/tagRef（StarterKit 另提供 bold/italic 等，仅编辑器态，不落 DSL）。
  *
  * 编辑器 getJSON() 产出即 serialization 的 PmNode 结构，正文与 DSL 文本经 pmDocToDsl/dslToPmDoc 往返。
@@ -21,7 +22,9 @@
 import { type Extensions,Mark, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 
+import { type BlockEmbedResolver,createBlockEmbedView } from './blockEmbedNodeView';
 import { BlockId } from './blockId';
+import { BlockRefDecorations } from './blockRefDecorations';
 
 /** 场景分隔（*** 行；Enter×2 产物）——块级叶节点 */
 export const SceneBreak = Node.create({
@@ -182,11 +185,72 @@ export const TagRef = Mark.create({
   },
 });
 
+/** 块引用 ((^id))——行内原子节点，显示为指向源块的链接。 */
+export const BlockRef = Node.create({
+  name: 'blockRef',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  selectable: true,
+  addAttributes() {
+    return {
+      id: { default: '', parseHTML: (element) => element.getAttribute('data-block-ref') },
+    };
+  },
+  renderHTML({ node }) {
+    const id = String(node.attrs.id ?? '');
+    return ['span', { 'data-block-ref': id, class: 'novel-block-ref' }, `((^${id}))`];
+  },
+  parseHTML() {
+    return [{ tag: 'span[data-block-ref]' }];
+  },
+});
+
+export interface BlockEmbedOptions {
+  /** 按块 id 解析被引块内容；缺省一律失链。 */
+  resolveBlock: BlockEmbedResolver;
+  /** 点击嵌入块跳转到源块。 */
+  onOpenSource: (id: string) => void;
+}
+
+/** 块嵌入 !((^id))——块级原子节点，实时投影源块内容。 */
+export const BlockEmbed = Node.create<BlockEmbedOptions>({
+  name: 'blockEmbed',
+  group: 'block',
+  atom: true,
+  addOptions() {
+    return { resolveBlock: () => null, onOpenSource: () => { /* 宿主未接线时静默 */ } };
+  },
+  addAttributes() {
+    return {
+      id: { default: '', parseHTML: (element) => element.getAttribute('data-block-embed') },
+    };
+  },
+  renderHTML({ node }) {
+    const id = String(node.attrs.id ?? '');
+    return ['div', { 'data-block-embed': id, class: 'novel-block-embed' }, `!((^${id}))`];
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-block-embed]' }];
+  },
+  addNodeView() {
+    return ({ node }) => createBlockEmbedView(node, this.options.resolveBlock, this.options.onOpenSource);
+  },
+});
+
 /**
  * 装配小说编辑器扩展集。StarterKit 关闭历史/撤销以外的默认多余项由上层按需覆盖；
  * 此处保留 StarterKit 默认（含 History），单一事务管线在其上叠加。
  */
-export function createNovelExtensions(options: { undoRedo?: boolean } = {}): Extensions {
+export interface NovelExtensionOptions {
+  undoRedo?: boolean;
+  /** 块嵌入投影解析（缺省一律失链，纯 schema 测试无需接线）。 */
+  resolveBlock?: BlockEmbedResolver;
+  /** 点击嵌入块跳转源块。 */
+  onOpenSource?: (id: string) => void;
+}
+
+export function createNovelExtensions(options: NovelExtensionOptions = {}): Extensions {
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
@@ -201,6 +265,12 @@ export function createNovelExtensions(options: { undoRedo?: boolean } = {}): Ext
     DialogueBlock,
     QuoteStyle,
     TagRef,
+    BlockRef,
+    BlockEmbed.configure({
+      resolveBlock: options.resolveBlock ?? (() => null),
+      onOpenSource: options.onOpenSource ?? (() => { /* 未接线时静默 */ }),
+    }),
+    BlockRefDecorations.configure({ resolveBlock: options.resolveBlock ?? (() => null) }),
     BlockId,
   ];
 }

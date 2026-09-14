@@ -12,6 +12,7 @@ import { Cloud } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { useTranslation } from '@/i18n';
+import { loadExitExportConfig, saveExitExportConfig } from '@/shared/services/syncExitService';
 import {
   loadSyncTransportConfig,
   saveSyncTransportConfig,
@@ -24,6 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { Input } from '@/shared/ui/Input';
 import { Label } from '@/shared/ui/Label';
 import { Select } from '@/shared/ui/Select';
+import { Switch } from '@/shared/ui/Switch';
 
 function defaultFor(kind: SyncTransportConfig['kind']): SyncTransportConfig {
   if (kind === 'webdav') {
@@ -44,6 +46,7 @@ const SyncTransportPanel: React.FC = () => {
   const [secretError, setSecretError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [exitExportEnabled, setExitExportEnabled] = useState(() => loadExitExportConfig().enabled);
   const desktop = typeof window !== 'undefined' && !!window.electronAPI;
 
   const commit = (next: SyncTransportConfig): void => {
@@ -94,6 +97,11 @@ const SyncTransportPanel: React.FC = () => {
     } finally {
       setTesting(false);
     }
+  };
+
+  const toggleExitExport = (enabled: boolean): void => {
+    setExitExportEnabled(enabled);
+    saveExitExportConfig({ enabled });
   };
 
   const hasCredential = config.kind === 's3'
@@ -263,6 +271,19 @@ const SyncTransportPanel: React.FC = () => {
           {hasCredential && secretState !== 'saved' && (
             <span className="text-xs text-muted-foreground">{t('syncTransfer.credentialReady')}</span>
           )}
+        </div>
+
+        <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+          <span>
+            <span className="block text-sm text-foreground">{t('syncTransfer.exitExportLabel')}</span>
+            <span className="block text-xs text-muted-foreground">{t('syncTransfer.exitExportHint')}</span>
+          </span>
+          <Switch
+            checked={exitExportEnabled}
+            disabled={!desktop}
+            onCheckedChange={toggleExitExport}
+            aria-label={t('syncTransfer.exitExportLabel')}
+          />
         </div>
         {!desktop && <p className="text-xs text-muted-foreground">{t('syncTransfer.desktopOnly')}</p>}
       </CardContent>

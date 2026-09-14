@@ -22,7 +22,10 @@ import { changeLanguage } from '../i18n';
 import { dt } from '../i18n';
 import { dialogService } from '../shared/services/dialogService';
 import { offerLocalToOpfsMigration,repository } from '../shared/services/repository';
+import { createExitExportDeps, retryPendingExitExports } from '../shared/services/syncExitService';
+import { listPendingExitExports } from '../shared/services/syncRecoveryService';
 import { applyTheme, watchSystemTheme } from '../shared/services/themeService';
+import { toast } from '../shared/services/toastService';
 import { logger } from '../shared/utils/logger';
 import { INITIAL_APP_STATE } from './initialState';
 import { startShellSync } from './services/shellSync';
@@ -61,6 +64,31 @@ export function hydrateStoresFromState(state: typeof INITIAL_APP_STATE): void {
   });
 }
 
+/** 上次退出导出失败的书：启动时提醒，确认后按当前传输配置重试。 */
+async function offerPendingExitExportRetry(): Promise<void> {
+  const pending = listPendingExitExports();
+  if (pending.length === 0) return;
+  const retry = await dialogService.confirm({
+    title: dt('app:sync.exitExportReminderTitle'),
+    message: dt('app:sync.exitExportReminder', { count: pending.length }),
+    confirmText: dt('app:sync.exitExportRetry'),
+    cancelText: dt('common:cancel'),
+  });
+  if (!retry) return;
+  const deps = createExitExportDeps(() =>
+    useProjectStore.getState().projects.map((p) => ({ id: p.id, title: p.title })),
+  );
+  const summary = await retryPendingExitExports(deps);
+  if (summary.succeeded > 0) toast.success(dt('app:sync.exitExportRetryDone', { count: summary.succeeded }));
+  if (summary.failed.length > 0) {
+    dialogService.alert({
+      title: dt('app:sync.exitExportRetryFailed'),
+      message: summary.failed.map((f) => `${f.title}：${f.message}`).join('\n'),
+      tone: 'error',
+    });
+  }
+}
+
 export function useAppBootstrap(): void {
   const theme = useSettingsStore(s => s.theme);
 
@@ -95,6 +123,8 @@ export function useAppBootstrap(): void {
         void bootCustomFonts().catch((error) => logger.error('自定义字体加载失败:', error));
         await vectorIntegrationService.initialize();
         startPersistenceBridge();
+        // 退出导出失败提醒：确认后按当前传输配置重试（不挡启动）
+        void offerPendingExitExportRetry().catch((error) => logger.warn('退出导出重试失败:', error));
         // 托盘/自启/代理下发主进程（hydrate 之后，读到用户真实配置）
         startShellSync();
         // 用户写法技能装载（<userData>/skills/user，失败不挡启动）

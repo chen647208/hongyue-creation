@@ -176,7 +176,50 @@
     "reportApplied": "应用变更：{{count}} 条",
     "reportSkipped": "已同步跳过：{{count}} 条",
     "reportManual": "需人工处理：{{count}} 条",
+    "reportPending": "待处理冲突：{{count}} 条（已记入恢复记录，本地未改动）",
     "conflictCopies": "冲突副本（本地已保留，远端以副本落库）",
+    "conflictIntro": "本次合并有 {{count}} 处冲突，请选择处理方式：",
+    "conflictReasonCopy": "节点双方都改：本地保留，远端另存为副本",
+    "conflictReasonManual": "属性或边双方都改：需人工比对",
+    "policyLegend": "冲突处理方式",
+    "policyApply": "应用所选方式",
+    "policyCancel": "取消",
+    "policy": {
+      "keep-copy": {
+        "label": "保留冲突副本",
+        "hint": "本地内容不动，远端版本以新条目存为副本，两份都保留。"
+      },
+      "use-remote": {
+        "label": "应用远端替换",
+        "hint": "用远端版本覆盖本地冲突项，本地改动会被替换。"
+      },
+      "defer": {
+        "label": "标记合并失败待处理",
+        "hint": "本次不改动冲突项，只记入恢复记录，稍后再处理。"
+      }
+    },
+    "recoveryShow": "自动恢复记录",
+    "recoveryHide": "收起恢复记录",
+    "recoveryTitle": "自动恢复记录",
+    "recoveryEmpty": "暂无同步记录。",
+    "recoveryKind": {
+      "import": "导入合并",
+      "download": "下载合并",
+      "upload": "上传",
+      "export": "导出",
+      "exit-export": "退出导出"
+    },
+    "recoveryOutcome": {
+      "ok": "成功",
+      "failed": "失败",
+      "pending": "待处理"
+    },
+    "recoveryCounts": "应用 {{applied}} 条 · 冲突 {{conflicts}} 条",
+    "exitExportReminderTitle": "上次退出导出未成功",
+    "exitExportReminder": "有 {{count}} 本书的退出导出未完成，是否现在重试？",
+    "exitExportRetry": "立即重试",
+    "exitExportRetryDone": "退出导出重试成功 {{count}} 本",
+    "exitExportRetryFailed": "退出导出重试仍有失败",
     "upload": "上传到传输",
     "download": "从传输下载并合并",
     "uploadDone": "同步包已上传",

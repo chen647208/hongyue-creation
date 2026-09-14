@@ -22,6 +22,7 @@
  * 行内：
  *   [[tag]] / [[tag|显示]] → chapterRef（硬链接）
  *   {name} / {name|kind}   → placeholder（占位符）
+ *   ((^id)) / !((^id))     → blockRef / blockEmbed（块引用与嵌入，见 @core/dsl/blockRef）
  *
  * 块锚（docs/design/45 §3）：已有 `blockId` 的块在正文前写一行 `^<id>`，解析时还原为
  * `blockId` 属性并从可见文本剥离；无标识的块不写锚。语法与避让规则见 @core/dsl/anchor。
@@ -30,6 +31,7 @@
  */
 
 import { formatBlockAnchor, isBlockAnchorId, isBlockAnchorLine, parseBlockAnchor } from '@core/dsl/anchor';
+import { formatBlockEmbed, formatBlockRef, isBlockEmbedLine, parseBlockEmbedLine, parseBlockInline } from '@core/dsl/blockRef';
 
 /** 块级节点承载稳定标识的属性名；与 blockId.ts / blockIndex.ts 同源。 */
 export const BLOCK_ID_ATTRIBUTE = 'blockId';
@@ -48,9 +50,9 @@ const SCENE_BREAK = /^\s*\*\*\*\s*$/;
 const WIKI_INLINE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 const PLACEHOLDER_INLINE = /\{([^{}|]+)(?:\|([^{}]+))?\}/g;
 
-/** 该行若原样落入 DSL 会被重新解析为块级语法（标题/关键字/场景分隔/块锚）。 */
+/** 该行若原样落入 DSL 会被重新解析为块级语法（标题/关键字/场景分隔/块锚/整行嵌入）。 */
 function isBlockCollision(line: string): boolean {
-  return HEADING.test(line) || KEYWORD_LINE.test(line) || SCENE_BREAK.test(line) || isBlockAnchorLine(line);
+  return HEADING.test(line) || KEYWORD_LINE.test(line) || SCENE_BREAK.test(line) || isBlockAnchorLine(line) || isBlockEmbedLine(line);
 }
 
 /** 读取块节点的稳定标识；缺失或非法（无法写成锚）时为 null。 */
@@ -89,6 +91,13 @@ function parseInline(line: string): PmNode[] {
       start,
       end: start + m[0].length,
       node: { type: 'placeholder', attrs: { name: (m[1] ?? '').trim(), kind: (m[2] ?? '').trim() || null } },
+    });
+  }
+  for (const hit of parseBlockInline(line)) {
+    hits.push({
+      start: hit.start,
+      end: hit.end,
+      node: { type: hit.kind === 'embed' ? 'blockEmbed' : 'blockRef', attrs: { id: hit.id } },
     });
   }
   hits.sort((a, b) => a.start - b.start);
@@ -166,6 +175,13 @@ export function dslToPmDoc(body: string): PmNode {
       pendingBlockId = null;
       continue;
     }
+    const embedId = parseBlockEmbedLine(line);
+    if (embedId !== null) {
+      flushPara();
+      blocks.push(withBlockId({ type: 'blockEmbed', attrs: { id: embedId } }, pendingBlockId));
+      pendingBlockId = null;
+      continue;
+    }
     paraBuf.push(line);
   }
   flushPara();
@@ -188,6 +204,10 @@ function renderInline(nodes: PmNode[] | undefined): string {
       const name = String(n.attrs?.name ?? '');
       const kind = n.attrs?.kind ? String(n.attrs.kind) : '';
       s += kind ? `{${name}|${kind}}` : `{${name}}`;
+    } else if (n.type === 'blockRef') {
+      s += formatBlockRef(String(n.attrs?.id ?? ''));
+    } else if (n.type === 'blockEmbed') {
+      s += formatBlockEmbed(String(n.attrs?.id ?? ''));
     }
   }
   return s;
@@ -228,6 +248,9 @@ export function pmDocToDsl(doc: PmNode): string {
         break;
       case 'keywordLine':
         pushBlock(lines, b, `# @${b.attrs?.keyword ?? ''}: ${b.attrs?.value ?? ''}`.trimEnd());
+        break;
+      case 'blockEmbed':
+        pushBlock(lines, b, formatBlockEmbed(String(b.attrs?.id ?? '')));
         break;
       default:
         // 未知块：尽力渲染其内联内容

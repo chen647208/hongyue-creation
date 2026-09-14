@@ -37,6 +37,9 @@ const WritingEditorCanvas: React.FC<WritingEditorCanvasProps> = ({
   onMouseMove,
   onContentChange,
   onNewChapter,
+  resolveBlock,
+  onOpenSource,
+  onActiveBlockChange,
   onStopStreaming,
   onStopBatchGeneration,
   streamingTokens,
@@ -64,6 +67,9 @@ const WritingEditorCanvas: React.FC<WritingEditorCanvasProps> = ({
         onMouseUp={onMouseUp}
         onKeyUp={onKeyUp}
         onMouseMove={onMouseMove}
+        resolveBlock={resolveBlock}
+        onOpenSource={onOpenSource}
+        onActiveBlockChange={onActiveBlockChange}
       />
       <WritingEditorStatusOverlay
         isGenerating={isGenerating}

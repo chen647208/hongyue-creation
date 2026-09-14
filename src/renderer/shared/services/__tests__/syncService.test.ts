@@ -9,7 +9,8 @@
  */
 
 /**
- * 同步包读写契约：读写一律经 SQL 语句 id（catalog 单源），不得传原始 SQL 文本。
+ * 同步包读写契约：读写一律经 SQL 语句 id（catalog 单源），不得传原始 SQL 文本；
+ * 冲突三选只改变落地策略，冲突分类仍来自 mergeBundle。
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,7 +19,14 @@ vi.mock('@core/entities', async (importOriginal) => {
   return { ...actual, getInstanceId: () => 'inst-test', hashEntity: vi.fn(async () => 'hash-x') };
 });
 
-import { downloadSyncBundle, exportSyncBundle, importSyncBundle, syncObjectKey, uploadSyncBundle } from '../syncService';
+import {
+  applySyncPlan,
+  exportSyncBundle,
+  prepareDownloadBundle,
+  prepareImportBundle,
+  syncObjectKey,
+  uploadSyncBundle,
+} from '../syncService';
 
 const SQL_ID = /^[a-z]+\.[A-Za-z]+$/;
 
@@ -55,6 +63,16 @@ function edgeBundle(edges: ReturnType<typeof edgeEntity>[], nodes: ReturnType<ty
       ...edges.map((e) => edgeChange(e.id)),
     ],
     entities: { nodes, edges, attrs: [] },
+  };
+}
+
+/** 单节点冲突包：远端 n1 正文与本地不同，触发冲突副本。 */
+function conflictBundle(remoteBody: string) {
+  const remoteNode = { id: 'n1', bookId: 'b1', type: 'novel.chapter', title: '第一章', body: remoteBody, path: undefined, createdAt: 1, updatedAt: 5, erased: false };
+  return {
+    version: 1, bookId: 'b1', instanceId: 'remote', generatedAt: 1,
+    changes: [{ changeId: 1, entityName: 'nodes' as const, entityId: 'n1', hash: 'remote-hash', isErased: false, agentId: 'sync', utcDateChanged: 5 }],
+    entities: { nodes: [remoteNode], edges: [], attrs: [] },
   };
 }
 
@@ -125,7 +143,7 @@ describe('exportSyncBundle', () => {
   });
 });
 
-describe('importSyncBundle', () => {
+describe('prepareImportBundle + applySyncPlan（无冲突）', () => {
   it('合并后按语句 id 写入节点与属性（不含原始 SQL）', async () => {
     const remoteNode = {
       id: 'n2', bookId: 'b1', type: 'novel.chapter', title: '第二章', body: '远端正文',
@@ -145,7 +163,10 @@ describe('importSyncBundle', () => {
       fileContent: { value: JSON.stringify(bundle) },
     });
 
-    const report = await importSyncBundle();
+    const plan = await prepareImportBundle();
+    expect(plan).not.toBeNull();
+    expect(plan!.conflicts).toHaveLength(0);
+    const report = await applySyncPlan(plan!, 'keep-copy');
 
     expect(report.applied).toBe(1);
     expect(writes.map((w) => w.id)).toEqual(['nodes.upsert', 'attrs.upsert']);
@@ -162,7 +183,8 @@ describe('importSyncBundle', () => {
       fileContent: { value: JSON.stringify(edgeBundle([edge], [n2, n3])) },
     });
 
-    const report = await importSyncBundle();
+    const plan = await prepareImportBundle();
+    const report = await applySyncPlan(plan!, 'keep-copy');
 
     expect(writes.map((w) => w.id)).toEqual(['nodes.upsert', 'nodes.upsert', 'edges.upsert']);
     const edgeWrite = writes.find((w) => w.id === 'edges.upsert')!;
@@ -181,7 +203,8 @@ describe('importSyncBundle', () => {
       fileContent: { value: JSON.stringify(edgeBundle([edge])) },
     });
 
-    const report = await importSyncBundle();
+    const plan = await prepareImportBundle();
+    const report = await applySyncPlan(plan!, 'keep-copy');
 
     expect(writes.map((w) => w.id)).toEqual(['edges.upsert']);
     expect(report.applied).toBe(1);
@@ -194,7 +217,8 @@ describe('importSyncBundle', () => {
       fileContent: { value: JSON.stringify(edgeBundle([edge])) },
     });
 
-    const report = await importSyncBundle();
+    const plan = await prepareImportBundle();
+    const report = await applySyncPlan(plan!, 'keep-copy');
 
     expect(writes).toHaveLength(0);
     expect(report.applied).toBe(0);
@@ -209,7 +233,8 @@ describe('importSyncBundle', () => {
       fileContent: { value: JSON.stringify(edgeBundle([remote])) },
     });
 
-    const report = await importSyncBundle();
+    const plan = await prepareImportBundle();
+    const report = await applySyncPlan(plan!, 'keep-copy');
 
     expect(writes).toHaveLength(0);
     expect(report.applied).toBe(0);
@@ -224,11 +249,67 @@ describe('importSyncBundle', () => {
       fileContent: { value: JSON.stringify(edgeBundle([remote])) },
     });
 
-    const report = await importSyncBundle();
+    const plan = await prepareImportBundle();
+    const report = await applySyncPlan(plan!, 'keep-copy');
 
     expect(writes).toHaveLength(0);
     expect(report.applied).toBe(0);
     expect(report.manual).toBe(1);
+  });
+});
+
+describe('冲突三选的分支逻辑', () => {
+  function conflictApi() {
+    return stubApi({
+      rows: { 'nodes.selectByBook': [nodeRow], 'attrs.selectByBook': [attrRow], 'edges.selectByBook': [] },
+      fileContent: { value: JSON.stringify(conflictBundle('远端改写的正文')) },
+    });
+  }
+
+  it('预合并列出冲突，且不写库', async () => {
+    const { writes } = conflictApi();
+    const plan = await prepareImportBundle();
+    expect(plan!.conflicts).toHaveLength(1);
+    expect(plan!.conflicts[0]!.entityId).toBe('n1');
+    expect(plan!.conflicts[0]!.source).toBe('copy');
+    expect(writes).toHaveLength(0);
+  });
+
+  it('保留冲突副本：远端以新 id 落库，本地原节点不动', async () => {
+    const { writes } = conflictApi();
+    const plan = await prepareImportBundle();
+    const report = await applySyncPlan(plan!, 'keep-copy');
+
+    expect(report.conflictCopies).toHaveLength(1);
+    expect(report.pendingConflicts).toBe(0);
+    expect(writes.map((w) => w.id)).toEqual(['nodes.upsert']);
+    const copyId = writes[0]!.params[0] as string;
+    expect(copyId).toContain('conflict-n1-');
+    expect(writes[0]!.params[4]).toBe('远端改写的正文');
+  });
+
+  it('应用远端替换：以原 id 覆盖本地，并软删本地多出的属性', async () => {
+    const { writes } = conflictApi();
+    const plan = await prepareImportBundle();
+    const report = await applySyncPlan(plan!, 'use-remote');
+
+    expect(report.conflictCopies).toHaveLength(0);
+    const nodeWrite = writes.find((w) => w.id === 'nodes.upsert')!;
+    expect(nodeWrite.params[0]).toBe('n1');
+    expect(nodeWrite.params[4]).toBe('远端改写的正文');
+    const attrWrite = writes.find((w) => w.id === 'attrs.upsert')!;
+    expect(attrWrite.params[0]).toBe('a1');
+    expect(attrWrite.params[7]).toBe(1);
+  });
+
+  it('标记待处理：不写冲突项，报告待处理数', async () => {
+    const { writes } = conflictApi();
+    const plan = await prepareImportBundle();
+    const report = await applySyncPlan(plan!, 'defer');
+
+    expect(writes).toHaveLength(0);
+    expect(report.pendingConflicts).toBe(1);
+    expect(report.conflictCopies).toHaveLength(0);
   });
 });
 
@@ -254,8 +335,8 @@ describe('uploadSyncBundle', () => {
   });
 });
 
-describe('downloadSyncBundle', () => {
-  it('下载远端同步包并合并落库', async () => {
+describe('prepareDownloadBundle', () => {
+  it('下载远端同步包并预合并', async () => {
     const remoteNode = {
       id: 'n2', bookId: 'b1', type: 'novel.chapter', title: '第二章', body: '远端正文',
       path: undefined, createdAt: 3, updatedAt: 4, erased: false,
@@ -270,7 +351,9 @@ describe('downloadSyncBundle', () => {
       fileContent: { value: JSON.stringify(bundle) },
     });
 
-    const report = await downloadSyncBundle({ kind: 'local', directory: '/x' }, 'hongyue-sync/b1.json', { maxAttempts: 1 });
+    const plan = await prepareDownloadBundle({ kind: 'local', directory: '/x' }, 'hongyue-sync/b1.json', { maxAttempts: 1 });
+    expect(plan.applied).toBe(1);
+    const report = await applySyncPlan(plan, 'keep-copy');
 
     expect(report.applied).toBe(1);
     expect(writes.map((w) => w.id)).toEqual(['nodes.upsert']);
@@ -282,7 +365,7 @@ describe('downloadSyncBundle', () => {
     sync.get.mockResolvedValueOnce(null);
 
     await expect(
-      downloadSyncBundle({ kind: 'local', directory: '/x' }, 'missing.json', { maxAttempts: 1 }),
+      prepareDownloadBundle({ kind: 'local', directory: '/x' }, 'missing.json', { maxAttempts: 1 }),
     ).rejects.toThrow('远端不存在同步包');
   });
 
@@ -296,9 +379,9 @@ describe('downloadSyncBundle', () => {
     });
     sync.get.mockRejectedValueOnce(new Error('网络抖动')).mockResolvedValueOnce(JSON.stringify(bundle));
 
-    const report = await downloadSyncBundle({ kind: 'local', directory: '/x' }, 'k.json', { maxAttempts: 2, delayMs: 0 });
+    const plan = await prepareDownloadBundle({ kind: 'local', directory: '/x' }, 'k.json', { maxAttempts: 2, delayMs: 0 });
 
     expect(sync.get).toHaveBeenCalledTimes(2);
-    expect(report.applied).toBe(3);
+    expect(plan.applied).toBe(3);
   });
 });

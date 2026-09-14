@@ -12,6 +12,7 @@ import type { Awareness } from 'y-protocols/awareness';
 import type * as Y from 'yjs';
 
 import type { AIHistoryRecord, Chapter, ModelConfig, OutputMode, Project, PromptTemplate } from '../../../shared/types';
+import type { BlockRefIndex, ResolvedBlockProjection } from '../../editor/blockRefs';
 
 /** 编辑器纸张样式。 */
 export type PaperStyle = 'plain' | 'grid' | 'lined' | 'sepia';
@@ -116,6 +117,16 @@ export interface NovelEditorHandle {
   insertText(text: string): boolean;
   /** 章节拆分：按当前光标把正文切成两段 DSL（光标在文首/文尾或空章返回 null）。 */
   splitAtCursor(): { before: string; after: string } | null;
+  /** 当前光标所在顶层块的 blockId；无块锚时 null。 */
+  getActiveBlockId(): string | null;
+  /** 在光标处插入块引用 ((^id))，返回是否成功。 */
+  insertBlockRef(id: string): boolean;
+  /** 在光标处插入块嵌入 !((^id))，返回是否成功。 */
+  insertBlockEmbed(id: string): boolean;
+  /** 选中并滚动到指定块；当前文档不含该块返回 false。 */
+  jumpToBlock(id: string): boolean;
+  /** 项目正文变化后重新投影全部嵌入。 */
+  refreshEmbeds(): void;
 }
 
 export interface GenerationModalState {
@@ -289,6 +300,17 @@ export interface WritingSidebarProps {
   onBatchDeleteChapter: (chapterIds: string[]) => void;
   /** 点击实体把名称插入正文光标处。 */
   onInsertEntity: (name: string) => void;
+  /** 块引用与反向引用面板数据与操作。 */
+  blockRefs: WritingBlockRefsPanelProps;
+}
+
+/** 块引用面板：反向引用、出链、失链与插入入口。 */
+export interface WritingBlockRefsPanelProps {
+  index: BlockRefIndex;
+  activeBlockId: string | null;
+  onInsertRef: (id: string) => void;
+  onInsertEmbed: (id: string) => void;
+  onJump: (id: string) => void;
 }
 
 export interface WritingEditorCanvasProps {
@@ -318,6 +340,10 @@ export interface WritingEditorCanvasProps {
   onContentChange: (content: string) => void;
   /** Enter×3 连按：宿主创建新章并切换。 */
   onNewChapter?: () => void;
+  /** 块引用/嵌入的宿主操作。 */
+  resolveBlock?: (id: string) => ResolvedBlockProjection | null;
+  onOpenSource?: (id: string) => void;
+  onActiveBlockChange?: (id: string | null) => void;
   onStopStreaming: () => void;
   onStopBatchGeneration: () => void;
   streamingTokens: TokenUsage;

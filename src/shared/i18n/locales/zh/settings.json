@@ -597,6 +597,8 @@
     "testing": "测试中…",
     "testOk": "连接成功",
     "testFail": "连接失败：{{error}}",
+    "exitExportLabel": "退出时导出同步包",
+    "exitExportHint": "应用退出时把每本书的同步包上传到上面的传输目标；失败会记录并在下次启动提醒。",
     "desktopOnly": "同步传输仅在桌面端可用。"
   }
 }

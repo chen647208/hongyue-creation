@@ -10,11 +10,14 @@
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import { EditorContent, useEditor } from '@tiptap/react';
-import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback,useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils/cn';
 
+import { refreshBlockEmbedViews } from '../../../editor/blockEmbedNodeView';
+import { BLOCK_ID_ATTRIBUTE } from '../../../editor/blockIndex';
+import type { ResolvedBlockProjection } from '../../../editor/blockRefs';
 import { createCollaborativeExtensions } from '../../../editor/collaborative';
 import { findMatches } from '../../../editor/findReplace';
 import { createWritingPrimitives } from '../../../editor/primitives';
@@ -72,6 +75,12 @@ interface TipTapCanvasProps {
   typewriter?: boolean;
   /** Enter×3 连按：宿主创建新章并切换（不阻塞继续输入）。 */
   onNewChapter?: () => void;
+  /** 块嵌入投影解析（缺省一律失链）。 */
+  resolveBlock?: (id: string) => ResolvedBlockProjection | null;
+  /** 点击嵌入/失链块跳转源块。 */
+  onOpenSource?: (id: string) => void;
+  /** 光标所在块变化时回调（反向引用面板用）。 */
+  onActiveBlockChange?: (id: string | null) => void;
   onContentChange: (content: string) => void;
   onMouseUp: (event: React.MouseEvent<HTMLDivElement>) => void;
   onKeyUp: () => void;
@@ -84,7 +93,7 @@ interface TipTapCanvasProps {
  * 传入 collaboration 时改为 y-prosemirror 节点级绑定。
  */
 const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function TipTapCanvas(
-  { content, activeChapterId, locked, collaboration, screenplayFormat, paper, isFocusMode, isGenerating, isStreaming, typewriter, onNewChapter, onContentChange, onMouseUp, onKeyUp, onMouseMove },
+  { content, activeChapterId, locked, collaboration, screenplayFormat, paper, isFocusMode, isGenerating, isStreaming, typewriter, onNewChapter, resolveBlock, onOpenSource, onActiveBlockChange, onContentChange, onMouseUp, onKeyUp, onMouseMove },
   ref,
 ) {
   const { t } = useTranslation('writing');
@@ -94,6 +103,15 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
   onChangeRef.current = onContentChange;
   const onNewChapterRef = useRef(onNewChapter);
   onNewChapterRef.current = onNewChapter;
+  const onActiveBlockChangeRef = useRef(onActiveBlockChange);
+  onActiveBlockChangeRef.current = onActiveBlockChange;
+  const resolveBlockRef = useRef(resolveBlock);
+  resolveBlockRef.current = resolveBlock;
+  const onOpenSourceRef = useRef(onOpenSource);
+  onOpenSourceRef.current = onOpenSource;
+  // 稳定的扩展选项身份：项目数据变化经 ref 读取，不触发编辑器重建。
+  const stableResolveBlock = useCallback((id: string) => resolveBlockRef.current?.(id) ?? null, []);
+  const stableOnOpenSource = useCallback((id: string) => { onOpenSourceRef.current?.(id); }, []);
   // 记录最近一次由本编辑器吐出的 DSL，用于区分「外部受控更新」与「自身回环」。
   const lastEmitted = useRef<string>(content);
   const [isEmpty, setIsEmpty] = useState(() => content.trim().length === 0);
@@ -104,7 +122,9 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
   const awareness = collaboration?.awareness;
   const extensions = useMemo(
     () => [
-      ...(collaborative ? createCollaborativeExtensions() : createNovelExtensions()),
+      ...(collaborative
+        ? createCollaborativeExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource })
+        : createNovelExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource })),
       ...createWritingPrimitives({ onNewChapter: () => onNewChapterRef.current?.() }),
       ...(screenplayFormat ? [createScreenplayFormatting()] : []),
       ...(fragment && awareness
@@ -119,7 +139,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
           ]
         : []),
     ],
-    [collaborative, fragment, awareness, screenplayFormat],
+    [collaborative, fragment, awareness, screenplayFormat, stableResolveBlock, stableOnOpenSource],
   );
 
   const editor = useEditor(
@@ -132,6 +152,16 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
         lastEmitted.current = dsl;
         setIsEmpty(dsl.trim().length === 0);
         onChangeRef.current(dsl);
+      },
+      onSelectionUpdate: ({ editor: e }) => {
+        const { from } = e.state.selection;
+        const $pos = e.state.doc.resolve(from);
+        let active: string | null = null;
+        for (let depth = $pos.depth; depth > 0; depth--) {
+          const id = $pos.node(depth).attrs?.[BLOCK_ID_ATTRIBUTE];
+          if (typeof id === 'string' && id.length > 0) { active = id; break; }
+        }
+        onActiveBlockChangeRef.current?.(active);
       },
     },
     [fragment, collaborative],
@@ -273,6 +303,60 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
         } catch {
           return false;
         }
+      },
+      getActiveBlockId() {
+        if (!editor) return null;
+        const { from } = editor.state.selection;
+        const $pos = editor.state.doc.resolve(from);
+        for (let depth = $pos.depth; depth > 0; depth--) {
+          const id = $pos.node(depth).attrs?.[BLOCK_ID_ATTRIBUTE];
+          if (typeof id === 'string' && id.length > 0) return id;
+        }
+        return null;
+      },
+      insertBlockRef(id: string) {
+        if (!editor) return false;
+        try {
+          return editor.commands.insertContent({ type: 'blockRef', attrs: { id } });
+        } catch {
+          return false;
+        }
+      },
+      insertBlockEmbed(id: string) {
+        if (!editor) return false;
+        try {
+          return editor.chain().focus().insertContent({ type: 'blockEmbed', attrs: { id } }).run();
+        } catch {
+          return false;
+        }
+      },
+      jumpToBlock(id: string) {
+        if (!editor) return false;
+        let pos = -1;
+        editor.state.doc.descendants((node, nodePos) => {
+          if (pos >= 0) return false;
+          const value = node.attrs?.[BLOCK_ID_ATTRIBUTE];
+          if (typeof value === 'string' && value === id) {
+            pos = nodePos;
+            return false;
+          }
+          return true;
+        });
+        if (pos < 0) return false;
+        try {
+          editor.commands.focus();
+          editor.commands.setTextSelection(pos + 1);
+          const coords = editor.view.coordsAtPos(pos + 1);
+          editor.view.dom.ownerDocument?.defaultView?.scrollTo?.({ top: Math.max(0, coords.top - 200), behavior: 'smooth' });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      refreshEmbeds() {
+        refreshBlockEmbedViews();
+        // 空事务触发装饰重算，让行内引用的失链标记随项目数据刷新。
+        if (editor) editor.view.dispatch(editor.state.tr);
       },
       splitAtCursor() {
         if (!editor) return null;

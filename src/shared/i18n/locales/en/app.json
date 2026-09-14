@@ -176,7 +176,50 @@
     "reportApplied": "Applied: {{count}}",
     "reportSkipped": "Skipped (up to date): {{count}}",
     "reportManual": "Needs manual review: {{count}}",
+    "reportPending": "Pending conflicts: {{count}} (recorded; local unchanged)",
     "conflictCopies": "Conflict copies (local kept, remote saved as copies)",
+    "conflictIntro": "This merge has {{count}} conflict(s). Choose how to handle them:",
+    "conflictReasonCopy": "Both sides edited this node: local kept, remote saved as a copy",
+    "conflictReasonManual": "Both sides edited this attribute or edge: manual comparison needed",
+    "policyLegend": "Conflict handling",
+    "policyApply": "Apply selected",
+    "policyCancel": "Cancel",
+    "policy": {
+      "keep-copy": {
+        "label": "Keep conflict copy",
+        "hint": "Leave local content as-is and save the remote version as a new copy. Both are kept."
+      },
+      "use-remote": {
+        "label": "Apply remote replacement",
+        "hint": "Overwrite local conflicting items with the remote version. Local edits are replaced."
+      },
+      "defer": {
+        "label": "Mark merge failed, handle later",
+        "hint": "Do not change conflicting items now; record them for later."
+      }
+    },
+    "recoveryShow": "Recovery log",
+    "recoveryHide": "Hide recovery log",
+    "recoveryTitle": "Recovery log",
+    "recoveryEmpty": "No sync records yet.",
+    "recoveryKind": {
+      "import": "Import merge",
+      "download": "Download merge",
+      "upload": "Upload",
+      "export": "Export",
+      "exit-export": "Exit export"
+    },
+    "recoveryOutcome": {
+      "ok": "Succeeded",
+      "failed": "Failed",
+      "pending": "Pending"
+    },
+    "recoveryCounts": "Applied {{applied}} · Conflicts {{conflicts}}",
+    "exitExportReminderTitle": "Exit export did not finish last time",
+    "exitExportReminder": "Exit export is incomplete for {{count}} book(s). Retry now?",
+    "exitExportRetry": "Retry now",
+    "exitExportRetryDone": "Exit export retried successfully for {{count}} book(s)",
+    "exitExportRetryFailed": "Exit export retry still has failures",
     "upload": "Upload to transport",
     "download": "Download & merge",
     "uploadDone": "Bundle uploaded",

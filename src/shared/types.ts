@@ -1353,6 +1353,10 @@ export interface ElectronAPI {
     list: (config: SyncTransportConfig, prefix?: string) => Promise<SyncTransportObject[]>;
     remove: (config: SyncTransportConfig, key: string) => Promise<{ ok: boolean }>;
   };
+  /** 退出导出：主进程 before-quit 请求渲染层导出；返回解绑函数。 */
+  onExitExportRequest: (listener: () => void) => () => void;
+  /** 渲染层退出导出完成后通知主进程。 */
+  notifyExitExportDone: () => void;
   /** 自动更新（仅打包版存在；开发/网页预览无此字段）。 */
   updater?: {
     check: () => Promise<{ ok: boolean; version: string | null }>;

@@ -41,6 +41,7 @@ export const DEFAULT_BLOCK_ID_TYPES: readonly string[] = [
   'listItem',
   'blockquote',
   'codeBlock',
+  'blockEmbed',
 ];
 
 /** 初始文档规范化事务的元标记：编辑器创建时不经过事务，appendTransaction 不会自触发。 */

@@ -10,8 +10,8 @@
 /** 协作模式的编辑器扩展：关闭 StarterKit 的 History，撤销由 y-prosemirror 的 yUndoPlugin 接管。 */
 import type { Extensions } from '@tiptap/core';
 
-import { createNovelExtensions } from './schema';
+import { createNovelExtensions, type NovelExtensionOptions } from './schema';
 
-export function createCollaborativeExtensions(): Extensions {
-  return createNovelExtensions({ undoRedo: false });
+export function createCollaborativeExtensions(options: Omit<NovelExtensionOptions, 'undoRedo'> = {}): Extensions {
+  return createNovelExtensions({ ...options, undoRedo: false });
 }

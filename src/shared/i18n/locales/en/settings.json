@@ -597,6 +597,8 @@
     "testing": "Testing…",
     "testOk": "Connection succeeded",
     "testFail": "Connection failed: {{error}}",
+    "exitExportLabel": "Export bundle on exit",
+    "exitExportHint": "Upload each book's sync bundle to the transport above when the app quits. Failures are recorded and shown on next start.",
     "desktopOnly": "Sync transport is available on desktop only."
   }
 }

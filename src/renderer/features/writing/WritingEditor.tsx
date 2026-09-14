@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { useChapterCollab } from '@/app/collaboration/collaborationService';
 import { type CommitOptions,useProjectStore } from '@/app/stores/projectStore';
 import { useSettingsStore, useUsableModel } from '@/app/stores/settingsStore';
+import { buildBlockRefIndex, resolveBlockProjection } from '@/editor/blockRefs';
 import { dialogService } from '@/shared/services/dialogService';
 import { onEditorOps } from '@/shared/services/editorOps';
 import { openForeshadows, overdueForeshadows } from '@/shared/services/foreshadowService';
@@ -147,6 +148,42 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
     [project, activeChapter?.order],
   );
   const editorRef = useRef<NovelEditorHandle>(null);
+
+  // 块引用图（docs/design/45 §4）：全书正反查 + 失链 + 嵌入边，随项目数据重算。
+  const blockRefIndex = useMemo(
+    () => buildBlockRefIndex(deferredProject.chapters.map((c) => ({ id: c.id, title: c.title, body: c.content }))),
+    [deferredProject],
+  );
+  const blockRefIndexRef = useRef(blockRefIndex);
+  blockRefIndexRef.current = blockRefIndex;
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const pendingBlockJumpRef = useRef<string | null>(null);
+  const resolveBlock = useCallback((id: string) => resolveBlockProjection(blockRefIndexRef.current, id), []);
+
+  // 跨章跳转：目标不在当前章时先切章，编辑器就绪后再定位。
+  const handleJumpToBlock = useCallback((id: string) => {
+    const location = blockRefIndexRef.current.blocks.get(id);
+    if (location && location.chapterId !== activeChapterId) {
+      pendingBlockJumpRef.current = id;
+      setActiveChapterId(location.chapterId);
+      return;
+    }
+    editorRef.current?.jumpToBlock(id);
+  }, [activeChapterId]);
+
+  useEffect(() => {
+    const pending = pendingBlockJumpRef.current;
+    if (!pending) return;
+    pendingBlockJumpRef.current = null;
+    const timer = setTimeout(() => { editorRef.current?.jumpToBlock(pending); }, 50);
+    return () => clearTimeout(timer);
+  }, [activeChapterId]);
+
+  // 正文变化后重新投影嵌入内容（源块可能在其它章节）。
+  useEffect(() => { editorRef.current?.refreshEmbeds(); }, [blockRefIndex]);
+
+  const handleInsertBlockRef = useCallback((id: string) => { editorRef.current?.insertBlockRef(id); }, []);
+  const handleInsertBlockEmbed = useCallback((id: string) => { editorRef.current?.insertBlockEmbed(id); }, []);
 
   useEffect(() => {
     if (writingPrompts.length > 0 && !selectedGenPromptId) {
@@ -489,6 +526,13 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
           onInsertEntity={(name: string) => {
             editorRef.current?.insertText(name);
           }}
+          blockRefs={{
+            index: blockRefIndex,
+            activeBlockId,
+            onInsertRef: handleInsertBlockRef,
+            onInsertEmbed: handleInsertBlockEmbed,
+            onJump: handleJumpToBlock,
+          }}
         />
       )}
 
@@ -601,6 +645,9 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
           onMouseMove={handleMouseMove}
           onContentChange={updateChapterContent}
           onNewChapter={handleNewChapter}
+          resolveBlock={resolveBlock}
+          onOpenSource={handleJumpToBlock}
+          onActiveBlockChange={setActiveBlockId}
           onStopStreaming={gen.stopStreaming}
           onStopBatchGeneration={gen.stopBatchGeneration}
           streamingTokens={gen.streamingTokens}

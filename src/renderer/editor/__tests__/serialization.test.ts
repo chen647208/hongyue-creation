@@ -9,12 +9,11 @@
 
 import { describe, expect,it } from 'vitest';
 
-import { dslToPmDoc, pmDocToDsl, type PmNode } from '../serialization';
+import { BLOCK_ID_ATTRIBUTE, dslToPmDoc, pmDocToDsl, type PmNode } from '../serialization';
 
 function topTypes(doc: PmNode): string[] {
   return (doc.content ?? []).map((b) => b.type);
 }
-
 describe('dslToPmDoc', () => {
   it('段落/标题/场景分隔/关键字行分类正确', () => {
     const doc = dslToPmDoc('# @pov: 林渊\n\n第一段。\n\n## 小节\n\n正文。\n\n***\n\n新场景。');
@@ -135,5 +134,45 @@ describe('块前缀转义（往返保真，段落不被误解析为块级语法�
     const reloaded = dslToPmDoc(dsl);
     expect(topTypes(reloaded)).toEqual(['paragraph']);
     expect(reloaded.content?.[0]?.content?.map((n) => n.text ?? n.type)).toEqual(['上行', 'hardBreak', '# 下行伪标题']);
+  });
+});
+
+describe('块引用与块嵌入往返', () => {
+  it('行内引用/嵌入解析为 blockRef/blockEmbed，渲染回原语法', () => {
+    const doc = dslToPmDoc('见 ((^abc-1)) 与 !((^def-2))。');
+    const types = (doc.content?.[0]?.content ?? []).map((n) => n.type);
+    expect(types).toEqual(['text', 'blockRef', 'text', 'blockEmbed', 'text']);
+    expect(doc.content?.[0]?.content?.[1]?.attrs).toMatchObject({ id: 'abc-1' });
+    expect(doc.content?.[0]?.content?.[3]?.attrs).toMatchObject({ id: 'def-2' });
+    expect(pmDocToDsl(doc)).toBe('见 ((^abc-1)) 与 !((^def-2))。');
+  });
+
+  it('整行嵌入为块级 blockEmbed，带块锚往返稳定', () => {
+    const doc: PmNode = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', attrs: { [BLOCK_ID_ATTRIBUTE]: 'src-1' }, content: [{ type: 'text', text: '甲' }] },
+        { type: 'blockEmbed', attrs: { [BLOCK_ID_ATTRIBUTE]: 'e1', id: 'src-1' } },
+      ],
+    };
+    const dsl = pmDocToDsl(doc);
+    expect(dsl).toBe('^src-1\n甲\n\n^e1\n!((^src-1))');
+    const reloaded = dslToPmDoc(dsl);
+    expect(reloaded.content?.[1]?.type).toBe('blockEmbed');
+    expect(reloaded.content?.[1]?.attrs).toMatchObject({ id: 'src-1', [BLOCK_ID_ATTRIBUTE]: 'e1' });
+    expect(pmDocToDsl(reloaded)).toBe(dsl);
+  });
+
+  it('段落整行恰为嵌入形时转义，结构不塌成块级嵌入', () => {
+    const doc: PmNode = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: '!((^abc-1))' }] }],
+    };
+    const dsl = pmDocToDsl(doc);
+    expect(dsl).toBe('\\!((^abc-1))');
+    const reloaded = dslToPmDoc(dsl);
+    expect(topTypes(reloaded)).toEqual(['paragraph']);
+    expect(reloaded.content?.[0]?.content?.[0]?.type).toBe('blockEmbed');
+    expect(pmDocToDsl(reloaded)).toBe(dsl);
   });
 });

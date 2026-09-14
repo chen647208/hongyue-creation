@@ -21,6 +21,7 @@ import { APP_STATE_VERSION } from '../../../shared/constants/versions';
 import { type AppState, type StorageConfig } from '../../../shared/types';
 import { autoBackupService } from '../../shared/services/autoBackupService';
 import { repository } from '../../shared/services/repository';
+import { createExitExportDeps, runExitExport } from '../../shared/services/syncExitService';
 import { TaskScheduler } from '../../shared/services/taskScheduler';
 import { toast } from '../../shared/services/toastService';
 import { logger } from '../../shared/utils/logger';
@@ -206,6 +207,15 @@ function bindFlushHandlers(): void {
   if (api?.onFlushRequest) {
     api.onFlushRequest(() => {
       void flushNow().finally(() => api.notifyFlushDone());
+    });
+  }
+  // 退出导出：渲染层持有 SQLite 读取与传输服务，按配置逐书上传同步包
+  if (api?.onExitExportRequest) {
+    api.onExitExportRequest(() => {
+      const deps = createExitExportDeps(() =>
+        useProjectStore.getState().projects.map((p) => ({ id: p.id, title: p.title })),
+      );
+      void runExitExport(deps).finally(() => api.notifyExitExportDone());
     });
   }
   window.addEventListener('beforeunload', () => {

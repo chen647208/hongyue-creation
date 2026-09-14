@@ -11,12 +11,21 @@
  * 同步服务：把 core/sync 协议接到应用的 SQLite 存储。
  *
  * 导出：读全书实体 + 变更记录 → canonicalHash 合成 SyncChange → bundle JSON。
- * 导入：读 bundle → mergeBundle（LWW 禁用）→ INSERT OR REPLACE 应用插入集
- * （冲突副本以新 id 落库、本地保留），返回报告供 UI 展示。
+ * 导入：读 bundle → mergeBundle（LWW 禁用）→ 按用户选定的冲突策略应用插入集
+ * 并返回报告供 UI 展示。冲突分类只有 mergeBundle 一套：本层只决定"怎么落地"，
+ * 不重新判定谁是冲突。
  */
-import type { AttributeEntity, EdgeEntity,NodeEntity } from '@core/entities';
-import { getInstanceId,hashEntity } from '@core/entities';
-import { buildBundle, canonicalHash, type EntitySnapshot, localState, mergeBundle, type SyncBundle } from '@core/sync';
+import type { AttributeEntity, EdgeEntity, NodeEntity } from '@core/entities';
+import { getInstanceId, hashEntity } from '@core/entities';
+import {
+  buildBundle,
+  canonicalHash,
+  type EntitySnapshot,
+  localState,
+  mergeBundle,
+  type MergeReport,
+  type SyncBundle,
+} from '@core/sync';
 import type { FileDialogOptions, SaveDialogOptions, SyncTransportConfig } from '@shared/types';
 
 import { getSyncObject, putSyncObject, type RetryOptions } from './syncTransportService';
@@ -37,7 +46,7 @@ function toAttr(r: AttrRow): AttributeEntity {
   return { id: r.id, nodeId: r.node_id, type: r.type, name: r.name, value: r.value, inheritable: r.inheritable === 1, position: Number(r.position), erased: r.erased === 1 };
 }
 function toEdge(r: EdgeRow): EdgeEntity {
-  return { id: r.id, fromId: r.from_id, toId: r.to_id, kind: r.kind as NodeEntity['bookId'] extends never ? never : EdgeEntity['kind'], role: r.role ?? undefined, position: Number(r.position), bookId: r.book_id, erased: r.erased === 1 };
+  return { id: r.id, fromId: r.from_id, toId: r.to_id, kind: r.kind as EdgeEntity['kind'], role: r.role ?? undefined, position: Number(r.position), bookId: r.book_id, erased: r.erased === 1 };
 }
 
 async function readEntities(bookId: string): Promise<EntitySnapshot> {
@@ -49,8 +58,8 @@ async function readEntities(bookId: string): Promise<EntitySnapshot> {
 
 export interface SyncBundleExport { path: string; changeCount: number }
 
-/** 合成某本书的同步包（导出与上传共用）。 */
-async function buildSyncBundle(bookId: string): Promise<{ bundle: SyncBundle; changeCount: number }> {
+/** 合成某本书的同步包（导出、上传与退出导出共用）。 */
+export async function buildSyncBundle(bookId: string): Promise<{ bundle: SyncBundle; changeCount: number }> {
   const entities = await readEntities(bookId);
   let seq = 0;
   const changes = [
@@ -104,59 +113,185 @@ function canonicalOf(entity: unknown): string {
   return canonicalHash(entity);
 }
 
+/** 合并冲突的落地策略：保留冲突副本 / 应用远端替换 / 标记失败待处理。 */
+export type SyncConflictPolicy = 'keep-copy' | 'use-remote' | 'defer';
+
+export interface SyncConflictItem {
+  entityName: 'nodes' | 'attrs' | 'edges';
+  entityId: string;
+  /** 节点冲突时的远端副本标题；attrs/edges 无标题。 */
+  title?: string;
+  reason: string;
+  /** copy=节点冲突副本；manual=attrs/edges 人工项。 */
+  source: 'copy' | 'manual';
+}
+
+type SyncMergeResult = MergeReport & {
+  insertNodes: NodeEntity[];
+  insertAttrs: AttributeEntity[];
+  insertEdges: EdgeEntity[];
+};
+
+export interface SyncMergePlan {
+  bookId: string;
+  /** 无冲突、将被自动应用的实体数（节点 + 边）。 */
+  applied: number;
+  skipped: number;
+  conflicts: SyncConflictItem[];
+  /** 合并明细，applySyncPlan 消费；UI 只读 conflicts/applied/skipped。 */
+  report: SyncMergeResult;
+  bundle: SyncBundle;
+  local: EntitySnapshot;
+}
+
 export interface SyncApplyReport {
   applied: number;
   conflictCopies: Array<{ id: string; title: string }>;
   skipped: number;
   manual: number;
+  /** 选择"待处理"时未落地、已记入恢复记录的冲突数。 */
+  pendingConflicts: number;
 }
 
-/** 合并同步包并应用插入集（导入与下载共用）。 */
-async function applyBundle(bundle: SyncBundle): Promise<SyncApplyReport> {
-  const local = localState(await readEntities(bundle.bookId));
-  const report = mergeBundle(bundle, local);
-
-  for (const node of report.insertNodes) {
-    const hash = await hashEntity('nodes', node);
-    await db().run('nodes.upsert', [node.id, node.bookId, node.type, node.title, node.body, node.path ?? null, node.createdAt, node.updatedAt, node.erased ? 1 : 0, hash]);
-  }
-  for (const attr of report.insertAttrs) {
-    const hash = await hashEntity('attrs', attr);
-    await db().run('attrs.upsert', [attr.id, attr.nodeId, attr.type, attr.name, attr.value, attr.inheritable ? 1 : 0, attr.position, attr.erased ? 1 : 0, hash]);
-  }
-  for (const edge of report.insertEdges) {
-    const hash = await hashEntity('edges', edge);
-    await db().run('edges.upsert', [edge.id, edge.fromId, edge.toId, edge.kind, edge.role ?? null, edge.position, edge.bookId, edge.erased ? 1 : 0, hash]);
-  }
-
+async function prepareSync(bundle: SyncBundle): Promise<SyncMergePlan> {
+  const local = await readEntities(bundle.bookId);
+  const report = mergeBundle(bundle, localState(local));
+  const conflicts: SyncConflictItem[] = [
+    ...report.conflictCopies.map((c) => ({
+      entityName: 'nodes' as const,
+      entityId: c.sourceId,
+      title: c.node.title,
+      reason: '节点双方都改：本地保留，远端以冲突副本落库',
+      source: 'copy' as const,
+    })),
+    ...report.manual.map((m) => ({
+      entityName: m.entityName === 'edges' ? 'edges' as const : 'attrs' as const,
+      entityId: m.entityId,
+      reason: m.reason,
+      source: 'manual' as const,
+    })),
+  ];
   return {
+    bookId: bundle.bookId,
     applied: report.applied.length + report.insertEdges.length,
-    conflictCopies: report.conflictCopies.map((c) => ({ id: c.node.id, title: c.node.title })),
     skipped: report.skipped.length,
-    manual: report.manual.length,
+    conflicts,
+    report,
+    bundle,
+    local,
   };
 }
 
-/** 导入同步包：选择文件 → 合并 → 应用插入集 → 返回报告。 */
-export async function importSyncBundle(): Promise<SyncApplyReport> {
+/** 选择文件 → 解析 → 预合并（不落库），返回待决策的合并计划；取消返回 null。 */
+export async function prepareImportBundle(): Promise<SyncMergePlan | null> {
   const api = window.electronAPI;
   if (!api) throw new Error('同步需要桌面环境');
   const picked = await api.openFileDialog({ title: '导入同步包', filters: [{ name: 'AI Novel Sync', extensions: ['json'] }], properties: ['openFile'] } satisfies FileDialogOptions);
-  if (picked.canceled || !picked.filePaths[0]) throw new Error('已取消导入');
+  if (picked.canceled || !picked.filePaths[0]) return null;
   const raw = await api.readFile(picked.filePaths[0]);
-  return applyBundle(JSON.parse(raw) as SyncBundle);
+  return prepareSync(JSON.parse(raw) as SyncBundle);
 }
 
 /**
- * 从传输后端下载同步包并导入合并。远端对象不存在时抛出可读错误；
+ * 从传输后端下载同步包并预合并（不落库）。远端对象不存在时抛出可读错误；
  * 下载失败按 retry 选项重试（默认 3 次）。
  */
-export async function downloadSyncBundle(
+export async function prepareDownloadBundle(
   config: SyncTransportConfig,
   key: string,
   options: RetryOptions = {},
-): Promise<SyncApplyReport> {
+): Promise<SyncMergePlan> {
   const raw = await getSyncObject(config, key, options);
   if (raw === null || raw === undefined) throw new Error(`远端不存在同步包：${key}`);
-  return applyBundle(JSON.parse(raw) as SyncBundle);
+  return prepareSync(JSON.parse(raw) as SyncBundle);
+}
+
+async function upsertNode(node: NodeEntity): Promise<void> {
+  const hash = await hashEntity('nodes', node);
+  await db().run('nodes.upsert', [node.id, node.bookId, node.type, node.title, node.body, node.path ?? null, node.createdAt, node.updatedAt, node.erased ? 1 : 0, hash]);
+}
+
+async function upsertAttr(attr: AttributeEntity): Promise<void> {
+  const hash = await hashEntity('attrs', attr);
+  await db().run('attrs.upsert', [attr.id, attr.nodeId, attr.type, attr.name, attr.value, attr.inheritable ? 1 : 0, attr.position, attr.erased ? 1 : 0, hash]);
+}
+
+async function upsertEdge(edge: EdgeEntity): Promise<void> {
+  const hash = await hashEntity('edges', edge);
+  await db().run('edges.upsert', [edge.id, edge.fromId, edge.toId, edge.kind, edge.role ?? null, edge.position, edge.bookId, edge.erased ? 1 : 0, hash]);
+}
+
+/** 远端实体在浏览器包中的同 id 当前值。 */
+function remoteNode(bundle: SyncBundle, id: string): NodeEntity | undefined {
+  return bundle.entities.nodes.find((n) => n.id === id);
+}
+function remoteAttrsOf(bundle: SyncBundle, nodeId: string): AttributeEntity[] {
+  return bundle.entities.attrs.filter((a) => a.nodeId === nodeId);
+}
+function remoteAttr(bundle: SyncBundle, id: string): AttributeEntity | undefined {
+  return bundle.entities.attrs.find((a) => a.id === id);
+}
+function remoteEdge(bundle: SyncBundle, id: string): EdgeEntity | undefined {
+  return bundle.entities.edges.find((e) => e.id === id);
+}
+
+/** 应用远端替换：覆盖本地节点/属性，软删本地多出的属性，人工项也以远端覆盖。 */
+async function applyRemoteReplace(plan: SyncMergePlan): Promise<void> {
+  for (const copy of plan.report.conflictCopies) {
+    const node = remoteNode(plan.bundle, copy.sourceId);
+    if (!node) continue;
+    await upsertNode(node);
+    const attrs = remoteAttrsOf(plan.bundle, copy.sourceId);
+    for (const attr of attrs) await upsertAttr(attr);
+    const keep = new Set(attrs.map((a) => a.id));
+    for (const local of plan.local.attrs) {
+      if (local.nodeId !== copy.sourceId || local.erased || keep.has(local.id)) continue;
+      await upsertAttr({ ...local, erased: true });
+    }
+  }
+  for (const item of plan.report.manual) {
+    if (item.entityName === 'attrs') {
+      const attr = remoteAttr(plan.bundle, item.entityId);
+      if (attr) await upsertAttr(attr);
+    } else if (item.entityName === 'edges') {
+      const edge = remoteEdge(plan.bundle, item.entityId);
+      if (edge) await upsertEdge(edge);
+    }
+  }
+}
+
+/**
+ * 按策略落地合并计划：
+ * - keep-copy：无冲突项直接应用，冲突以新 id 副本落库（本地保留）；
+ * - use-remote：无冲突项照常，冲突项以远端覆盖本地；
+ * - defer：无冲突项照常，冲突项不改动（待处理，由调用方记入恢复记录）。
+ */
+export async function applySyncPlan(plan: SyncMergePlan, policy: SyncConflictPolicy): Promise<SyncApplyReport> {
+  const { report } = plan;
+  const copyIds = new Set(report.conflictCopies.map((c) => c.node.id));
+  const baseNodes = report.insertNodes.filter((n) => !copyIds.has(n.id));
+  const baseAttrs = report.insertAttrs.filter((a) => !copyIds.has(a.nodeId));
+
+  for (const node of baseNodes) await upsertNode(node);
+  for (const attr of baseAttrs) await upsertAttr(attr);
+  for (const edge of report.insertEdges) await upsertEdge(edge);
+
+  if (policy === 'keep-copy') {
+    for (const copy of report.conflictCopies) {
+      await upsertNode(copy.node);
+      for (const attr of copy.attrs) await upsertAttr(attr);
+    }
+  } else if (policy === 'use-remote') {
+    await applyRemoteReplace(plan);
+  }
+
+  return {
+    applied: baseNodes.length + report.insertEdges.length,
+    conflictCopies: policy === 'keep-copy'
+      ? report.conflictCopies.map((c) => ({ id: c.node.id, title: c.node.title }))
+      : [],
+    skipped: report.skipped.length,
+    manual: report.manual.length,
+    pendingConflicts: policy === 'defer' ? plan.conflicts.length : 0,
+  };
 }

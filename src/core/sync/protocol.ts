@@ -62,6 +62,8 @@ export interface LocalEntityState {
 }
 
 export interface ConflictCopy {
+  /** 冲突对应的本地实体 id（本地保留不变，远端版本据此映射回原实体）。 */
+  sourceId: string;
   /** 远端实体以新 id 落为副本 */
   node: NodeEntity;
   attrs: AttributeEntity[];
@@ -118,7 +120,7 @@ export function buildBundle(input: { bookId: string; instanceId: string; changes
   return { version: 1, bookId: input.bookId, instanceId: input.instanceId, generatedAt: Date.now(), changes: input.changes, entities: input.entities };
 }
 
-function conflictedNodeCopy(node: NodeEntity, allAttrs: AttributeEntity[]): { node: NodeEntity; attrs: AttributeEntity[] } {
+function conflictedNodeCopy(node: NodeEntity, allAttrs: AttributeEntity[]): { sourceId: string; node: NodeEntity; attrs: AttributeEntity[] } {
   const copyId = `conflict-${node.id}-${uuidv7()}`;
   const copy: NodeEntity = {
     ...node,
@@ -130,7 +132,7 @@ function conflictedNodeCopy(node: NodeEntity, allAttrs: AttributeEntity[]): { no
   const attrs = allAttrs
     .filter((a) => a.nodeId === node.id && !a.erased)
     .map((a) => ({ ...a, id: `conflict-${a.id}-${uuidv7()}`, nodeId: copyId }));
-  return { node: copy, attrs };
+  return { sourceId: node.id, node: copy, attrs };
 }
 
 /**
@@ -191,7 +193,7 @@ export function mergeBundle(bundle: SyncBundle, local: LocalEntityState): MergeR
     const copy = conflictedNodeCopy(remoteNode, [...(remoteAttrsByNode.get(entityId) ?? [])]);
     insertNodes.push(copy.node);
     insertAttrs.push(...copy.attrs);
-    report.conflictCopies.push({ node: copy.node, attrs: copy.attrs });
+    report.conflictCopies.push({ sourceId: copy.sourceId, node: copy.node, attrs: copy.attrs });
   }
 
   // attrs 冲突：无法独立成副本，报告人工

@@ -137,5 +137,8 @@ export const IPC = {
     transportGet: 'sync:transport:get',
     transportList: 'sync:transport:list',
     transportRemove: 'sync:transport:remove',
+    // 退出导出：主进程请求渲染层导出，渲染层完成后回执
+    exitExportRequest: 'sync:exit-export-request',
+    exitExportDone: 'sync:exit-export-done',
   },
 } as const;

@@ -156,6 +156,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     list: (config: unknown, prefix?: string) => ipcRenderer.invoke(IPC.sync.transportList, config, prefix),
     remove: (config: unknown, key: string) => ipcRenderer.invoke(IPC.sync.transportRemove, config, key),
   },
+  // 退出导出握手：主进程 before-quit 请求渲染层导出，完成后回执
+  onExitExportRequest: (listener: () => void) => {
+    const handler = (): void => listener();
+    ipcRenderer.on(IPC.sync.exitExportRequest, handler);
+    return () => ipcRenderer.removeListener(IPC.sync.exitExportRequest, handler);
+  },
+  notifyExitExportDone: () => ipcRenderer.send(IPC.sync.exitExportDone),
   // 自动更新（打包版原生链路；开发版无 updater 字段，渲染层退回 GitHub 查询）
   updater: {
     check: () => ipcRenderer.invoke(IPC.updater.check),

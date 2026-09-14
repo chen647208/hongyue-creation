@@ -48,6 +48,14 @@ export function saveSyncTransportConfig(config: SyncTransportConfig): void {
   localStore.setItem(STORAGE_KEYS.syncTransport, JSON.stringify(config));
 }
 
+/** 配置是否完整到可收发（本地目录非空 / WebDAV 地址 + 认证 / S3 五项齐全）。 */
+export function isTransportReady(config: SyncTransportConfig | null): boolean {
+  if (!config) return false;
+  if (config.kind === 'local') return !!config.directory.trim();
+  if (config.kind === 'webdav') return !!config.baseUrl.trim() && (config.authType === 'none' || !!config.credentialRef);
+  return !!config.endpoint.trim() && !!config.bucket.trim() && !!config.accessKeyId.trim() && !!config.secretRef;
+}
+
 function api(): NonNullable<Window['electronAPI']> {
   const value = typeof window === 'undefined' ? undefined : window.electronAPI;
   if (!value?.sync) throw new Error('同步传输仅桌面端可用');

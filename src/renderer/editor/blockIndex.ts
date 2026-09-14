@@ -15,6 +15,8 @@
  * 块锚（`^<id>`）读写该属性，缺失标识的块 id 为 null。
  */
 
+import { formatBlockEmbed, formatBlockRef } from '@core/dsl/blockRef';
+
 import { BLOCK_ID_ATTRIBUTE, dslToPmDoc, type PmNode } from './serialization';
 
 export { BLOCK_ID_ATTRIBUTE };
@@ -55,6 +57,12 @@ function inlineText(nodes: PmNode[] | undefined): string {
         out += typeof kind === 'string' && kind.length > 0 ? `{${name}|${kind}}` : `{${name}}`;
         break;
       }
+      case 'blockRef':
+        out += formatBlockRef(String(node.attrs?.id ?? ''));
+        break;
+      case 'blockEmbed':
+        out += formatBlockEmbed(String(node.attrs?.id ?? ''));
+        break;
       default:
         out += inlineText(node.content);
     }
@@ -71,6 +79,8 @@ export function blockText(node: PmNode): string {
       return `# @${String(node.attrs?.keyword ?? '')}: ${String(node.attrs?.value ?? '')}`.trimEnd();
     case 'darlingSlot':
       return String(node.attrs?.text ?? '');
+    case 'blockEmbed':
+      return formatBlockEmbed(String(node.attrs?.id ?? ''));
     default:
       return inlineText(node.content);
   }

@@ -464,5 +464,26 @@
     "promptNotFound": "选择的摘要提示词模板不存在。",
     "failed": "AI 提取摘要失败: {{error}}",
     "success": "章节正文摘要提取成功！"
+  },
+  "blockRefs": {
+    "title": "块引用",
+    "activeLabel": "当前块",
+    "noActive": "把光标放进一个段落，即可查看与插入块引用。",
+    "backlinksTitle": "反向引用（谁引用了我）",
+    "backlinksEmpty": "暂无块引用本块。",
+    "outgoingTitle": "本块引用",
+    "outgoingEmpty": "本块未引用其它块。",
+    "brokenTitle": "失链",
+    "targetMissing": "目标块不存在",
+    "jump": "跳转",
+    "insertRef": "引用",
+    "insertEmbed": "嵌入",
+    "insertTitle": "引用/嵌入一个块",
+    "searchPlaceholder": "搜索块文本或标识",
+    "empty": "书中暂无带标识的块。",
+    "selfRejected": "不能引用块自身。",
+    "cycleRejected": "该嵌入会形成循环引用，已阻止。",
+    "kindRef": "引用",
+    "kindEmbed": "嵌入"
   }
 }

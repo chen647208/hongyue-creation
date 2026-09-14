@@ -32,6 +32,7 @@ import { applySecurityHeaders } from './app/security.js';
 import { setQuitting } from './app/tray.js';
 import { getMainWindow } from './app/window.js';
 import { logger } from './logger.js';
+import { requestExitExport } from './sync/exitExport.js';
 
 /**
  * 应用入口：装配 Provider 容器并按序启动（docs/design/02）。
@@ -123,9 +124,10 @@ app.on('before-quit', (event) => {
   const timer = setTimeout(() => {
     logger.warn('app', 'shutdown timed out, forcing exit');
     app.exit(0);
-  }, 5000);
-  // 先让渲染层把未落库的差分写回，再释放主进程资源
+  }, 12_000);
+  // 先让渲染层把未落库的差分写回，再按其配置执行退出导出，最后释放主进程资源
   void requestRendererFlush(getMainWindow)
+    .then(() => requestExitExport(getMainWindow))
     .then(() => container.shutdown(ctx))
     .catch((err) => logger.error('app', 'shutdown failed', err))
     .finally(() => {

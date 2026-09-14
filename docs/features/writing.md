@@ -14,6 +14,7 @@
 - `components/WritingEditorToolbar.tsx`：工具条（撤销/重做、查找、章节拆分/合并、专注/打字机等）
 - `components/ChapterNavigationSection.tsx`：章节列表与多选批量
 - `components/FindBar.tsx`：章内查找替换
+- `components/WritingBlockRefsPanel.tsx`：块引用/嵌入面板（反向引用、失链、插入）
 - `app/app-shell/GlobalSearchModal.tsx`（书籍库侧）：跨书全文检索
 - `services/summaryExtractionService.ts`：摘要提取服务
 - `utils.ts`：写作域通用工具
@@ -54,6 +55,21 @@
   `.yml` 可 diff 可分享。
 - 封面导出：书架卡片菜单「导出封面」由 `core/build/cover.ts` 生成竖版 SVG，
   经 `shared/services/coverService.ts` 光栅化为 PNG 另存；环境无 canvas 时退回 SVG。
+
+## 块引用与嵌入
+
+- 语法：正文中 `((^<id>))` 是块引用，`!((^<id>))` 是块嵌入；`<id>` 是块锚标识，
+  字符集为 `[A-Za-z0-9][A-Za-z0-9_-]*`。整行嵌入按块级元素处理，其余位置按行内处理。
+- 持久化：引用只写 id，不复制被引内容。块标识经块锚（整行 `^<id>`）随正文落库，
+  重载与切章后仍可回指；引用与嵌入不改数据库表或字段。
+- 编辑器：`src/renderer/editor/blockRefs.ts` 扫描全书正文，得到正反查、失链清单与嵌入边；
+  左侧栏 `WritingBlockRefsPanel.tsx` 展示当前块的反向引用、出链、失链与插入入口。
+  嵌入节点由 `src/renderer/editor/blockEmbedNodeView.ts` 投影源块完整文本；
+  目标缺失时行内引用加失链装饰，嵌入块显示失链并可点击跳转。
+- 防环：插入引用禁止自引；插入嵌入时若沿嵌入边从目标可达源块则拒绝并提示；
+  展开以访问集合截断，不成环死循环。
+- 导出：编译/导出前引用与嵌入统一展开为被引块可见文本（跨章解析），目标缺失写
+  `【失链：<id>】`，成环写 `【循环引用：<id>】`；产物不残留 `((^id))` 语法。
 
 ## 素材隔离
 

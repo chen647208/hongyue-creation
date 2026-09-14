@@ -14,6 +14,7 @@
  * 共用同一段文本来源，保证「成稿字数」单一口径（验收 4）。
  */
 import { stripBlockAnchors } from '../dsl/anchor';
+import { collectBlockTexts, resolveBlockRefs } from '../dsl/blockRef';
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '../entities';
 import type { BuildProfile } from './profile.js';
 import { typeMatches } from './profile.js';
@@ -142,6 +143,8 @@ function resolveRefs(body: string, titleById: Map<string, string>): string {
 export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBlock[] {
   const { headings, content } = profile.transform;
   const titleById = new Map(nodes.map((n) => [n.id, n.title]));
+  // 块引用/嵌入的展开源：全书被锚定块的可见文本（跨章引用也能解析）。
+  const blockTexts = collectBlockTexts(nodes.map((n) => n.body));
 
   let chapterNo = 0;
   const blocks: DocBlock[] = [];
@@ -165,8 +168,10 @@ export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBloc
     }
 
     // 块锚是编辑器元数据，不进成稿：编译/导出前先剥离。
+    // 引用/嵌入统一展开为被引块文本；失链写标记，成环截断（口径见 @core/dsl/blockRef）。
     const source = stripBlockAnchors(node.body);
-    const body = content.resolveRefs === 'displayName' ? resolveRefs(source, titleById) : source;
+    const withNodeRefs = content.resolveRefs === 'displayName' ? resolveRefs(source, titleById) : source;
+    const body = resolveBlockRefs(withNodeRefs, blockTexts);
     const paragraphs = body
       .split(/\n+/)
       .map((p) => p.trim())

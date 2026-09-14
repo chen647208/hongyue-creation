@@ -464,5 +464,26 @@
     "promptNotFound": "The selected summary prompt template does not exist.",
     "failed": "AI summary extraction failed: {{error}}",
     "success": "Chapter content summary extracted successfully!"
+  },
+  "blockRefs": {
+    "title": "Block references",
+    "activeLabel": "Current block",
+    "noActive": "Place the cursor in a paragraph to view and insert block references.",
+    "backlinksTitle": "Backlinks (who references this block)",
+    "backlinksEmpty": "No block references this block yet.",
+    "outgoingTitle": "Outgoing references",
+    "outgoingEmpty": "This block references no other block.",
+    "brokenTitle": "Broken links",
+    "targetMissing": "Target block does not exist",
+    "jump": "Jump",
+    "insertRef": "Reference",
+    "insertEmbed": "Embed",
+    "insertTitle": "Reference or embed a block",
+    "searchPlaceholder": "Search block text or id",
+    "empty": "No anchored blocks in this book.",
+    "selfRejected": "A block cannot reference itself.",
+    "cycleRejected": "This embed would create a reference cycle and was blocked.",
+    "kindRef": "Reference",
+    "kindEmbed": "Embed"
   }
 }
