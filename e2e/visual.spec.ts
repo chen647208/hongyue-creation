@@ -17,7 +17,7 @@ test('工作台导航栏视觉快照', async () => {
     await createBook(page);
     const nav = page.locator('aside').first();
     await expect(nav).toBeVisible({ timeout: 30_000 });
-    await expect(nav).toHaveScreenshot('workspace-nav.png', { maxDiffPixelRatio: 0.02 });
+    await expect(nav).toHaveScreenshot('workspace-nav.png', { maxDiffPixelRatio: 0.02, animations: 'disabled' });
   } finally {
     await app.close();
     cleanupUserDataDir(userDataDir);
@@ -32,7 +32,7 @@ test('命令面板视觉快照', async () => {
     await page.keyboard.press('Control+K');
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 30_000 });
-    await expect(dialog).toHaveScreenshot('command-palette.png', { maxDiffPixelRatio: 0.02 });
+    await expect(dialog).toHaveScreenshot('command-palette.png', { maxDiffPixelRatio: 0.02, animations: 'disabled' });
   } finally {
     await app.close();
     cleanupUserDataDir(userDataDir);
@@ -50,6 +50,7 @@ test('写作区空态视觉快照', async () => {
     await expect(page).toHaveScreenshot('writing-empty.png', {
       mask: [page.locator('header')],
       maxDiffPixelRatio: 0.02,
+      animations: 'disabled',
     });
   } finally {
     await app.close();

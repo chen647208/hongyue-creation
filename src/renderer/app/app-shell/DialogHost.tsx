@@ -72,7 +72,7 @@ const DialogHost: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 z-modal flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-modal flex animate-fade-in items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       role="presentation"
       onKeyDown={onKeyDown}
     >
@@ -80,7 +80,7 @@ const DialogHost: React.FC = () => {
         role="dialog"
         aria-modal="true"
         aria-label={front.options.title ?? t('dialog.untitled')}
-        className="flex w-full max-w-md flex-col rounded-xl border border-border bg-card p-7 text-left shadow-lg"
+        className="flex w-full max-w-md animate-zoom-in flex-col rounded-xl border border-border bg-card p-7 text-left shadow-lg"
       >
         <div className="flex items-start gap-3">
           {front.kind === 'alert' && (() => {
