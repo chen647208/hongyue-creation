@@ -201,6 +201,7 @@ export const SQL = {
 
   // ── edges ──
   'edges.selectAll': `SELECT * FROM edges`,
+  'edges.selectByBook': `SELECT * FROM edges WHERE book_id = ?`,
   'edges.selectHashesByBook': `SELECT id, hash FROM edges WHERE book_id = ?`,
   'edges.deleteById': `DELETE FROM edges WHERE id = ?`,
   'edges.upsert': `INSERT INTO edges(id, from_id, to_id, kind, role, position, book_id, erased, hash)
@@ -214,6 +215,7 @@ export const SQL = {
 
   // ── attrs ──
   'attrs.selectAllWithBook': `SELECT a.*, n.book_id FROM attrs a JOIN nodes n ON a.node_id = n.id`,
+  'attrs.selectByBook': `SELECT a.*, n.book_id FROM attrs a JOIN nodes n ON a.node_id = n.id WHERE n.book_id = ?`,
   'attrs.selectHashesByBook': `SELECT a.id, a.hash FROM attrs a JOIN nodes n ON a.node_id = n.id WHERE n.book_id = ?`,
   'attrs.deleteById': `DELETE FROM attrs WHERE id = ?`,
   'attrs.upsert': `INSERT INTO attrs(id, node_id, type, name, value, inheritable, position, erased, hash)

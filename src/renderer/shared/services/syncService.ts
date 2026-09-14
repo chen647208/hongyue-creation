@@ -39,9 +39,9 @@ function toEdge(r: EdgeRow): EdgeEntity {
 }
 
 async function readEntities(bookId: string): Promise<EntitySnapshot> {
-  const nodeRows = (await db().all(`SELECT * FROM nodes WHERE book_id = ?`, [bookId])) as unknown as NodeRow[];
-  const attrRows = (await db().all(`SELECT a.* FROM attrs a JOIN nodes n ON a.node_id = n.id WHERE n.book_id = ?`, [bookId])) as unknown as AttrRow[];
-  const edgeRows = (await db().all(`SELECT * FROM edges WHERE book_id = ?`, [bookId])) as unknown as EdgeRow[];
+  const nodeRows = (await db().all('nodes.selectByBook', [bookId])) as unknown as NodeRow[];
+  const attrRows = (await db().all('attrs.selectByBook', [bookId])) as unknown as AttrRow[];
+  const edgeRows = (await db().all('edges.selectByBook', [bookId])) as unknown as EdgeRow[];
   return { nodes: nodeRows.map(toNode), attrs: attrRows.map(toAttr), edges: edgeRows.map(toEdge) };
 }
 
@@ -96,17 +96,11 @@ export async function importSyncBundle(): Promise<SyncApplyReport> {
 
   for (const node of report.insertNodes) {
     const hash = await hashEntity('nodes', node);
-    await db().run(
-      `INSERT OR REPLACE INTO nodes(id, book_id, type, title, body, path, created_at, updated_at, erased, hash) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [node.id, node.bookId, node.type, node.title, node.body, node.path ?? null, node.createdAt, node.updatedAt, node.erased ? 1 : 0, hash],
-    );
+    await db().run('nodes.upsert', [node.id, node.bookId, node.type, node.title, node.body, node.path ?? null, node.createdAt, node.updatedAt, node.erased ? 1 : 0, hash]);
   }
   for (const attr of report.insertAttrs) {
     const hash = await hashEntity('attrs', attr);
-    await db().run(
-      `INSERT OR REPLACE INTO attrs(id, node_id, type, name, value, inheritable, position, erased, hash) VALUES (?,?,?,?,?,?,?,?,?)`,
-      [attr.id, attr.nodeId, attr.type, attr.name, attr.value, attr.inheritable ? 1 : 0, attr.position, attr.erased ? 1 : 0, hash],
-    );
+    await db().run('attrs.upsert', [attr.id, attr.nodeId, attr.type, attr.name, attr.value, attr.inheritable ? 1 : 0, attr.position, attr.erased ? 1 : 0, hash]);
   }
 
   return {
