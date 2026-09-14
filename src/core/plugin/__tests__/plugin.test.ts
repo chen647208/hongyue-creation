@@ -52,6 +52,19 @@ describe('validateManifest（验收 1：错误定位 JSON 路径）', () => {
       expect(paths).toContain('version');
     }
   });
+
+  it('可执行贡献清单必须是字符串数组（editor/logic/renderers）', () => {
+    const base = { id: 'com.x.y', name: 'p', version: '1.0.0', host: '^2.0.0', license: 'MIT' };
+    const asString = validateManifest({ ...base, contributes: { editor: './editor.js' } });
+    expect(asString.ok).toBe(false);
+    if (!asString.ok) expect(asString.issues.some((i) => i.path === 'contributes.editor')).toBe(true);
+
+    const asArray = validateManifest({
+      ...base,
+      contributes: { editor: ['./editor/'], logic: ['./logic/'], renderers: ['./renderers.json'] },
+    });
+    expect(asArray.ok, asArray.ok ? '' : JSON.stringify(asArray.issues)).toBe(true);
+  });
 });
 
 describe('命名空间（验收 4：同名各自前缀化）', () => {
@@ -107,6 +120,22 @@ describe('PluginHost 生命周期', () => {
     host.enable('com.a.plugin');
     host.activate('com.a.plugin');
     expect(registry).toEqual(['com.a.plugin']);
+  });
+
+  it('isActive：仅 active 为真，装载后/禁用后/uninstalled 为假', () => {
+    const host = new PluginHost({ hostVersion: HOST }, () => []);
+    host.loadAll([plugin('com.active.plugin')]);
+    expect(host.isActive('com.active.plugin')).toBe(false);
+
+    host.activate('com.active.plugin');
+    expect(host.isActive('com.active.plugin')).toBe(true);
+
+    host.disable('com.active.plugin');
+    expect(host.isActive('com.active.plugin')).toBe(false);
+
+    host.uninstall('com.active.plugin');
+    expect(host.isActive('com.active.plugin')).toBe(false);
+    expect(host.isActive('com.ghost.plugin')).toBe(false);
   });
 
   it('配置级 disabled：装载即不激活', () => {

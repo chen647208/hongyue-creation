@@ -16,8 +16,8 @@
  * 可逆注册不变量：一切注册 API 返回 Disposable，宿主持栈、禁用/卸载时逆序
  * dispose——插件的任何注册都不会残留在宿主里。
  *
- * 权限：deny-by-default。资源型贡献（skills/types/buildProfiles）零代码可热载。
- * 逻辑型（editor/worker）当前无沙箱，本运行时不执行插件代码。
+ * 权限：deny-by-default。资源型贡献（skills/types/buildProfiles）零代码可热载；
+ * 逻辑型贡献（logic/editor）由渲染端装配，执行前经 assertCan 权限门。
  */
 import {
   assertPermission,
@@ -302,6 +302,11 @@ export class PluginHost {
 
   list(): PluginStatus[] {
     return [...this.statuses.values()];
+  }
+
+  /** 插件当前是否 active：逻辑执行等边界据此放行（disabled/failed/uninstalled 均为 false）。 */
+  isActive(pluginId: string): boolean {
+    return this.statuses.get(pluginId)?.state === 'active';
   }
 
   get(pluginId: string): DiscoveredPlugin | undefined {

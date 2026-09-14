@@ -70,9 +70,14 @@ export async function runPluginLogic(pluginId: string, fn: string, input: unknow
   if (!/^[A-Za-z_$][\w$]*$/.test(fn)) {
     return { ok: false, error: { kind: 'runtime', message: `非法函数名：${fn}` } };
   }
-  // 权限边界：逻辑贡献在 ai 接缝执行，须声明 write:ai；未声明即拒、不进沙箱。
+  // 权限边界：逻辑贡献在 ai 接缝执行。deny-by-default——插件未激活或未声明 write:ai 一律拒绝，不进沙箱。
+  const host = activeHost;
+  if (!host || !host.isActive(pluginId)) {
+    logger.warn(`插件 ${pluginId} 逻辑执行被拒：插件未激活`);
+    return { ok: false, error: { kind: 'permission', message: `插件 ${pluginId} 未激活，拒绝执行逻辑贡献` } };
+  }
   try {
-    activeHost?.assertCan(pluginId, 'write', 'ai');
+    host.assertCan(pluginId, 'write', 'ai');
   } catch (error) {
     logger.warn(`插件 ${pluginId} 逻辑执行被拒：未声明 write:ai 权限`);
     return { ok: false, error: { kind: 'permission', message: error instanceof Error ? error.message : String(error) } };

@@ -61,7 +61,8 @@ export interface PluginContribution {
   ui?: string[];
   mcpServers?: Record<string, { command: string; args?: string[] }>;
   hooks?: string;
-  editor?: string;
+  /** 编辑器扩展目录（含 index.html，iframe 内运行，design/22 §4）。 */
+  editor?: string[];
   /** 逻辑贡献目录（.js，导出具名函数；调用时进沙箱，design/22 §3）。 */
   logic?: string[];
   renderers?: string[];
@@ -155,6 +156,14 @@ export function validateManifest(raw: unknown): ManifestValidateResult {
       for (const [key, value] of Object.entries(m.contributes)) {
         if (value !== null && typeof value !== 'object' && !str(value)) {
           fail(`contributes.${key}`, '必须是路径字符串或对象/数组');
+        }
+      }
+      // 目录/文件清单贡献必须是字符串数组（字符串会被逐字符误读为多个路径）。
+      const c = m.contributes as Record<string, unknown>;
+      for (const key of ['skills', 'types', 'buildProfiles', 'commands', 'ui', 'logic', 'renderers', 'editor'] as const) {
+        const value = c[key];
+        if (value !== undefined && (!Array.isArray(value) || value.some((x) => !str(x)))) {
+          fail(`contributes.${key}`, '必须是字符串数组');
         }
       }
     }

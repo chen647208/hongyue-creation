@@ -25,8 +25,8 @@
     "ui":           ["./ui.json"],              // 槽位贡献（§4）
     "mcpServers":   { "inline": { "graph-query": { "command": "..." } } },
     "hooks":        "./hooks.yml",              // 能力接缝装饰（§5）
-    "editor":       "./editor.js",              // 逻辑型：TipTap/CM6 扩展（沙箱内）
-    "renderers":    "./renderers.json"          // 导出渲染器（07 篇）
+    "editor":       ["./editor/"],              // 逻辑型：编辑器扩展目录（含 index.html，iframe 内）
+    "renderers":    ["./renderers.json"]        // 导出渲染器（07 篇）
   },
 
   "permissions": {

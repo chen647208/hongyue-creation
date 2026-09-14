@@ -233,6 +233,49 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     expect(uiSlotRegistry.getSnapshot('plugin.panel')).toHaveLength(0);
   });
 
+  it('编辑器扩展：装配进 plugin.editor 槽位，禁用后释放无残留（design/22 §4）', async () => {
+    vi.stubGlobal('window', {
+      electronAPI: {
+        getAppDataPath: async () => '/data',
+        listDirectory: async (dir: string) =>
+          dir === '/data/plugins' ? [{ name: 'com.editor.p', type: 'directory' }] : [],
+        pluginListDirectory: async (root: string, rel: string) =>
+          `${root}/${rel}` === '/data/plugins/com.editor.p/editor' ? [{ name: 'index.html', type: 'file' }] : [],
+        pluginReadBinary: async () => '',
+        pluginReadFile: async (root: string, rel: string) => {
+          const full = `${root}/${rel}`;
+          if (full === '/data/plugins/com.editor.p/plugin.json') {
+            return JSON.stringify({
+              id: 'com.editor.p',
+              name: 'editor-p',
+              version: '1.0.0',
+              host: '^2.0.0',
+              license: 'MIT',
+              contributes: { editor: ['./editor/'] },
+            });
+          }
+          if (full === '/data/plugins/com.editor.p/editor/index.html') return '<div>ext</div>';
+          if (full === '/data/plugins/com.editor.p/plugin.sig') {
+            return JSON.stringify({ algorithm: 'ed25519', signature: 'sig', publicKey: 'test-key' });
+          }
+          throw new Error('missing');
+        },
+        pluginVerifySignature: async () => true,
+      },
+    });
+    setTrustedPluginKeys(['test-key']);
+    const host = await bootstrapPlugins(
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus() },
+      '2.0.0',
+      [],
+    );
+    expect(host.list().find((s) => s.id === 'com.editor.p')?.state).toBe('active');
+    expect(uiSlotRegistry.getSnapshot('plugin.editor')).toHaveLength(1);
+
+    host.disable('com.editor.p');
+    expect(uiSlotRegistry.getSnapshot('plugin.editor')).toHaveLength(0);
+  });
+
   it('逻辑贡献：收集 .js 并经沙箱执行（design/22）', async () => {
     vi.stubGlobal('window', {
       electronAPI: {
@@ -282,7 +325,15 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     expect(result.output).toEqual({ echoed: 'hi' });
 
     host.disable('com.logic.p');
-    expect((await runPluginLogic('com.logic.p', 'greet', 'hi')).ok).toBe(false);
+    const afterDisable = await runPluginLogic('com.logic.p', 'greet', 'hi');
+    expect(afterDisable.ok).toBe(false);
+    expect(afterDisable.error?.kind).toBe('permission');
+  });
+
+  it('未激活/无宿主的逻辑执行：deny-by-default 返回 permission（权限门）', async () => {
+    const result = await runPluginLogic('com.absent.p', 'greet', 'hi');
+    expect(result.ok).toBe(false);
+    expect(result.error?.kind).toBe('permission');
   });
 
   it('未声明 write:ai 的逻辑插件：执行返回 permission 错误（权限边界）', async () => {
