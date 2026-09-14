@@ -1,4 +1,5 @@
 {
+  "storageBackendMismatch": "The browser database (OPFS) was used last time but is unavailable now; the app opened with the fallback store, so the bookshelf may look empty. Use a browser that supports OPFS, or import from a backup.",
   "bookshelf": {
     "title": "Bookshelf",
     "subtitle": "All your novel projects. Click a card to continue writing.",

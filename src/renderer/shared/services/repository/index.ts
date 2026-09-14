@@ -7,12 +7,40 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import { STORAGE_KEYS } from '@shared/constants/storageKeys';
+
 import { logger } from '../../utils/logger';
+import { localStore } from '../localStore';
 import { IpcSqlDriver } from './ipcDriver';
 import { jsonRepository } from './jsonRepository';
 import { SqliteRepository } from './sqliteRepository';
 import type { StorageRepository } from './types';
 import { WasmSqliteDriver } from './wasmDriver';
+
+export type StorageBackendKind = 'ipc' | 'opfs' | 'local';
+
+export interface StorageBackendStatus {
+  kind: StorageBackendKind;
+  /** 上次成功使用的后端；null = 无记录。 */
+  expected: string | null;
+  /** 期望 OPFS 但当前不可用：数据可能在另一后端，绝不能静默当空库。 */
+  mismatch: boolean;
+}
+
+/** 后端决策（纯函数，便于测试）。 */
+export function decideStorageBackend(input: { hasIpc: boolean; hasOpfs: boolean; sentinel: string | null }): { kind: StorageBackendKind; mismatch: boolean } {
+  if (input.hasIpc) return { kind: 'ipc', mismatch: false };
+  if (input.hasOpfs) return { kind: 'opfs', mismatch: false };
+  return { kind: 'local', mismatch: input.sentinel === 'opfs' };
+}
+
+function readSentinel(): string | null {
+  return localStore.getItem(STORAGE_KEYS.storageBackend);
+}
+
+function writeSentinel(kind: StorageBackendKind): void {
+  localStore.setItem(STORAGE_KEYS.storageBackend, kind === 'opfs' ? 'opfs' : kind);
+}
 
 /**
  * 应用数据的唯一入口：统一经 `import { repository }` 访问。
@@ -38,6 +66,25 @@ function selectRepository(): StorageRepository {
   // 非安全上下文/无 OPFS：退回 localStorage，已有 SQLite/OPFS 数据不会自动迁移
   logger.warn('[repository] 无 OPFS，退回 localStorage（不自动迁移既有 SQLite 数据）');
   return jsonRepository;
+}
+
+/** 后端选择与哨兵：启动时计算一次；期望 OPFS 但不可用时标记 mismatch 供 UI 提示。 */
+const backendDecision = decideStorageBackend({
+  hasIpc: typeof window !== 'undefined' ? !!window.electronAPI?.db : false,
+  hasOpfs: opfsAvailable(),
+  sentinel: readSentinel(),
+});
+
+const backendStatus: StorageBackendStatus = {
+  kind: backendDecision.kind,
+  expected: readSentinel(),
+  mismatch: backendDecision.mismatch,
+};
+
+if (!backendDecision.mismatch) writeSentinel(backendDecision.kind);
+
+export function getStorageBackendStatus(): StorageBackendStatus {
+  return backendStatus;
 }
 
 export const repository: StorageRepository = selectRepository();

@@ -24,6 +24,7 @@ export const STORAGE_KEYS = {
   editorScreenplayFormat: 'editor.screenplayFormat',
   editorSensitiveWords: 'editor.sensitiveWords',
   editorPaper: 'editor.paper',
+  storageBackend: 'storage.backend',
   viewsSelected: 'views.selected',
   collabEnabled: 'collab.enabled',
   collabServerUrl: 'collab.serverUrl',

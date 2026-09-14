@@ -33,6 +33,7 @@ import { useViewPreference } from '../shared/hooks/useViewPreference';
 import { exportCover } from '../shared/services/coverService';
 import { dialogService } from '../shared/services/dialogService';
 import { eventToKeybinding, resolveKeybindings } from '../shared/services/keybindings';
+import { getStorageBackendStatus } from '../shared/services/repository';
 import { registerAssistantRuntime } from './app-shell/assistantRuntimeSetup';
 import Bookshelf from './app-shell/Bookshelf';
 import CommandPalette from './app-shell/CommandPalette';
@@ -283,6 +284,12 @@ const App: React.FC = () => {
         <DialogHost />
         <ToastHost />
         <ApprovalHost />
+
+        {getStorageBackendStatus().mismatch && (
+          <div role="alert" className="absolute inset-x-0 top-0 z-50 border-b border-warning/40 bg-warning/10 px-4 py-2 text-center text-xs text-warning">
+            {t('storageBackendMismatch')}
+          </div>
+        )}
 
         <ResetAlertDialog open={resetOpen} type="factory_reset" onClose={() => setResetOpen(false)} />
 
