@@ -7,7 +7,8 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { AlertCircle, BookOpen, Calculator, Check, Clock, Copy, Cpu, FileText, Flag, Keyboard, Landmark, MapPin, MessagesSquare, Paperclip, Pencil, Reply, Send, Settings2, Square, Trash2, User, X, Zap } from 'lucide-react';
+import type { Citation } from '@core/ai';
+import { AlertCircle, BookOpen, Calculator, Check, Clock, Copy, Cpu, FileText, Flag, Keyboard, Landmark, Link2, MapPin, MessagesSquare, Paperclip, Pencil, Reply, Send, Settings2, Square, Trash2, User, X, Zap } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -53,6 +54,8 @@ interface AssistantChatWorkspaceProps {
   bookId: string | null;
   /** 保存新附件后递增，触发附件库刷新。 */
   attachmentsRefreshKey?: number;
+  /** 点击引用出处跳回来源（章节/知识库）。 */
+  onOpenSource?: (citation: Citation) => void;
 }
 
 // cmd 前缀是数据（aiCardCommandService 对中英别名都接受），故按语言在渲染期取用；
@@ -106,6 +109,7 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
   setSelectedCardTemplateId,
   bookId,
   attachmentsRefreshKey,
+  onOpenSource,
 }) => {
   const { t, i18n } = useTranslation('assistant');
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
@@ -183,11 +187,38 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
                   <hr className={cn('my-2 border-white/20', msg.role !== 'user' && 'border-border')} />
                 </div>
               )}
-              <div className="relative">
-                {msg.role === 'user'
-                  ? msg.content
-                  : <MarkdownView content={msg.content} className="text-sm [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0" />}
-                {msg.isStreaming && <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary align-middle"></span>}
+              <div className={cn('relative', msg.citations?.length && 'flex gap-3')}>
+                <div className="min-w-0 flex-1">
+                  {msg.role === 'user'
+                    ? msg.content
+                    : <MarkdownView content={msg.content} className="text-sm [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0" />}
+                  {msg.isStreaming && <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary align-middle"></span>}
+                </div>
+                {msg.role !== 'user' && msg.citations && msg.citations.length > 0 && (
+                  <aside className="w-40 shrink-0 border-l border-border pl-2">
+                    <div className="mb-1 text-2xs uppercase tracking-wider text-muted-foreground">{t('chat.citationTitle')}</div>
+                    <ul className="space-y-1.5">
+                      {msg.citations.map((citation) => (
+                        <li key={citation.id}>
+                          <button
+                            type="button"
+                            onClick={() => onOpenSource?.(citation)}
+                            className="block w-full rounded px-1 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            title={t('chat.citationJump')}
+                          >
+                            <span className="flex items-center gap-1 font-medium text-foreground">
+                              <Link2 className="size-3 shrink-0" />
+                              <span className="truncate">
+                                {citation.sourceKind === 'chapter' ? t('chat.citationChapter') : t('chat.citationKnowledge')}《{citation.title}》
+                              </span>
+                            </span>
+                            <span className="mt-0.5 block truncate">{citation.snippet}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </aside>
+                )}
               </div>
               {/* 单条操作：复制 / 删除；用户消息可回填改后重发 */}
               <div className="mt-2 flex items-center gap-1 border-t border-border pt-1.5">

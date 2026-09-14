@@ -19,6 +19,7 @@
  */
 import type { AIMessageImage, AIResponse, ModelConfig, Project } from '../../shared/types';
 import type { ApprovalProposal, ApprovalRouter } from './approval.js';
+import type { Citation } from './grounding.js';
 import type { PromptAssembler } from './promptAssembler.js';
 import { diffLines } from './proposalDiff.js';
 import type { AiSession } from './session.js';
@@ -27,6 +28,21 @@ import type { ToolRegistry } from './tools.js';
 /** 写类提案的 diff 文本（unified 风格）与可执行载荷。 */
 function unifiedDiff(diff: ReturnType<typeof diffLines>): string {
   return diff.map((line) => `${line.op === 'add' ? '+' : line.op === 'del' ? '-' : ' '}${line.text}`).join('\n');
+}
+
+/** 从工具输出提取带出处的引用（检索类工具在 data.citations 返回）。 */
+function extractCitations(data: unknown): Citation[] | undefined {
+  if (typeof data !== 'object' || data === null) return undefined;
+  const raw = (data as { citations?: unknown }).citations;
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const valid = raw.filter(
+    (item): item is Citation =>
+      typeof item === 'object'
+      && item !== null
+      && typeof (item as Citation).id === 'string'
+      && typeof (item as Citation).refId === 'string',
+  );
+  return valid.length ? valid : undefined;
 }
 
 function isProjectLike(value: unknown): value is { id: string; chapters: Project['chapters'] } {
@@ -88,6 +104,8 @@ export interface AgentLoopDeps {
   };
   maxTurns?: number;
   signal?: AbortSignal;
+  /** 会话启动（session.start 落盘）后的回调：宿主在此补记装配元事件，保证 start 仍是首事件。 */
+  onStarted?: () => void | Promise<void>;
   /**
    * 首轮 prompt 字符预算（超限只丢可再生上下文段，任务/协议/工具受保护）。
    * 宿主按模型上下文档位传入；缺席则不截断。
@@ -161,6 +179,7 @@ export async function runAgentSession(deps: AgentLoopDeps, task: string): Promis
   });
 
   await deps.session.start();
+  if (deps.onStarted) await deps.onStarted();
 
   let prompt = assembled.prompt;
   let lastReply = '';
@@ -266,7 +285,8 @@ export async function runAgentSession(deps: AgentLoopDeps, task: string): Promis
           signal: deps.signal,
           extra: ctx.extra,
         }, call.callId);
-        await deps.session.emit({ t: 'tool.result', turn, callId: call.callId, ok: output.ok, error: output.error, at: Date.now() });
+        const citations = extractCitations(output.data);
+        await deps.session.emit({ t: 'tool.result', turn, callId: call.callId, ok: output.ok, error: output.error, citations, at: Date.now() });
         observations.push(`<untrusted tool="${call.toolId}" ok="${output.ok}">${JSON.stringify(output.data ?? output.error)?.slice(0, 2000)}</untrusted>`);
       }
 

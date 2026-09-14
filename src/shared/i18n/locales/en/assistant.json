@@ -44,6 +44,7 @@
     "resizeSidebarTitle": "Drag to resize the sidebar",
     "editDataTitle": "Edit project data",
     "contextTitle": "Project context analysis",
+    "injectionTitle": "Auto-injected context",
     "stopStreamTitle": "Stop streaming response",
     "planModeTitle": "Plan mode: plan only, act after confirmation",
     "clearChatTitle": "Clear chat history"
@@ -97,7 +98,34 @@
     "deleteTitle": "Delete this message",
     "editResendTitle": "Load into input to edit and resend",
     "toolChainTitle": "Tool chain ({{count}})",
-    "retryTitle": "Regenerate from the last message (keeps the old answer)"
+    "retryTitle": "Regenerate from the last message (keeps the old answer)",
+    "citationTitle": "Sources",
+    "citationJump": "Jump to source",
+    "citationChapter": "Chapter",
+    "citationKnowledge": "Knowledge"
+  },
+  "injection": {
+    "title": "Auto-injected context",
+    "close": "Close",
+    "enableLabel": "Enable auto-injection (turn off to pick context manually)",
+    "budgetLabel": "Injection budget used",
+    "empty": "Send a message to see what was actually injected.",
+    "disabledHint": "Auto-injection is off. No context was injected for this session.",
+    "noEntries": "No context entries matched this run.",
+    "droppedTitle": "Not injected",
+    "reasonBudget": "Over budget",
+    "reasonQuote": "Quote differs from source",
+    "reasonDisabled": "Turned off",
+    "kind": {
+      "chapter": "Chapter",
+      "knowledge": "Knowledge",
+      "character": "Character",
+      "location": "Location",
+      "faction": "Faction",
+      "timeline": "Timeline",
+      "memory": "Memory",
+      "search": "Full-text"
+    }
   },
   "dialog": {
     "noModel": "Please configure an AI model first",
@@ -279,6 +307,7 @@
     "mcpSyncOk": "MCP sync succeeded",
     "mcpSyncFail": "MCP sync failed: {{error}}",
     "writeDirect": "Direct write ({{toolId}})",
+    "contextInjection": "Auto-injection: {{entries}} entries ({{chars}}/{{budget}} chars), {{dropped}} not injected",
     "input": "in {{n}}",
     "output": "out {{n}}",
     "cacheRead": "cache {{n}}"

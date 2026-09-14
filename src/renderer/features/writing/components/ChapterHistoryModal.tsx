@@ -8,8 +8,8 @@
  */
 
 import type { RevisionEntity } from '@core/entities';
-import { Bot, Camera, Copy, History, Redo2, RotateCcw, Trash2 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import { Bot, Camera, Check, ChevronLeft, Copy, History, Redo2, RotateCcw, Trash2, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { listSnapshots, removeSnapshot } from '@/shared/services/chapterSnapshotService';
@@ -22,8 +22,21 @@ import { ModalShell } from '@/shared/ui/ModalShell';
 import { cn } from '@/shared/utils/cn';
 
 import type { Chapter } from '../../../../shared/types';
+import {
+  changeHunks,
+  diffChars,
+  mergeRevisionDecisions,
+  type RevisionDecision,
+  uniformDecisions,
+} from '../../../editor/revisionDiff';
 import { diffLines } from '../services/historyDiff';
+import { computeChapterStats } from '../services/writingStatsService';
 import { formatHistoryTimestamp, getGenerationType, getProviderIcon } from '../utils';
+
+interface ReviewBaseline {
+  label: string;
+  text: string;
+}
 
 interface ChapterHistoryModalProps {
   isOpen: boolean;
@@ -51,6 +64,25 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
   const [revisions, setRevisions] = useState<RevisionEntity[]>([]);
   // diff 对比目标记录 id（与当前正文逐行比对，只读展示）
   const [diffRecordId, setDiffRecordId] = useState<string | null>(null);
+  // 修订对比：选定版本为基线，逐处接受/拒绝后写回正文（docs/design/38 §2.1）
+  const [review, setReview] = useState<ReviewBaseline | null>(null);
+  const [decisions, setDecisions] = useState<Record<string, RevisionDecision>>({});
+
+  const reviewHunks = useMemo(
+    () => (review ? diffChars(review.text, chapter?.content ?? '') : []),
+    [review, chapter?.content],
+  );
+  const reviewChanges = useMemo(() => changeHunks(reviewHunks), [reviewHunks]);
+  const reviewMerged = useMemo(() => mergeRevisionDecisions(reviewHunks, decisions), [reviewHunks, decisions]);
+
+  const startReview = (label: string, text: string) => {
+    setDecisions({});
+    setReview({ label, text });
+  };
+  const stopReview = () => {
+    setReview(null);
+    setDecisions({});
+  };
 
   // 修订记录按需加载：节点 id 即章节 id（bridge 平铺时原样透传）；
   // 应用走正常回写路径（onApplyContent），自然产生一条新修订，无需写回管线
@@ -74,6 +106,14 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
     };
   }, [isOpen, chapter, tab]);
 
+  // 关闭后丢弃修订对比状态，重开从列表进入
+  useEffect(() => {
+    if (!isOpen) {
+      setReview(null);
+      setDecisions({});
+    }
+  }, [isOpen]);
+
   if (!isOpen || !chapter) {
     return null;
   }
@@ -92,6 +132,104 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
     onClose();
   };
 
+  const currentCharCount = computeChapterStats(chapter.content ?? '').charCount;
+  const mergedCharCount = computeChapterStats(reviewMerged).charCount;
+
+  const reviewView = (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs text-muted-foreground">
+          {t('chapterHistory.reviewCharSync', { from: currentCharCount, to: mergedCharCount })}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDecisions(Object.fromEntries(uniformDecisions(reviewHunks, 'accept')))}
+          >
+            <Check className="size-3.5" /> {t('chapterHistory.reviewAcceptAll')}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDecisions(Object.fromEntries(uniformDecisions(reviewHunks, 'reject')))}
+          >
+            <X className="size-3.5" /> {t('chapterHistory.reviewRejectAll')}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              onApplyContent(reviewMerged);
+              dialogService.alert(t('chapterHistory.reviewApplied'));
+              onClose();
+            }}
+          >
+            <Redo2 className="size-3.5" /> {t('chapterHistory.reviewApply')}
+          </Button>
+        </div>
+      </div>
+
+      {reviewChanges.length === 0 ? (
+        <EmptyState icon={History} title={t('chapterHistory.reviewEmpty')} description={review?.label ?? ''} />
+      ) : (
+        <ul className="space-y-2">
+          {reviewChanges.map((hunk, index) => {
+            const decision = decisions[hunk.id] ?? 'reject';
+            return (
+              <li key={hunk.id} className="rounded-lg border border-border bg-card p-3">
+                <div className="mb-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {t('chapterHistory.reviewChangeLabel', { index: index + 1 })}
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div>
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">{t('chapterHistory.reviewBaseline')}</div>
+                    <div
+                      className={cn(
+                        'whitespace-pre-wrap rounded border p-2 font-serif text-sm',
+                        decision === 'accept' ? 'border-success/40 bg-success/10 text-success' : 'border-border bg-muted/30 text-foreground',
+                      )}
+                    >
+                      {hunk.baselineText || ' '}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">{t('chapterHistory.reviewCurrent')}</div>
+                    <div
+                      className={cn(
+                        'whitespace-pre-wrap rounded border p-2 font-serif text-sm',
+                        decision === 'reject' ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-border bg-muted/30 text-foreground',
+                      )}
+                    >
+                      {hunk.currentText || ' '}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    variant={decision === 'accept' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 px-3 text-xs"
+                    onClick={() => setDecisions((prev) => ({ ...prev, [hunk.id]: 'accept' }))}
+                  >
+                    {t('chapterHistory.reviewAccept')}
+                  </Button>
+                  <Button
+                    variant={decision === 'reject' ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 px-3 text-xs"
+                    onClick={() => setDecisions((prev) => ({ ...prev, [hunk.id]: 'reject' }))}
+                  >
+                    {t('chapterHistory.reviewReject')}
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+
   return (
     <ModalShell
       open={isOpen}
@@ -103,8 +241,19 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
           <p className="mt-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
             {t('chapterHistory.chapterHeader', { num: chapter.order + 1, title: chapter.title })}
           </p>
+          {review ? (
+            <div className="mt-2 flex items-center gap-2">
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={stopReview}>
+                <ChevronLeft className="size-3.5" /> {t('chapterHistory.reviewBack')}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {t('chapterHistory.reviewTitle', { label: review.label })}
+              </span>
+            </div>
+          ) : null}
         </div>
 
+        {review ? null : (
         <div className="flex shrink-0 gap-4 border-b border-border bg-card px-6">
           <button
             onClick={() => setTab('ai')}
@@ -134,9 +283,12 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
             <History className="size-3.5" /> {t('chapterHistory.tabRevisions', { count: revisions.length })}
           </button>
         </div>
+        )}
 
         <div className=" flex-1 space-y-3 overflow-y-auto bg-muted/20 p-5">
-          {tab === 'snapshot' ? (
+          {review ? (
+            reviewView
+          ) : tab === 'snapshot' ? (
             snapshots.length > 0 ? (
               snapshots.map((snap) => {
                 const label = sourceLabels[snap.source] ?? fallbackSourceLabel;
@@ -152,6 +304,14 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startReview(formatHistoryTimestamp(snap.timestamp), snap.content)}
+                        title={t('chapterHistory.compareAsBaselineTitle')}
+                      >
+                        <History className="size-3.5" /> {t('chapterHistory.compareAsBaseline')}
+                      </Button>
                       <Button variant="secondary" size="sm" onClick={() => handleRestoreSnapshot(snap.content)} title={t('chapterHistory.restoreTitle')}>
                         <RotateCcw className="size-3.5" /> {t('chapterHistory.restore')}
                       </Button>
@@ -189,18 +349,28 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
                         {` · ${rev.body.slice(0, 60).replace(/\n/g, ' ') || t('chapterHistory.emptyPreview')}`}
                       </div>
                     </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="shrink-0"
-                      onClick={() => {
-                        onApplyContent(rev.body);
-                        onClose();
-                      }}
-                      title={t('chapterHistory.revisionApplyTitle')}
-                    >
-                      <Redo2 className="size-3.5" /> {t('chapterHistory.revisionApply')}
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startReview(`#${rev.seq}`, rev.body)}
+                        title={t('chapterHistory.compareAsBaselineTitle')}
+                      >
+                        <History className="size-3.5" /> {t('chapterHistory.compareAsBaseline')}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => {
+                          onApplyContent(rev.body);
+                          onClose();
+                        }}
+                        title={t('chapterHistory.revisionApplyTitle')}
+                      >
+                        <Redo2 className="size-3.5" /> {t('chapterHistory.revisionApply')}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

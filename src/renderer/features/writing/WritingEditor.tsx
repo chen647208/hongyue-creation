@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { useChapterCollab } from '@/app/collaboration/collaborationService';
 import { type CommitOptions,useProjectStore } from '@/app/stores/projectStore';
 import { useSettingsStore, useUsableModel } from '@/app/stores/settingsStore';
+import { buildBlockTextMap, resolveAnnotation } from '@/editor/annotations';
 import { buildBlockRefIndex, resolveBlockProjection } from '@/editor/blockRefs';
 import { dialogService } from '@/shared/services/dialogService';
 import { onEditorOps } from '@/shared/services/editorOps';
@@ -39,6 +40,7 @@ import {
   DEFAULT_TARGET_WORD_COUNT,
   INITIAL_GENERATION_MODAL_STATE,
 } from './constants';
+import { useChapterAnnotations } from './hooks/useChapterAnnotations';
 import { useChapterExport } from './hooks/useChapterExport';
 import { useChapterGeneration } from './hooks/useChapterGeneration';
 import { useChapterMutations } from './hooks/useChapterMutations';
@@ -184,6 +186,35 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
 
   const handleInsertBlockRef = useCallback((id: string) => { editorRef.current?.insertBlockRef(id); }, []);
   const handleInsertBlockEmbed = useCallback((id: string) => { editorRef.current?.insertBlockEmbed(id); }, []);
+
+  // ===== 行内批注（docs/design/38 §2.2）：侧车数据 + 编辑器装饰 =====
+  const annotationController = useChapterAnnotations({ project, activeChapterId, onUpdate });
+  // 锚点解析用完整块文本（blockRefIndex 的摘要会截断，不能用于偏移定位）。
+  const annotationBlockTexts = useMemo(
+    () => buildBlockTextMap(activeChapter?.content ?? ''),
+    [activeChapter?.content],
+  );
+  const annotationInputs = useMemo(() => {
+    if (!activeChapter) return [];
+    return (activeChapter.annotations ?? [])
+      .filter((a) => !a.resolved)
+      .map((a) => resolveAnnotation(a, annotationBlockTexts))
+      .filter((r) => r.status === 'anchored')
+      .map((r) => ({ annotationId: r.annotationId, blockId: r.blockId, start: r.start, end: r.end }));
+  }, [activeChapter, annotationBlockTexts]);
+
+  const handleAddAnnotation = () => {
+    const anchor = editorRef.current?.getSelectionAnchor();
+    if (!anchor) {
+      dialogService.alert(t('annotations.addHint'));
+      return;
+    }
+    void dialogService
+      .prompt({ title: t('selectionMenu.addAnnotation'), message: t('annotations.commentLabel'), placeholder: t('annotations.replyPlaceholder') })
+      .then((body) => {
+        if (body && body.trim()) annotationController.addAnnotation(anchor, body);
+      });
+  };
 
   useEffect(() => {
     if (writingPrompts.length > 0 && !selectedGenPromptId) {
@@ -481,6 +512,13 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
         exportFormat={exporter.format}
         exportProfileId={exporter.profileId}
         onExportProfileChange={exporter.setProfileId}
+        exportProfile={exporter.effectiveProfile}
+        exportCompile={exporter.compile}
+        onExportCompileChange={exporter.patchCompile}
+        exportUserProfiles={exporter.userProfiles}
+        onSaveExportProfile={exporter.saveProfileAs}
+        onDeleteExportProfile={exporter.removeProfile}
+        exportError={exporter.error}
         onCloseExportModal={() => exporter.setOpen(false)}
         onToggleAllExport={exporter.toggleAll}
         onToggleExportChapter={exporter.toggle}
@@ -489,6 +527,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
         menuPos={menuPos}
         hasModel={isModelUsable(activeModel)}
         onOpenEditModal={openEditModal}
+        onAddAnnotation={handleAddAnnotation}
         onClearSelection={clearSelectionMenu}
         isHistoryViewerOpen={isHistoryViewerOpen}
         activeChapter={activeChapter}
@@ -532,6 +571,18 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
             onInsertRef: handleInsertBlockRef,
             onInsertEmbed: handleInsertBlockEmbed,
             onJump: handleJumpToBlock,
+          }}
+          annotationPanel={{
+            activeChapterId,
+            annotations: annotationController.annotations,
+            blockTexts: annotationBlockTexts,
+            onJump: handleJumpToBlock,
+            onAddFromSelection: handleAddAnnotation,
+            onReply: annotationController.reply,
+            onUpdateBody: annotationController.updateBody,
+            onResolve: annotationController.resolve,
+            onReopen: annotationController.reopen,
+            onDelete: annotationController.remove,
           }}
         />
       )}
@@ -648,6 +699,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
           resolveBlock={resolveBlock}
           onOpenSource={handleJumpToBlock}
           onActiveBlockChange={setActiveBlockId}
+          annotations={annotationInputs}
           onStopStreaming={gen.stopStreaming}
           onStopBatchGeneration={gen.stopBatchGeneration}
           streamingTokens={gen.streamingTokens}

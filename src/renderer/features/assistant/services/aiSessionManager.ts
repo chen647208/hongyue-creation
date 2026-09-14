@@ -17,6 +17,9 @@ import type {
   AgentTurnResult,
   AiEvent,
   ApprovalBroker,
+  ContextInjectionResult,
+  ContextTarget,
+  InjectionEntry,
   PromptAssembler,
   SessionSink,
   SkillCatalog,
@@ -25,11 +28,16 @@ import type {
 import {
   AiSession,
   ApprovalRouter,
+  assembleContextInjection,
+  buildCitations,
+  inferContextTarget,
   registerBuiltinSections,
   runAgentSession,
 } from '@core/ai';
 import { uuidv7 } from '@core/entities';
 import type { EventBus, SeamPolicy } from '@core/plugin';
+import { MAX_RETRIEVAL_INJECTION_ENTRIES } from '@shared/constants/aiContext';
+import { MIN_SEARCH_QUERY_LENGTH } from '@shared/constants/search';
 import type { AIMessageImage, CardPromptTemplate, ConsistencyCheckPromptTemplate, McpServerConfig, ModelConfig, Project } from '@shared/types';
 
 import { useSettingsStore } from '@/app/stores/settingsStore';
@@ -119,6 +127,12 @@ export interface RunSessionInput {
   images?: AIMessageImage[];
   /** 用户在助手中选中的卡片模板（Agent 卡片生成沿用，不再回退默认） */
   cardTemplate?: CardPromptTemplate;
+  /** 上下文装配目标（章节/选中实体/视图）；缺席时由任务文本推断。 */
+  contextTarget?: ContextTarget;
+  /** 自动注入总开关；false 时回到纯手动（不注入任何上下文）。 */
+  injectionEnabled?: boolean;
+  /** 单条关闭的注入条目 id。 */
+  disabledInjectionIds?: string[];
 }
 
 export class AiSessionManager {
@@ -128,6 +142,7 @@ export class AiSessionManager {
   readonly broker: ApprovalBroker;
   private readonly router: ApprovalRouter;
   private lastSession: AiSession | null = null;
+  private lastInjection: ContextInjectionResult | null = null;
 
   private readonly events: EventBus;
 
@@ -147,6 +162,11 @@ export class AiSessionManager {
   /** 最近一次会话的事件（事件浏览器/诊断消费）。 */
   getEvents(): AiEvent[] {
     return this.lastSession?.events ?? [];
+  }
+
+  /** 最近一次会话实际装配的注入上下文（可读、可核对；未跑过会话为 null）。 */
+  getLastInjection(): ContextInjectionResult | null {
+    return this.lastInjection;
   }
 
   /** 审批待审箱数量（角标消费）。 */
@@ -204,6 +224,16 @@ export class AiSessionManager {
       }
     }
 
+    // 自动上下文注入（design/37）：按目标装配、逐字校验、预算裁剪；关闭时不做任何注入
+    const injection = assembleContextInjection({
+      project: input.project,
+      target: input.contextTarget ?? inferContextTarget(input.project, input.task),
+      enabled: input.injectionEnabled !== false,
+      disabledIds: input.disabledInjectionIds,
+      extraEntries: await this.collectRetrievalEntries(input.project?.id, input.task),
+    });
+    this.lastInjection = injection;
+
     try {
       const result = await runAgentSession(
         {
@@ -260,6 +290,8 @@ export class AiSessionManager {
             extra: {
               // 会话历史：宿主截断后的最近 N 轮，经 history section 注入（空即跳过）
               historyText: buildHistoryText(input.history ?? []) || undefined,
+              // 自动注入的上下文（contextInjection section 消费；关闭时为空结果）
+              injection,
               // 技能清单常驻 prompt（渐进加载：清单一直可见，全文按需 core.skill.load）
               skillManifest: this.catalog.manifest() ?? undefined,
               aiPolicies: [
@@ -283,12 +315,50 @@ export class AiSessionManager {
           signal: input.signal,
           // 首轮预算 24000 字符（约 8–12k token，32k 上下文模型留足工具观察与输出空间）
           charBudget: 24000,
+          // session.start 之后补记注入元事件（审计/事件浏览器可见），不打断 start 首事件语义
+          onStarted: () => session.emit({
+            t: 'context.injection',
+            enabled: injection.enabled,
+            entries: injection.entries.length,
+            dropped: injection.dropped.length,
+            totalChars: injection.totalChars,
+            budgetChars: injection.budgetChars,
+            at: Date.now(),
+          }),
         },
         input.task,
       );
       return result;
     } finally {
       this.catalog.deactivate();
+    }
+  }
+
+  /**
+   * 全文检索命中转注入条目：来源即出处（章节/知识库），供装配阶段参与预算与溯源。
+   * 检索不可用或查询过短时返回空数组（注入仍可走内置规划）。
+   */
+  private async collectRetrievalEntries(projectId: string | undefined, task: string): Promise<InjectionEntry[]> {
+    const query = task.trim();
+    if (!projectId || query.length < MIN_SEARCH_QUERY_LENGTH) return [];
+    try {
+      const { repository } = await import('@/shared/services/repository/index.js');
+      const hits = await repository.search(query, {
+        projectId,
+        limit: MAX_RETRIEVAL_INJECTION_ENTRIES,
+        preferMaterial: true,
+      });
+      return buildCitations(hits).map((citation) => ({
+        id: `search:${citation.anchor}`,
+        title: `检索命中：${citation.title}`,
+        text: citation.snippet,
+        source: { kind: citation.sourceKind, refId: citation.refId, title: citation.title, locator: '全文检索命中' },
+        trigger: '全文检索',
+        priority: 60,
+        scope: 'book' as const,
+      }));
+    } catch {
+      return [];
     }
   }
 

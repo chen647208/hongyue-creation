@@ -372,6 +372,13 @@
     padding: 0 2px;
   }
 
+  /* 行内批注高亮（docs/design/38 §2.2）：正文只加装饰，不改文本，不入导出 */
+  .novel-annotation {
+    background: color-mix(in oklab, var(--color-chart-2) 18%, transparent);
+    border-bottom: 1px dashed color-mix(in oklab, var(--color-chart-2) 65%, transparent);
+    cursor: pointer;
+  }
+
   /* CM6 novelDsl 编辑器外壳 */
   .novel-dsl-editor {
     border: 1px solid var(--color-border);

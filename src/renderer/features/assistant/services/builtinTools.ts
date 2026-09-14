@@ -15,7 +15,7 @@
  * 第二批是 Agent 按需上下文：章节/大纲/人物/知识读接口 + 全文/语义检索。
  * 多步约定：先读后写，读工具可同轮并行；写工具只产提案（审批后落稿）。
  */
-import { type ToolContext, ToolRegistry, type ToolSpec } from '@core/ai';
+import { type CitationHitLike, describeRetrieval, type ToolContext, ToolRegistry, type ToolSpec } from '@core/ai';
 import type { IndexSnapshot } from '@core/index';
 import type { ModelConfig, Project } from '@shared/types';
 import type { ConsistencyCheckPromptTemplate } from '@shared/types';
@@ -406,7 +406,7 @@ export const knowledgeReadTool: ToolSpec = {
 /** core.text.search：全文关键词检索（章节正文/知识库，FTS5 高亮片段）。 */
 export const textSearchTool: ToolSpec = {
   id: 'core.text.search',
-  description: '全文关键词检索（章节正文与知识库，返回高亮片段）。找原文出处、回查伏笔/设定时用它。',
+  description: '全文关键词检索（章节正文与知识库，返回带出处的命中片段）。找原文出处、回查伏笔/设定时用它。无命中会明确返回未找到。',
   parameters: {
     type: 'object',
     properties: {
@@ -421,15 +421,16 @@ export const textSearchTool: ToolSpec = {
     const query = str(args.query, 'query');
     const limit = num(args.limit, 'limit', 10, 1, 30);
     const search = searchServiceOf(ctx, 'textSearch');
-    const hits = await search(query, limit);
-    return { ok: true, data: { query, hits } };
+    const hits = (await search(query, limit)) as CitationHitLike[];
+    const outcome = describeRetrieval(query, Array.isArray(hits) ? hits : []);
+    return { ok: true, data: { query, found: outcome.found, text: outcome.text, citations: outcome.citations } };
   },
 };
 
 /** core.text.semanticSearch：语义检索（按含义找相关知识条目；不可用时回落关键词检索）。 */
 export const textSemanticSearchTool: ToolSpec = {
   id: 'core.text.semanticSearch',
-  description: '语义检索：按含义找相关知识条目（换词/意合场景）。嵌入服务不可用时报错并改用 core.text.search。',
+  description: '语义检索：按含义找相关知识条目（换词/意合场景，返回带出处的命中片段）。嵌入服务不可用时报错并改用 core.text.search。',
   parameters: {
     type: 'object',
     properties: {
@@ -444,8 +445,9 @@ export const textSemanticSearchTool: ToolSpec = {
     const query = str(args.query, 'query');
     const limit = num(args.limit, 'limit', 8, 1, 20);
     const search = searchServiceOf(ctx, 'semanticSearch');
-    const hits = await search(query, limit);
-    return { ok: true, data: { query, hits } };
+    const hits = (await search(query, limit)) as CitationHitLike[];
+    const outcome = describeRetrieval(query, Array.isArray(hits) ? hits : []);
+    return { ok: true, data: { query, found: outcome.found, text: outcome.text, citations: outcome.citations } };
   },
 };
 

@@ -22,6 +22,7 @@
 import { type Extensions,Mark, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 
+import { type AnnotationDecorationInput,AnnotationDecorations } from './annotationDecorations';
 import { type BlockEmbedResolver,createBlockEmbedView } from './blockEmbedNodeView';
 import { BlockId } from './blockId';
 import { BlockRefDecorations } from './blockRefDecorations';
@@ -248,6 +249,8 @@ export interface NovelExtensionOptions {
   resolveBlock?: BlockEmbedResolver;
   /** 点击嵌入块跳转源块。 */
   onOpenSource?: (id: string) => void;
+  /** 待装饰的批注范围读取器（缺省不装饰）。 */
+  getAnnotations?: () => readonly AnnotationDecorationInput[];
 }
 
 export function createNovelExtensions(options: NovelExtensionOptions = {}): Extensions {
@@ -271,6 +274,7 @@ export function createNovelExtensions(options: NovelExtensionOptions = {}): Exte
       onOpenSource: options.onOpenSource ?? (() => { /* 未接线时静默 */ }),
     }),
     BlockRefDecorations.configure({ resolveBlock: options.resolveBlock ?? (() => null) }),
+    AnnotationDecorations.configure({ getAnnotations: options.getAnnotations ?? (() => []) }),
     BlockId,
   ];
 }

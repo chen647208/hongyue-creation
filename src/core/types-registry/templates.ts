@@ -68,6 +68,7 @@ const NOVEL_TEMPLATES: TypeTemplate[] = [
       { key: 'storyDate', label: '故事内时间', type: 'json' },
       { key: 'history', label: 'AI 生成历史', type: 'json' },
       { key: 'snapshots', label: '编辑快照', type: 'json' },
+      { key: 'annotations', label: '行内批注', labelEn: 'Inline annotations', type: 'json' },
     ],
     views: ['outline', 'corkboard', 'table'],
     statusLabels: 'status',

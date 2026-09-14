@@ -270,6 +270,21 @@
     "revisionCause": "Cause",
     "revisionApply": "Apply this version",
     "revisionApplyTitle": "Overwrite current content with this revision (records a new revision)",
+    "compareAsBaseline": "Revise from this",
+    "compareAsBaselineTitle": "Use this as the baseline, diff against the current body, accept or reject per change",
+    "reviewTitle": "Revision diff: {{label}} → current body",
+    "reviewBaseline": "This version",
+    "reviewCurrent": "Current body",
+    "reviewBack": "Back to list",
+    "reviewAccept": "Accept (use this version)",
+    "reviewReject": "Reject (keep current)",
+    "reviewAcceptAll": "Accept all",
+    "reviewRejectAll": "Reject all",
+    "reviewApply": "Apply result",
+    "reviewEmpty": "No difference between this version and the current body.",
+    "reviewChangeLabel": "Change {{index}}",
+    "reviewCharSync": "Current {{from}} chars → result {{to}} chars",
+    "reviewApplied": "Written back to the body; word count and export update accordingly.",
     "footerCount": "{{count}} records in total",
     "clearHistory": "Clear history",
     "close": "Close"
@@ -383,7 +398,22 @@
     "previewShow": "Preview",
     "previewHide": "Hide preview",
     "previewTitle": "Export preview (same pipeline as export)",
-    "previewCharCount": "Final word count: {{count}}"
+    "previewCharCount": "Final word count: {{count}}",
+    "tocTitle": "Contents",
+    "materialLabel": "Material",
+    "material_exclude": "Exclude material",
+    "material_include": "Include material",
+    "material_prefer": "Prefer material",
+    "tocLabel": "Table of contents",
+    "headingLevelLabel": "Heading level",
+    "rangeLabel": "Range",
+    "rangeFrom": "From",
+    "rangeTo": "To",
+    "profilePlaceholder": "Profile name (reusable)",
+    "saveProfile": "Save profile",
+    "profileNameRequired": "Enter a profile name",
+    "deleteProfileTitle": "Delete this profile",
+    "configError": "Invalid export settings: {{errors}}"
   },
   "summarySection": {
     "title": "Chapter Content Summary",
@@ -403,6 +433,8 @@
   },
   "selectionMenu": {
     "polishExpand": "AI Polish / Expand",
+    "addAnnotation": "Comment",
+    "addAnnotationTitle": "Add an inline comment on the selection (excluded from body and export)",
     "clearTitle": "Clear selection"
   },
   "navigation": {
@@ -485,5 +517,28 @@
     "cycleRejected": "This embed would create a reference cycle and was blocked.",
     "kindRef": "Reference",
     "kindEmbed": "Embed"
+  },
+  "annotations": {
+    "title": "Inline comments",
+    "add": "Comment",
+    "addHint": "Select some text in the body first, then click to add a comment.",
+    "noActive": "Select a chapter first.",
+    "empty": "No comments in this chapter.",
+    "commentLabel": "Comment",
+    "emptyQuote": "(source text missing)",
+    "jump": "Jump to the comment anchor",
+    "orphanBadge": "Orphaned",
+    "orphanHint": "The anchored text or block no longer exists; the comment is kept but cannot be located.",
+    "reply": "Reply",
+    "replyPlaceholder": "Write a reply…",
+    "send": "Send",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "resolve": "Resolve",
+    "reopen": "Reopen",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this comment and all its replies?",
+    "resolvedTitle": "Resolved"
   }
 }

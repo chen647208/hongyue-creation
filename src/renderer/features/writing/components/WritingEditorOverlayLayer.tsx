@@ -72,6 +72,13 @@ const WritingEditorOverlayLayer: React.FC<WritingEditorOverlayLayerProps> = ({
   exportFormat,
   exportProfileId,
   onExportProfileChange,
+  exportProfile,
+  exportCompile,
+  onExportCompileChange,
+  exportUserProfiles,
+  onSaveExportProfile,
+  onDeleteExportProfile,
+  exportError,
   onCloseExportModal,
   onToggleAllExport,
   onToggleExportChapter,
@@ -80,6 +87,7 @@ const WritingEditorOverlayLayer: React.FC<WritingEditorOverlayLayerProps> = ({
   menuPos,
   hasModel,
   onOpenEditModal,
+  onAddAnnotation,
   onClearSelection,
   isHistoryViewerOpen,
   activeChapter,
@@ -163,6 +171,13 @@ const WritingEditorOverlayLayer: React.FC<WritingEditorOverlayLayerProps> = ({
         format={exportFormat}
         exportProfileId={exportProfileId}
         onExportProfileChange={onExportProfileChange}
+        exportProfile={exportProfile}
+        exportCompile={exportCompile}
+        onExportCompileChange={onExportCompileChange}
+        exportUserProfiles={exportUserProfiles}
+        onSaveExportProfile={onSaveExportProfile}
+        onDeleteExportProfile={onDeleteExportProfile}
+        exportError={exportError}
         onClose={onCloseExportModal}
         onToggleAll={onToggleAllExport}
         onToggleChapter={onToggleExportChapter}
@@ -175,6 +190,7 @@ const WritingEditorOverlayLayer: React.FC<WritingEditorOverlayLayerProps> = ({
         isEditModalOpen={editModalOpen}
         hasModel={hasModel}
         onOpenEditModal={onOpenEditModal}
+        onAddAnnotation={onAddAnnotation}
         onClearSelection={onClearSelection}
       />
 

@@ -21,6 +21,7 @@ export {
 } from './package.js';
 export {
   applyMaterialPolicy,
+  applyRange,
   type DocBlock,
   listRenderers,
   listTransformers,
@@ -32,18 +33,28 @@ export {
   runBuild,
   select,
   type SelectedNode,
+  type TocEntry,
   transform,
   type Transformer,
 } from './pipeline.js';
 export {
+  type BuildCompile,
+  type BuildHeadings,
   type BuildProfile,
+  type BuildRange,
   type BuildRender,
   type BuildSelection,
+  type BuildToc,
   type BuildTransform,
+  clampHeadingLevel,
   COMPENDIUM_BUILD_PROFILE,
+  COMPILE_DEFAULTS,
   DEFAULT_BUILD_PROFILE,
+  MANUSCRIPT_BUILD_PROFILE,
+  normalizeProfile,
   parseProfileYaml,
   roundtripProfile,
   serializeProfileYaml,
   typeMatches,
+  validateProfile,
 } from './profile.js';

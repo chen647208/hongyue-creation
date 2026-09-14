@@ -7,6 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import type { Citation } from '@core/ai';
 import type React from 'react';
 
 import type { KnowledgeItem, ModelConfig, Project, PromptTemplate } from '../../../shared/types';
@@ -42,6 +43,8 @@ export interface ChatMessage {
   finishReason?: string;
   error?: string;
   isStreaming?: boolean;
+  /** 本轮答复引用的可检索来源（带出处，界面分栏呈现）。 */
+  citations?: Citation[];
 }
 
 export type AssistantCategory = 'inspiration' | 'knowledge' | 'characters' | 'outline' | 'chapters';

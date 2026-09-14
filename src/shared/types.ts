@@ -203,6 +203,8 @@ export interface Chapter {
   material?: boolean;
   history?: AIHistoryRecord[]; // AI生成历史记录
   snapshots?: ChapterSnapshot[]; // 手动编辑快照（用于误删/回退恢复）
+  /** 行内批注（侧车标注层，缺席=[]，免迁移）：不进入正文、字数与导出。 */
+  annotations?: ChapterAnnotation[];
   
   // ===== 世界观关联字段（Phase 1 Integration）=====
   /** 主要发生地点ID */
@@ -231,6 +233,45 @@ export interface ChapterSnapshot {
   charCount: number;
   /** 快照来源：自动定时 / 手动 / 清空前 */
   source: 'auto' | 'manual' | 'before-clear';
+}
+
+/**
+ * 批注锚（docs/design/38 §2.2）：块稳定标识 + 块内纯文本偏移 + 原文引用。
+ * 块重排后按标识仍能定位；块内文字变化时用 quote 重新找回；找不到即失锚。
+ */
+export interface AnnotationAnchor {
+  /** 块级稳定标识（blockId.ts 维护，随块锚落库）。 */
+  blockId: string;
+  /** 块内纯文本起始偏移（含端点）；与 blockIndex.blockText 口径一致。 */
+  start: number;
+  /** 块内纯文本结束偏移（不含端点）。 */
+  end: number;
+  /** 锚定时选中的原文，用于偏移漂移后重新定位与失锚判定。 */
+  quote: string;
+}
+
+/** 批注回复（单条评论，作者与时间留痕）。 */
+export interface AnnotationReply {
+  id: string;
+  author: string;
+  body: string;
+  createdAt: number;
+}
+
+/**
+ * 章节批注线程：侧车数据，不进入正文与导出（硬验收）。
+ * 解决后从正文装饰移除但保留本条历史，可重开。
+ */
+export interface ChapterAnnotation {
+  id: string;
+  anchor: AnnotationAnchor;
+  body: string;
+  author: string;
+  createdAt: number;
+  updatedAt: number;
+  resolved: boolean;
+  resolvedAt?: number;
+  replies: AnnotationReply[];
 }
 
 export type KnowledgeCategory = 'inspiration' | 'character' | 'outline' | 'chapter' | 'writing';

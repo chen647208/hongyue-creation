@@ -13,6 +13,8 @@
  */
 import type { Project } from '../../shared/types';
 import type { IndexSnapshot } from '../index';
+import type { ContextInjectionResult } from './contextInjection.js';
+import { renderContextInjection } from './contextInjection.js';
 import type { PromptAssembler, PromptContext, PromptSection } from './promptAssembler.js';
 import { truncateText } from './promptAssembler.js';
 
@@ -149,6 +151,18 @@ export const worldDigestSection: PromptSection = {
   },
 };
 
+/** contextInjection：按当前章节/选中实体/关键词装配的上下文（宿主预算裁剪后经 extra.injection 传入）。 */
+export const contextInjectionSection: PromptSection = {
+  id: 'contextInjection',
+  title: '自动注入上下文',
+  order: 35,
+  render(ctx: PromptContext): string | undefined {
+    const injection = ctx.extra?.injection as ContextInjectionResult | undefined;
+    if (!injection) return undefined;
+    return renderContextInjection(injection);
+  },
+};
+
 const TAG_DIGEST_LIMIT = 24;
 const STRAND_DIGEST_LIMIT = 10;
 const FORESHADOW_DIGEST_LIMIT = 10;
@@ -238,6 +252,7 @@ export const agentProtocolSection: PromptSection = {
       '你是能使用工具的 Agent：需要查数据或生成内容时，不要猜，先调工具；拿到结果后再继续，直到任务完成或轮数上限。',
       '调用方式：整轮输出严格 JSON：{"reply": "本轮想说的话", "toolCalls": [{"callId": "自定唯一id", "toolId": "工具id", "args": {参数}}]}；无需工具时直接输出答复文本。',
       '多步策略：只读工具（read 档）可同轮并行多调；先读后写——生成/改写类工具依赖正文、人物、细纲时，先用读工具取到原文再调写工具；',
+      '资料可信：引用设定/原文时只用 core.text.search、core.text.semanticSearch、core.knowledge.read、core.index.query 等可检索来源的结果，并在答复中标明出处；检索返回未找到就如实回答未找到，不要编造。',
       '写工具只产出提案（进审批待审，不直接落稿），在答复里告诉作者去待审箱确认；查不到数据就直说缺什么，不要编造。',
     ].join('\n');
   },
@@ -282,6 +297,7 @@ export function registerBuiltinSections(assembler: PromptAssembler): void {
     aiPolicySection,
     bookMetaSection,
     worldDigestSection,
+    contextInjectionSection,
     indexDigestSection,
     activeSkillSection,
     skillManifestSection,

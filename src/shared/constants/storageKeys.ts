@@ -40,6 +40,7 @@ export const STORAGE_KEYS = {
   aiUsage: 'ai.usage',
   aiHourlyLimit: 'ai.hourlyLimit',
   appFeaturesDisabled: 'features.disabled',
+  buildUserProfiles: 'build.userProfiles',
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

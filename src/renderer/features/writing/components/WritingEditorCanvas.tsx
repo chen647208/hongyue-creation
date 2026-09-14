@@ -40,6 +40,7 @@ const WritingEditorCanvas: React.FC<WritingEditorCanvasProps> = ({
   resolveBlock,
   onOpenSource,
   onActiveBlockChange,
+  annotations,
   onStopStreaming,
   onStopBatchGeneration,
   streamingTokens,
@@ -70,6 +71,7 @@ const WritingEditorCanvas: React.FC<WritingEditorCanvasProps> = ({
         resolveBlock={resolveBlock}
         onOpenSource={onOpenSource}
         onActiveBlockChange={onActiveBlockChange}
+        annotations={annotations}
       />
       <WritingEditorStatusOverlay
         isGenerating={isGenerating}

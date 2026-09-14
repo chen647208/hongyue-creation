@@ -16,8 +16,10 @@
 import { stripBlockAnchors } from '../dsl/anchor';
 import { collectBlockTexts, resolveBlockRefs } from '../dsl/blockRef';
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '../entities';
-import type { BuildProfile } from './profile.js';
-import { typeMatches } from './profile.js';
+import type { BuildProfile, MaterialPolicy } from './profile.js';
+import { clampHeadingLevel, COMPILE_DEFAULTS,typeMatches } from './profile.js';
+
+export type { MaterialPolicy };
 
 // ── select ───────────────────────────────────────────────────────────
 
@@ -33,9 +35,6 @@ export interface SelectedNode {
   material?: boolean;
 }
 
-/** 素材口径：exclude 剔除素材；include 保留原序；prefer 保留并把素材排到前面。 */
-export type MaterialPolicy = 'exclude' | 'include' | 'prefer';
-
 /**
  * 素材过滤/排序纯函数：调用方已按构建序排好，prefer 时素材整体前移且组内保持原序。
  * 不改入参。
@@ -46,6 +45,20 @@ export function applyMaterialPolicy(nodes: SelectedNode[], policy: MaterialPolic
     return [...nodes].sort((a, b) => Number(Boolean(b.material)) - Number(Boolean(a.material)));
   }
   return nodes.filter((node) => !node.material);
+}
+
+/**
+ * 范围过滤纯函数：按构建序（1 起、含端点）截取 [from, to]；不改入参。
+ * from 缺省 1，to 缺省末尾；from 超过长度时返回空。
+ */
+export function applyRange(nodes: SelectedNode[], range: { from?: number; to?: number } | undefined): SelectedNode[] {
+  if (!range) return nodes;
+  const from = range.from ?? 1;
+  const to = range.to ?? Number.POSITIVE_INFINITY;
+  return nodes.filter((_node, index) => {
+    const no = index + 1;
+    return no >= from && no <= to;
+  });
 }
 
 function orderOf(node: NodeEntity, attrByNode: Map<string, AttributeEntity[]>): number {
@@ -75,14 +88,18 @@ export function select(profile: BuildProfile, entities: { nodes: NodeEntity[]; a
   }
 
   const excluded = new Set(selection.exclude.filter((e) => e.startsWith('node:')).map((e) => e.slice(5)));
+  // 前后置页按 id 指定：不受类型与状态过滤影响（仍受单点排除约束）。
+  const pinned = new Set([...(profile.compile?.frontMatter ?? []), ...(profile.compile?.backMatter ?? [])]);
 
   const selected = entities.nodes
     .filter((n) => !n.erased && !excluded.has(n.id))
     .filter((n) => {
+      if (pinned.has(n.id)) return true;
       if (selection.includeInactive || !['inactive', 'archived'].includes(statusOf(n, attrByNode) ?? '')) return true;
       return false;
     })
     .filter((n) => {
+      if (pinned.has(n.id)) return true;
       if (materialOf(n, attrByNode) && policy === 'prefer') return true; // 设定集：素材无视类型规则纳入
       if (!selection.includeTypes.some((p) => typeMatches(n.type, p))) return false;
       if (selection.rootSwitches.cards === false && n.type.startsWith('card.')) return false;
@@ -100,13 +117,21 @@ export function select(profile: BuildProfile, entities: { nodes: NodeEntity[]; a
     }));
 
   selected.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, 'zh'));
-  return applyMaterialPolicy(selected, policy);
+  return applyMaterialPolicy(applyRange(selected, selection.range), policy);
 }
 
 // ── transform ────────────────────────────────────────────────────────
 
+export interface TocEntry {
+  text: string;
+  /** 相对文档的标题层级（1 起，取 clampHeadingLevel 后的值）。 */
+  level: number;
+}
+
 export type DocBlock =
-  | { kind: 'chapter'; number?: number; text: string }
+  | { kind: 'chapter'; number?: number; text: string; level?: number }
+  | { kind: 'volume'; text: string; level?: number }
+  | { kind: 'toc'; title: string; level?: number; entries: TocEntry[] }
   | { kind: 'separator'; text: string }
   | { kind: 'paragraph'; text: string };
 
@@ -139,55 +164,118 @@ function resolveRefs(body: string, titleById: Map<string, string>): string {
     .replace(/@([\w\u4e00-\u9fff-]+)/g, (_m, name) => titleById.get(String(name)) ?? `@${String(name)}`);
 }
 
-/** 变换：标题模板 + 重编号 + 隐藏层级 + 引用替换。 */
+/** 单节点正文段：剥块锚 → 展开块引用/嵌入 → 拆段去标签。 */
+function paragraphsOf(
+  node: SelectedNode,
+  titleById: Map<string, string>,
+  blockTexts: Map<string, string>,
+  content: BuildProfile['transform']['content'],
+): string {
+  // 块锚是编辑器元数据，不进成稿：编译/导出前先剥离。
+  // 引用/嵌入统一展开为被引块文本；失链写标记，成环截断（口径见 @core/dsl/blockRef）。
+  const source = stripBlockAnchors(node.body);
+  const withNodeRefs = content.resolveRefs === 'displayName' ? resolveRefs(source, titleById) : source;
+  const body = resolveBlockRefs(withNodeRefs, blockTexts);
+  const paragraphs = body
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
+    .filter((p) => !content.stripTags.some((tag) => p.includes(`[${tag}]`)))
+    .map((p) => p.replace(/\[\/?[a-z-]+\]/gi, ''));
+  return paragraphs.join('\n\n');
+}
+
+/** 标题模板回填：%N 编号（无则空）%T 标题。 */
+function headingText(template: string, no: number | undefined, title: string): string {
+  return template.replace('%N', no !== undefined ? String(no) : '').replace('%T', title).trim();
+}
+
+/**
+ * 变换：标题模板 + 重编号 + 隐藏层级 + 引用替换 + 目录/分卷/前后置页（compile）。
+ * 默认档案（无 compile）输出与纯章节导出逐字一致。
+ */
 export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBlock[] {
   const { headings, content } = profile.transform;
+  const compile = profile.compile;
+  const level = clampHeadingLevel(headings.level);
   const titleById = new Map(nodes.map((n) => [n.id, n.title]));
   // 块引用/嵌入的展开源：全书被锚定块的可见文本（跨章引用也能解析）。
   const blockTexts = collectBlockTexts(nodes.map((n) => n.body));
 
-  let chapterNo = 0;
+  const volumeTypes = compile?.volumeTypes ?? [];
+  const volumeHeading = compile?.volumeHeading ?? COMPILE_DEFAULTS.volumeHeading;
+  const frontIds = compile?.frontMatter ?? [];
+  const backIds = compile?.backMatter ?? [];
+  const frontSet = new Set(frontIds);
+  const backSet = new Set(backIds);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+
   const blocks: DocBlock[] = [];
+  const tocEntries: TocEntry[] = [];
+  let chapterNo = 0;
+  let volumeNo = 0;
 
   for (const node of nodes) {
+    // 前后置页在主循环外按配置顺序渲染，避免重复。
+    if (frontSet.has(node.id) || backSet.has(node.id)) continue;
     // 素材按口径纳入设定集时不受 hide 限制（否则设定集只选到却不渲染）
     if (headings.hide.includes(node.type) && !node.material) continue;
 
-    const isChapter = node.type.startsWith('novel.chapter') || node.type.startsWith('meta.');
-    const isScene = node.type.startsWith('novel.scene');
-    if (isChapter) {
-      if (headings.renumber) chapterNo += 1;
-      const no = headings.renumber ? chapterNo : undefined;
-      const title = headings.chapter
-        .replace('%N', no !== undefined ? String(no) : '')
-        .replace('%T', node.title)
-        .trim();
-      blocks.push({ kind: 'chapter', number: no, text: title });
-    } else if (!isScene) {
-      blocks.push({ kind: 'chapter', text: `【${node.title}】` });
+    if (volumeTypes.some((pattern) => typeMatches(node.type, pattern))) {
+      volumeNo += 1;
+      const text = headingText(volumeHeading, volumeNo, node.title);
+      const volumeLevel = Math.max(1, level - 1);
+      blocks.push({ kind: 'volume', text, level: volumeLevel });
+      tocEntries.push({ text, level: volumeLevel });
+    } else {
+      const isChapter = node.type.startsWith('novel.chapter') || node.type.startsWith('meta.');
+      const isScene = node.type.startsWith('novel.scene');
+      if (isChapter) {
+        if (headings.renumber) chapterNo += 1;
+        const no = headings.renumber ? chapterNo : undefined;
+        const text = headingText(headings.chapter, no, node.title);
+        blocks.push({ kind: 'chapter', number: no, text, level });
+        tocEntries.push({ text, level });
+      } else if (!isScene) {
+        const text = `【${node.title}】`;
+        blocks.push({ kind: 'chapter', text, level });
+        tocEntries.push({ text, level });
+      }
     }
 
-    // 块锚是编辑器元数据，不进成稿：编译/导出前先剥离。
-    // 引用/嵌入统一展开为被引块文本；失链写标记，成环截断（口径见 @core/dsl/blockRef）。
-    const source = stripBlockAnchors(node.body);
-    const withNodeRefs = content.resolveRefs === 'displayName' ? resolveRefs(source, titleById) : source;
-    const body = resolveBlockRefs(withNodeRefs, blockTexts);
-    const paragraphs = body
-      .split(/\n+/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0)
-      .filter((p) => !content.stripTags.some((tag) => p.includes(`[${tag}]`)))
-      .map((p) => p.replace(/\[\/?[a-z-]+\]/gi, ''));
-
-    blocks.push({ kind: 'paragraph', text: paragraphs.join('\n\n') });
+    blocks.push({ kind: 'paragraph', text: paragraphsOf(node, titleById, blockTexts, content) });
     if (headings.scene) blocks.push({ kind: 'separator', text: headings.scene });
   }
 
-  // 尾部分隔符去掉
-  for (let last = blocks.at(-1); last && last.kind === 'separator'; last = blocks.at(-1)) {
-    blocks.pop();
+  /** 前置/后置页：按配置顺序取节点，以标题成章，不参与重编号与目录。 */
+  const matterBlocks = (ids: string[]): DocBlock[] => {
+    const out: DocBlock[] = [];
+    for (const id of ids) {
+      const node = byId.get(id);
+      if (!node) continue;
+      out.push({ kind: 'chapter', text: node.title, level });
+      out.push({ kind: 'paragraph', text: paragraphsOf(node, titleById, blockTexts, content) });
+    }
+    return out;
+  };
+
+  // 目录收录范围：maxDepth 以章节层级为基准，向上含分卷（level-1）、向下含更深标题。
+  const tocBlocks: DocBlock[] = [];
+  if (compile?.toc?.enabled && tocEntries.length > 0) {
+    const maxDepth = compile.toc.maxDepth ?? COMPILE_DEFAULTS.tocMaxDepth;
+    const entries = tocEntries.filter((entry) => entry.level >= level - (maxDepth - 1));
+    if (entries.length > 0) {
+      tocBlocks.push({ kind: 'toc', title: compile.toc.title || COMPILE_DEFAULTS.tocTitle, level, entries });
+    }
   }
-  return blocks;
+
+  const assembled = [...matterBlocks(frontIds), ...tocBlocks, ...blocks, ...matterBlocks(backIds)];
+
+  // 尾部分隔符去掉
+  for (let last = assembled.at(-1); last && last.kind === 'separator'; last = assembled.at(-1)) {
+    assembled.pop();
+  }
+  return assembled;
 }
 
 // ── render ───────────────────────────────────────────────────────────
@@ -212,17 +300,30 @@ export function listRenderers(): Renderer[] {
   return [...renderers.values()];
 }
 
+function tocPlain(b: Extract<DocBlock, { kind: 'toc' }>): string {
+  return [b.title, ...b.entries.map((entry) => entry.text)].join('\n');
+}
+
 function renderTxt(blocks: DocBlock[]): string {
   return blocks
-    .map((b) => (b.kind === 'chapter' ? b.text : b.kind === 'separator' ? b.text : b.text))
+    .map((b) => (b.kind === 'toc' ? tocPlain(b) : b.text))
     .join('\n\n');
+}
+
+function mdHeading(level: number, text: string): string {
+  return `${'#'.repeat(clampHeadingLevel(level))} ${text}`;
 }
 
 function renderMd(blocks: DocBlock[], profile: BuildProfile): string {
   return blocks
     .map((b) => {
       if (b.kind === 'chapter') {
-        return profile.render.chapterPageBreak ? `${b.text}\n\n---` : `## ${b.text}`;
+        return profile.render.chapterPageBreak ? `${b.text}\n\n---` : mdHeading(b.level ?? COMPILE_DEFAULTS.chapterLevel, b.text);
+      }
+      if (b.kind === 'volume') return mdHeading(b.level ?? 1, b.text);
+      if (b.kind === 'toc') {
+        const items = b.entries.map((entry) => `- ${entry.text}`).join('\n');
+        return `${mdHeading(b.level ?? COMPILE_DEFAULTS.chapterLevel, b.title)}\n\n${items}`;
       }
       return b.text;
     })
@@ -237,8 +338,15 @@ function renderHtml(blocks: DocBlock[], profile: BuildProfile): string {
   const body = blocks
     .map((b) => {
       if (b.kind === 'chapter') {
+        const h = clampHeadingLevel(b.level ?? COMPILE_DEFAULTS.chapterLevel);
         const pageBreak = profile.render.chapterPageBreak ? ' style="page-break-before: always"' : '';
-        return `<h2${pageBreak}>${escapeHtml(b.text)}</h2>`;
+        return `<h${h}${pageBreak}>${escapeHtml(b.text)}</h${h}>`;
+      }
+      if (b.kind === 'volume') return `<h${clampHeadingLevel(b.level ?? 1)}>${escapeHtml(b.text)}</h${clampHeadingLevel(b.level ?? 1)}>`;
+      if (b.kind === 'toc') {
+        const h = clampHeadingLevel(b.level ?? COMPILE_DEFAULTS.chapterLevel);
+        const items = b.entries.map((entry) => `<li>${escapeHtml(entry.text)}</li>`).join('');
+        return `<nav class="toc"><h${h}>${escapeHtml(b.title)}</h${h}><ul>${items}</ul></nav>`;
       }
       if (b.kind === 'separator') return `<p class="scene">${escapeHtml(b.text)}</p>`;
       return b.text
@@ -280,6 +388,11 @@ function renderRtf(blocks: DocBlock[], profile: BuildProfile): string {
     if (b.kind === 'chapter') {
       const page = profile.render.chapterPageBreak ? '\\page ' : '';
       lines.push(`${page}{\\b\\fs32 ${escapeRtf(b.text)}}\\par`);
+    } else if (b.kind === 'volume') {
+      lines.push(`{\\b\\fs36 ${escapeRtf(b.text)}}\\par`);
+    } else if (b.kind === 'toc') {
+      lines.push(`{\\b ${escapeRtf(b.title)}}\\par`);
+      for (const entry of b.entries) lines.push(`${escapeRtf(entry.text)}\\par`);
     } else if (b.kind === 'separator') {
       lines.push(`${escapeRtf(b.text)}\\par`);
     } else {

@@ -29,6 +29,7 @@ export {
   activeSkillSection,
   aiPolicySection,
   bookMetaSection,
+  contextInjectionSection,
   historySection,
   identitySection,
   indexDigestSection,
@@ -40,6 +41,32 @@ export {
   type WorldDigestOptions,
   worldDigestSection,
 } from './builtinSections.js';
+export {
+  assembleContextInjection,
+  type ContextInjectionInput,
+  type ContextInjectionResult,
+  type ContextTarget,
+  type DroppedInjection,
+  inferContextTarget,
+  type InjectionEntry,
+  type InjectionScope,
+  type InjectionSource,
+  type InjectionSourceKind,
+  planContextInjection,
+  renderContextInjection,
+} from './contextInjection.js';
+export {
+  buildCitations,
+  type Citation,
+  type CitationHitLike,
+  type CitationSourceKind,
+  describeRetrieval,
+  formatNoRetrieval,
+  quoteAppearsExactly,
+  renderCitations,
+  type RetrievalOutcome,
+  toCitation,
+} from './grounding.js';
 export {
   type AssembleResult,
   PromptAssembler,

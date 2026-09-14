@@ -52,4 +52,14 @@ AI 调用采用「主进程网关 + 渲染端客户端 + 工具/审批/会话」
 - `session.ts`：AiEvent 事件流落 `ai-sessions/<bookId>/*.jsonl`。
 - `skills.ts`：SKILL.md 渐进注入（清单预算、激活/卸载、触发词匹配）。
 
+## 上下文注入与可信检索（design/37）
+
+- 注入引擎 `contextInjection.ts`：按目标（当前章节 / 选中实体 / 任务关键词）装配正文片段、细纲、前情、相关设定与时间线事件；每条标注来源（kind / refId / title / locator）与触发原因。
+- 预算单源 `src/shared/constants/aiContext.ts`：超预算按优先级裁剪并记录被裁条目；引用型片段注入前与原文逐字比对，不一致的剔除并标出。
+- 开关：`injectionEnabled=false` 不做任何注入（回到手动）；单条经 `disabledInjectionIds` 关闭。装配顺序为世界观之后、索引摘要之前（section id `contextInjection`）。
+- 可信检索 `grounding.ts`：检索命中规范化为带出处的引用（锚点 `chapter:<id>` / `knowledge:<id>`）；空结果返回明确「未找到」措辞，禁止编造。工具 `core.text.search` / `core.text.semanticSearch` 返回 `found` / `citations` / `text`。
+- 界面：助手答复的引用与正文分栏呈现，出处可点跳回来源；自动注入面板列出条目、来源与预算占用，可整体关闭或逐条取消。
+- 事件：`context.injection` 记录本次注入条数、预算占用与被裁条数。
+- 当前章节目标由会话入参 `contextTarget` 传入；助手按任务文本推断（`inferContextTarget`）。编辑器未向助手暴露活动章节，跨面板选择待接。
+
 详细交互规范见 `design/05-ai-layer.md` 与 `design/04 §3.1`。

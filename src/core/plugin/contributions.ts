@@ -36,6 +36,11 @@ export class BuildProfileRegistry {
     return this.profiles.get(id);
   }
 
+  /** 移除注册项（用户删除档案/插件卸载）；不存在时静默。 */
+  remove(id: string): void {
+    this.profiles.delete(id);
+  }
+
   list(): BuildProfile[] {
     return [...this.profiles.values()];
   }

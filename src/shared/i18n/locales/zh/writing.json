@@ -270,6 +270,21 @@
     "revisionCause": "原因",
     "revisionApply": "应用此版",
     "revisionApplyTitle": "用此修订版覆盖当前正文（会记一条新修订）",
+    "compareAsBaseline": "按此版修订",
+    "compareAsBaselineTitle": "以此为基线，与当前正文做字符级差异，逐处接受或拒绝",
+    "reviewTitle": "修订对比：{{label}} → 当前正文",
+    "reviewBaseline": "该版本",
+    "reviewCurrent": "当前正文",
+    "reviewBack": "返回列表",
+    "reviewAccept": "接受（采用该版本）",
+    "reviewReject": "拒绝（保留当前）",
+    "reviewAcceptAll": "全部接受",
+    "reviewRejectAll": "全部拒绝",
+    "reviewApply": "应用结果",
+    "reviewEmpty": "该版本与当前正文无差异。",
+    "reviewChangeLabel": "改动 {{index}}",
+    "reviewCharSync": "当前 {{from}} 字 → 结果 {{to}} 字",
+    "reviewApplied": "已写回正文，字数与导出随之更新。",
     "footerCount": "共 {{count}} 条记录",
     "clearHistory": "清空历史",
     "close": "关闭"
@@ -383,7 +398,22 @@
     "previewShow": "预览",
     "previewHide": "收起预览",
     "previewTitle": "导出预览（与导出文件同源管线）",
-    "previewCharCount": "成稿字数：{{count}}"
+    "previewCharCount": "成稿字数：{{count}}",
+    "tocTitle": "目录",
+    "materialLabel": "素材",
+    "material_exclude": "剔除素材",
+    "material_include": "保留素材",
+    "material_prefer": "素材优先",
+    "tocLabel": "生成目录",
+    "headingLevelLabel": "标题层级",
+    "rangeLabel": "范围",
+    "rangeFrom": "起",
+    "rangeTo": "止",
+    "profilePlaceholder": "档案名称（保存后复用）",
+    "saveProfile": "保存档案",
+    "profileNameRequired": "请输入档案名称",
+    "deleteProfileTitle": "删除该档案",
+    "configError": "导出配置错误：{{errors}}"
   },
   "summarySection": {
     "title": "章节正文摘要",
@@ -403,6 +433,8 @@
   },
   "selectionMenu": {
     "polishExpand": "AI 润色 / 扩写",
+    "addAnnotation": "批注",
+    "addAnnotationTitle": "为选中文字添加行内批注（不进入正文与导出）",
     "clearTitle": "取消选择"
   },
   "navigation": {
@@ -485,5 +517,28 @@
     "cycleRejected": "该嵌入会形成循环引用，已阻止。",
     "kindRef": "引用",
     "kindEmbed": "嵌入"
+  },
+  "annotations": {
+    "title": "行内批注",
+    "add": "加批注",
+    "addHint": "先在正文选中一段文字，再点此新建批注。",
+    "noActive": "先选择一个章节。",
+    "empty": "本章暂无批注。",
+    "commentLabel": "批注内容",
+    "emptyQuote": "（原文缺失）",
+    "jump": "定位到批注锚点",
+    "orphanBadge": "失锚",
+    "orphanHint": "锚定的文字或块已不存在，批注保留但无法定位。",
+    "reply": "回复",
+    "replyPlaceholder": "输入回复…",
+    "send": "发送",
+    "edit": "编辑",
+    "save": "保存",
+    "cancel": "取消",
+    "resolve": "解决",
+    "reopen": "重开",
+    "delete": "删除",
+    "deleteConfirm": "删除这条批注及其全部回复？",
+    "resolvedTitle": "已解决"
   }
 }

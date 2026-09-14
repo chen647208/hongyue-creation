@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { buildDocxFiles, buildEpubFiles, type BuildProfile,runBuild } from '@core/build';
+import { buildDocxFiles, buildEpubFiles, type BuildProfile,clampHeadingLevel, COMPILE_DEFAULTS,roundtripProfile, runBuild } from '@core/build';
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '@core/entities';
 import { Bot, Brain, Cpu, Feather, type LucideIcon,Server } from 'lucide-react';
 
@@ -23,7 +23,7 @@ import {
   MAX_CHAPTER_CONTEXT_LENGTH,
   MAX_PREVIOUS_CHAPTER_SUMMARIES,
 } from './constants';
-import type { ExportFormat,TextSelectionRange, TokenUsage } from './types';
+import type { ExportCompileOptions,ExportFormat,TextSelectionRange, TokenUsage } from './types';
 
 export const debounce = <Args extends unknown[]>(func: (...args: Args) => void, wait: number) => {
   let timeout: ReturnType<typeof setTimeout>;
@@ -124,24 +124,46 @@ const escapeHtml = (text: string) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
-export const buildExportContent = (project: Project, selectedChapterIds: Set<string>, format: ExportFormat = 'txt', profileOverride?: BuildProfile) => {
-  // 导出统一走 core/build 三段式管线（选择→变换→渲染），
-  // 与写作统计、插件渲染器共享同一实现（单一口径，无双轨）。
-  const selected = new Set(selectedChapterIds);
-  const { nodes, attrs } = projectToBuildEntities(project);
+/**
+ * 把导出对话框的编译覆盖项叠加到档案上：素材口径、目录、标题层级、章节范围。
+ * 深拷贝后修改，不改动内置档案；范围两端都为空时清除 range。
+ */
+export const applyExportCompileOptions = (profile: BuildProfile, options: ExportCompileOptions): BuildProfile => {
+  const next = roundtripProfile(profile);
+  next.selection = { ...next.selection, materialPolicy: options.materialPolicy };
+  const from = options.rangeFrom ?? undefined;
+  const to = options.rangeTo ?? undefined;
+  next.selection.range = from !== undefined || to !== undefined ? { from, to } : undefined;
+  next.transform = {
+    ...next.transform,
+    headings: { ...next.transform.headings, level: clampHeadingLevel(options.headingLevel) },
+  };
+  const existingToc = next.compile?.toc;
+  next.compile = {
+    ...next.compile,
+    toc: {
+      enabled: options.tocEnabled,
+      title: existingToc?.title || i18n.t('writing:export.tocTitle'),
+      maxDepth: existingToc?.maxDepth ?? COMPILE_DEFAULTS.tocMaxDepth,
+    },
+  };
+  return next;
+};
 
-  // 章节标题模板沿用 i18n 文案：用哨兵 %N/%T 先生成骨架，管线再回填真值
-  const chapterTemplate = i18n.t('writing:export.chapterHeader', { num: '%N', title: '%T' });
-  // PDF 复用 HTML 管线产出（主进程打印为 PDF），文件名与保存走 pdf 分支
+/**
+ * 未选预设时的默认快速导出档案：章节模板取 i18n 文案、引用原样保留，
+ * 与历史单路径导出口径一致（默认档案等价现状）。
+ */
+export const buildQuickExportProfile = (format: ExportFormat): BuildProfile => {
   const buildFormat = format === 'pdf' ? 'html' : format;
-  const unselected = project.chapters.filter((c) => !selected.has(c.id)).map((c) => `node:${c.id}`);
-  const defaultProfile: BuildProfile = {
+  const chapterTemplate = i18n.t('writing:export.chapterHeader', { num: '%N', title: '%T' });
+  return {
     name: '快速导出',
     format: buildFormat,
     selection: {
       includeTypes: ['novel.chapter'],
       includeInactive: false,
-      exclude: unselected,
+      exclude: [],
       rootSwitches: { cards: false, meta: false },
     },
     transform: {
@@ -150,14 +172,32 @@ export const buildExportContent = (project: Project, selectedChapterIds: Set<str
     },
     render: { chapterPageBreak: buildFormat === 'html' || format === 'rtf', stripUnicode: false },
   };
+};
+
+export const buildExportContent = (project: Project, selectedChapterIds: Set<string>, format: ExportFormat = 'txt', profileOverride?: BuildProfile, compileOptions?: ExportCompileOptions) => {
+  // 导出统一走 core/build 三段式管线（选择→变换→渲染），
+  // 与写作统计、插件渲染器共享同一实现（单一口径，无双轨）。
+  const selected = new Set(selectedChapterIds);
+  const { nodes, attrs } = projectToBuildEntities(project);
+
+  // PDF 复用 HTML 管线产出（主进程打印为 PDF），文件名与保存走 pdf 分支
+  const buildFormat = format === 'pdf' ? 'html' : format;
+  const unselected = project.chapters.filter((c) => !selected.has(c.id)).map((c) => `node:${c.id}`);
+  const quickProfile = buildQuickExportProfile(format);
+  const defaultProfile: BuildProfile = {
+    ...quickProfile,
+    selection: { ...quickProfile.selection, exclude: unselected },
+  };
   // 选用注册表构建档（内置/插件）时套用其 selection/transform/render，格式与未选章节仍由本次导出决定
-  const profile: BuildProfile = profileOverride
+  let profile: BuildProfile = profileOverride
     ? {
         ...profileOverride,
         format: buildFormat,
         selection: { ...profileOverride.selection, exclude: [...profileOverride.selection.exclude, ...unselected] },
       }
     : defaultProfile;
+  // 编译覆盖项（对话框即时设置）优先于档案缺省
+  if (compileOptions) profile = applyExportCompileOptions(profile, compileOptions);
 
   const { text } = runBuild(profile, { nodes, attrs, edges: [] });
 
@@ -258,8 +298,9 @@ export const buildExportPackage = (
   selectedChapterIds: Set<string>,
   format: 'epub' | 'docx',
   profileOverride?: BuildProfile,
+  compileOptions?: ExportCompileOptions,
 ): Record<string, string> => {
-  const fullHtml = buildExportContent(project, selectedChapterIds, 'html', profileOverride);
+  const fullHtml = buildExportContent(project, selectedChapterIds, 'html', profileOverride, compileOptions);
   // 取 body 内层，避免 html/head/body 嵌套进出版文件；
   // 再剥掉管线自带的书名 h1 与简介 intro（打包器按 project 统一重加）
   const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);

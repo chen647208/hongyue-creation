@@ -14,9 +14,11 @@
  * 可回放、可恢复（崩溃续跑）、可审计。「AI 历史」UI 升级为事件浏览器。
  * 事件为纯数据；落盘经 SessionSink 抽象（渲染端用 electronAPI 文件写）。
  */
+import type { Citation } from './grounding.js';
 
 export type AiEvent =
   | { t: 'session.start'; sessionId: string; bookId?: string; task: string; skill?: string; sections: string[]; at: number }
+  | { t: 'context.injection'; enabled: boolean; entries: number; dropped: number; totalChars: number; budgetChars: number; at: number }
   | { t: 'turn.start'; turn: number; at: number }
   | { t: 'llm.request'; turn: number; model: string; promptChars: number; at: number }
   | { t: 'llm.delta'; turn: number; accumulatedChars: number; at: number }
@@ -25,7 +27,7 @@ export type AiEvent =
   | { t: 'tool.call'; turn: number; callId: string; toolId: string; args: unknown; at: number }
   | { t: 'tool.approval'; turn: number; callId: string; verdict: 'approved' | 'rejected' | 'timeout' | 'skipped'; by: string; at: number }
   | { t: 'write.direct'; callId: string; toolId: string; at: number }
-  | { t: 'tool.result'; turn: number; callId: string; ok: boolean; error?: string; at: number }
+  | { t: 'tool.result'; turn: number; callId: string; ok: boolean; error?: string; citations?: Citation[]; at: number }
   | { t: 'turn.end'; turn: number; turns: number; at: number }
   | { t: 'session.end'; ok: boolean; error?: string; at: number }
   | { t: 'mcp.sync'; ok: boolean; error?: string; at: number };

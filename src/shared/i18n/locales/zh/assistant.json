@@ -44,6 +44,7 @@
     "resizeSidebarTitle": "拖动调整侧边栏宽度",
     "editDataTitle": "编辑项目数据",
     "contextTitle": "项目上下文分析",
+    "injectionTitle": "自动注入上下文",
     "stopStreamTitle": "停止流式响应",
     "planModeTitle": "计划模式：只出计划不执行，确认后再行动",
     "clearChatTitle": "清空聊天记录"
@@ -97,7 +98,34 @@
     "deleteTitle": "删除本条",
     "editResendTitle": "回填到输入框改后重发",
     "toolChainTitle": "本轮调用链（{{count}}）",
-    "retryTitle": "按上轮原文重新生成（旧答案保留）"
+    "retryTitle": "按上轮原文重新生成（旧答案保留）",
+    "citationTitle": "引用来源",
+    "citationJump": "跳回出处",
+    "citationChapter": "章节",
+    "citationKnowledge": "知识库"
+  },
+  "injection": {
+    "title": "自动注入上下文",
+    "close": "关闭",
+    "enableLabel": "启用自动注入（关闭后回到手动选择）",
+    "budgetLabel": "注入预算占用",
+    "empty": "发送一次消息后显示实际注入的条目。",
+    "disabledHint": "自动注入已关闭，本次会话未注入任何上下文。",
+    "noEntries": "本次没有命中可注入的条目。",
+    "droppedTitle": "未注入条目",
+    "reasonBudget": "超出预算",
+    "reasonQuote": "引用与原文不一致",
+    "reasonDisabled": "已关闭",
+    "kind": {
+      "chapter": "章节",
+      "knowledge": "知识库",
+      "character": "角色",
+      "location": "地点",
+      "faction": "势力",
+      "timeline": "时间线",
+      "memory": "会话记忆",
+      "search": "全文检索"
+    }
   },
   "dialog": {
     "noModel": "请先配置AI模型",
@@ -279,6 +307,7 @@
     "mcpSyncOk": "MCP 同步成功",
     "mcpSyncFail": "MCP 同步失败：{{error}}",
     "writeDirect": "直写（{{toolId}}）",
+    "contextInjection": "自动注入：{{entries}} 条（{{chars}}/{{budget}} 字），{{dropped}} 条未注入",
     "input": "输入 {{n}}",
     "output": "输出 {{n}}",
     "cacheRead": "缓存命中 {{n}}"

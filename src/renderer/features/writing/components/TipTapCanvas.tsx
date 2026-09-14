@@ -9,12 +9,19 @@
 
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { EditorContent, useEditor } from '@tiptap/react';
 import React, { forwardRef, useCallback,useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils/cn';
 
+import type { AnnotationAnchor } from '../../../../shared/types';
+import {
+  type AnnotationDecorationInput,
+  blockPlainText,
+  docPosToPlainOffset,
+} from '../../../editor/annotationDecorations';
 import { refreshBlockEmbedViews } from '../../../editor/blockEmbedNodeView';
 import { BLOCK_ID_ATTRIBUTE } from '../../../editor/blockIndex';
 import type { ResolvedBlockProjection } from '../../../editor/blockRefs';
@@ -81,6 +88,8 @@ interface TipTapCanvasProps {
   onOpenSource?: (id: string) => void;
   /** 光标所在块变化时回调（反向引用面板用）。 */
   onActiveBlockChange?: (id: string | null) => void;
+  /** 行内批注装饰范围（未解决且已锚定；变化时重算装饰）。 */
+  annotations?: readonly AnnotationDecorationInput[];
   onContentChange: (content: string) => void;
   onMouseUp: (event: React.MouseEvent<HTMLDivElement>) => void;
   onKeyUp: () => void;
@@ -93,7 +102,7 @@ interface TipTapCanvasProps {
  * 传入 collaboration 时改为 y-prosemirror 节点级绑定。
  */
 const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function TipTapCanvas(
-  { content, activeChapterId, locked, collaboration, screenplayFormat, paper, isFocusMode, isGenerating, isStreaming, typewriter, onNewChapter, resolveBlock, onOpenSource, onActiveBlockChange, onContentChange, onMouseUp, onKeyUp, onMouseMove },
+  { content, activeChapterId, locked, collaboration, screenplayFormat, paper, isFocusMode, isGenerating, isStreaming, typewriter, onNewChapter, resolveBlock, onOpenSource, onActiveBlockChange, annotations, onContentChange, onMouseUp, onKeyUp, onMouseMove },
   ref,
 ) {
   const { t } = useTranslation('writing');
@@ -109,9 +118,12 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
   resolveBlockRef.current = resolveBlock;
   const onOpenSourceRef = useRef(onOpenSource);
   onOpenSourceRef.current = onOpenSource;
+  const annotationsRef = useRef<readonly AnnotationDecorationInput[]>(annotations ?? []);
+  annotationsRef.current = annotations ?? [];
   // 稳定的扩展选项身份：项目数据变化经 ref 读取，不触发编辑器重建。
   const stableResolveBlock = useCallback((id: string) => resolveBlockRef.current?.(id) ?? null, []);
   const stableOnOpenSource = useCallback((id: string) => { onOpenSourceRef.current?.(id); }, []);
+  const stableGetAnnotations = useCallback(() => annotationsRef.current, []);
   // 记录最近一次由本编辑器吐出的 DSL，用于区分「外部受控更新」与「自身回环」。
   const lastEmitted = useRef<string>(content);
   const [isEmpty, setIsEmpty] = useState(() => content.trim().length === 0);
@@ -123,8 +135,8 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
   const extensions = useMemo(
     () => [
       ...(collaborative
-        ? createCollaborativeExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource })
-        : createNovelExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource })),
+        ? createCollaborativeExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource, getAnnotations: stableGetAnnotations })
+        : createNovelExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource, getAnnotations: stableGetAnnotations })),
       ...createWritingPrimitives({ onNewChapter: () => onNewChapterRef.current?.() }),
       ...(screenplayFormat ? [createScreenplayFormatting()] : []),
       ...(fragment && awareness
@@ -139,7 +151,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
           ]
         : []),
     ],
-    [collaborative, fragment, awareness, screenplayFormat, stableResolveBlock, stableOnOpenSource],
+    [collaborative, fragment, awareness, screenplayFormat, stableResolveBlock, stableOnOpenSource, stableGetAnnotations],
   );
 
   const editor = useEditor(
@@ -183,6 +195,12 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
     const editable = !!activeChapterId && !locked && !(isGenerating && !isStreaming);
     if (editor.isEditable !== editable) editor.setEditable(editable);
   }, [editor, activeChapterId, locked, isGenerating, isStreaming]);
+
+  // 批注数据变化（新增/解决/失锚）不产生文档事务：派发空事务触发装饰重算。
+  useEffect(() => {
+    if (!editor) return;
+    editor.view.dispatch(editor.state.tr);
+  }, [editor, annotations]);
 
   // 打字机模式：选区变化时把光标收到视口约 40% 高度处，长文连写不沉底。
   const typewriterRef = useRef(typewriter);
@@ -313,6 +331,39 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
           if (typeof id === 'string' && id.length > 0) return id;
         }
         return null;
+      },
+      getSelectionAnchor() {
+        if (!editor) return null;
+        const { from, to, empty } = editor.state.selection;
+        if (empty || from === to) return null;
+        const doc = editor.state.doc;
+        const $from = doc.resolve(from);
+        let blockNode: ProseMirrorNode | null = null;
+        let blockPos = -1;
+        let blockId: string | null = null;
+        for (let depth = $from.depth; depth > 0; depth--) {
+          const node = $from.node(depth);
+          const id = node.attrs?.[BLOCK_ID_ATTRIBUTE];
+          if (typeof id === 'string' && id.length > 0) {
+            blockNode = node;
+            blockPos = $from.before(depth);
+            blockId = id;
+            break;
+          }
+        }
+        if (!blockNode || blockId === null) return null;
+        const text = blockPlainText(blockNode);
+        const blockEnd = blockPos + blockNode.nodeSize - 1;
+        const endPos = Math.min(to, blockEnd);
+        const start = docPosToPlainOffset(blockNode, blockPos, from);
+        const end = Math.max(start, Math.min(docPosToPlainOffset(blockNode, blockPos, endPos), text.length));
+        const quote = text.slice(start, end);
+        if (!quote) return null;
+        const anchor: AnnotationAnchor = { blockId, start, end, quote };
+        return anchor;
+      },
+      refreshAnnotations() {
+        if (editor) editor.view.dispatch(editor.state.tr);
       },
       insertBlockRef(id: string) {
         if (!editor) return false;

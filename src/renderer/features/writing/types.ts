@@ -7,12 +7,24 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import type { BuildProfile, MaterialPolicy } from '@core/build';
 import type React from 'react';
 import type { Awareness } from 'y-protocols/awareness';
 import type * as Y from 'yjs';
 
-import type { AIHistoryRecord, Chapter, ModelConfig, OutputMode, Project, PromptTemplate } from '../../../shared/types';
+import type { AIHistoryRecord, AnnotationAnchor, Chapter, ChapterAnnotation, ModelConfig, OutputMode, Project, PromptTemplate } from '../../../shared/types';
+import type { AnnotationDecorationInput } from '../../editor/annotationDecorations';
 import type { BlockRefIndex, ResolvedBlockProjection } from '../../editor/blockRefs';
+
+/** 导出编译覆盖项：叠加在所选档案之上，不改动内置档案本身。 */
+export interface ExportCompileOptions {
+  materialPolicy: MaterialPolicy;
+  tocEnabled: boolean;
+  headingLevel: number;
+  /** 章节范围（按构建序，1 起，含端点）；null 表示不限。 */
+  rangeFrom: number | null;
+  rangeTo: number | null;
+}
 
 /** 编辑器纸张样式。 */
 export type PaperStyle = 'plain' | 'grid' | 'lined' | 'sepia';
@@ -119,6 +131,10 @@ export interface NovelEditorHandle {
   splitAtCursor(): { before: string; after: string } | null;
   /** 当前光标所在顶层块的 blockId；无块锚时 null。 */
   getActiveBlockId(): string | null;
+  /** 当前选区的批注锚（块 id + 块内偏移 + 原文）；无选区或无块锚时 null。 */
+  getSelectionAnchor(): AnnotationAnchor | null;
+  /** 批注数据变化后重算正文装饰。 */
+  refreshAnnotations(): void;
   /** 在光标处插入块引用 ((^id))，返回是否成功。 */
   insertBlockRef(id: string): boolean;
   /** 在光标处插入块嵌入 !((^id))，返回是否成功。 */
@@ -239,6 +255,8 @@ export interface WritingSelectionMenuProps {
   isEditModalOpen: boolean;
   hasModel: boolean;
   onOpenEditModal: () => void;
+  /** 为当前选中文字新建行内批注。 */
+  onAddAnnotation: () => void;
   onClearSelection: () => void;
 }
 
@@ -302,6 +320,23 @@ export interface WritingSidebarProps {
   onInsertEntity: (name: string) => void;
   /** 块引用与反向引用面板数据与操作。 */
   blockRefs: WritingBlockRefsPanelProps;
+  /** 行内批注面板数据与操作。 */
+  annotationPanel: WritingAnnotationsPanelProps;
+}
+
+/** 行内批注面板（docs/design/38 §2.2）：线程列表、回复、解决/重开与失锚提示。 */
+export interface WritingAnnotationsPanelProps {
+  activeChapterId: string | null;
+  annotations: readonly ChapterAnnotation[];
+  /** 块 id → 块内纯文本，用于解析锚点与判定失锚。 */
+  blockTexts: ReadonlyMap<string, string>;
+  onJump: (blockId: string) => void;
+  onAddFromSelection: () => void;
+  onReply: (annotationId: string, body: string) => void;
+  onUpdateBody: (annotationId: string, body: string) => void;
+  onResolve: (annotationId: string) => void;
+  onReopen: (annotationId: string) => void;
+  onDelete: (annotationId: string) => void;
 }
 
 /** 块引用面板：反向引用、出链、失链与插入入口。 */
@@ -344,6 +379,8 @@ export interface WritingEditorCanvasProps {
   resolveBlock?: (id: string) => ResolvedBlockProjection | null;
   onOpenSource?: (id: string) => void;
   onActiveBlockChange?: (id: string | null) => void;
+  /** 行内批注装饰范围。 */
+  annotations?: readonly AnnotationDecorationInput[];
   onStopStreaming: () => void;
   onStopBatchGeneration: () => void;
   streamingTokens: TokenUsage;
@@ -426,6 +463,17 @@ export interface WritingEditorOverlayLayerProps {
   exportFormat: ExportFormat;
   exportProfileId: string;
   onExportProfileChange: (id: string) => void;
+  /** 当前生效的编译档案（所选预设叠加覆盖项），预览与落盘同源。 */
+  exportProfile: BuildProfile;
+  /** 编译覆盖项（素材口径/目录/层级/范围），叠加在导出档案之上。 */
+  exportCompile: ExportCompileOptions;
+  onExportCompileChange: (patch: Partial<ExportCompileOptions>) => void;
+  /** 本机保存的编译档案，供导出对话框列出与删除。 */
+  exportUserProfiles: BuildProfile[];
+  onSaveExportProfile: (name: string) => void;
+  onDeleteExportProfile: (id: string) => void;
+  /** 导出配置/落盘错误的可读提示。 */
+  exportError: string | null;
   onCloseExportModal: () => void;
   onToggleAllExport: () => void;
   onToggleExportChapter: (id: string) => void;
@@ -434,6 +482,7 @@ export interface WritingEditorOverlayLayerProps {
   menuPos: MenuPosition | null;
   hasModel: boolean;
   onOpenEditModal: () => void;
+  onAddAnnotation: () => void;
   onClearSelection: () => void;
   isHistoryViewerOpen: boolean;
   activeChapter: Chapter | undefined;

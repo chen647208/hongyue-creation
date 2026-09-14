@@ -125,21 +125,32 @@ describe('按需上下文工具', () => {
     expect(missing.ok).toBe(false);
   });
 
-  it('text.search 透传宿主全文检索；缺服务时明确报错', async () => {
+  it('text.search 透传宿主全文检索并返回带出处的引用；空结果明确未找到；缺服务时明确报错', async () => {
     const registry = createToolRegistry();
-    const hits = [{ scope: 'chapter', id: 'ch1', snippet: '命中…', rank: 1 }];
+    const hits = [{ scope: 'chapter', id: 'ch1', title: '启程', snippet: '命中…', rank: 1 }];
     const textSearch = vi.fn(async () => hits);
     const ok = await registry.execute('core.text.search', { query: '星辰', limit: 5 }, ctxOf(stubProject(), { textSearch }));
     expect(ok.ok).toBe(true);
     expect(textSearch).toHaveBeenCalledWith('星辰', 5);
-    expect((ok.data as { hits: unknown }).hits).toEqual(hits);
+    const data = ok.data as { found: boolean; citations: Array<{ refId: string; anchor: string }>; text: string };
+    expect(data.found).toBe(true);
+    expect(data.citations[0]?.refId).toBe('ch1');
+    expect(data.citations[0]?.anchor).toBe('chapter:ch1');
+    expect(data.text).toContain('出处 chapter:ch1');
+
+    const emptyHits = await registry.execute('core.text.search', { query: '没有的词' }, ctxOf(stubProject(), { textSearch: vi.fn(async () => []) }));
+    expect(emptyHits.ok).toBe(true);
+    const emptyData = emptyHits.data as { found: boolean; citations: unknown[]; text: string };
+    expect(emptyData.found).toBe(false);
+    expect(emptyData.citations).toEqual([]);
+    expect(emptyData.text).toContain('未找到');
 
     const noService = await registry.execute('core.text.search', { query: '星辰' }, ctxOf(stubProject()));
     expect(noService.ok).toBe(false);
     expect(noService.error).toContain('全文检索服务不可用');
 
-    const empty = await registry.execute('core.text.search', { query: '  ' }, ctxOf(stubProject(), { textSearch }));
-    expect(empty.ok).toBe(false);
+    const blank = await registry.execute('core.text.search', { query: '  ' }, ctxOf(stubProject(), { textSearch }));
+    expect(blank.ok).toBe(false);
   });
 
   it('semanticSearch 缺服务时引导回落关键词检索', async () => {

@@ -11,7 +11,8 @@
  * 助手聊天编排（从 GlobalAssistant 抽出）：消息流、输入、发送/重试/停止、
  * 会话记忆、卡片模板选择。卡片落库经 addCardToProject 回调交回组件（保持归因与审批语义）。
  */
-import type { AgentTurnResult } from '@core/ai';
+import type { AgentTurnResult, Citation, ContextInjectionResult } from '@core/ai';
+import { inferContextTarget } from '@core/ai';
 import { indexService } from '@core/index';
 import type { TFunction } from 'i18next';
 import { useEffect, useRef, useState } from 'react';
@@ -51,6 +52,25 @@ interface UseAssistantChatOptions {
   addCardToProject: (command: AICardCommand, data: CreatedCard) => void;
   t: TFunction<'assistant'>;
   language: string;
+  /** 自动上下文注入总开关（关闭即纯手动）。 */
+  injectionEnabled?: boolean;
+  /** 单条关闭的注入条目 id。 */
+  disabledInjectionIds?: string[];
+}
+
+/** 从会话事件收集本轮检索引用（带出处），按 anchor 去重。 */
+function collectCitations(events: ReturnType<typeof sessionManager.getEvents>): Citation[] {
+  const seen = new Set<string>();
+  const citations: Citation[] = [];
+  for (const event of events) {
+    if (event.t !== 'tool.result' || !event.citations) continue;
+    for (const citation of event.citations) {
+      if (seen.has(citation.id)) continue;
+      seen.add(citation.id);
+      citations.push(citation);
+    }
+  }
+  return citations;
 }
 
 export function useAssistantChat({
@@ -61,6 +81,8 @@ export function useAssistantChat({
   addCardToProject,
   t,
   language,
+  injectionEnabled = true,
+  disabledInjectionIds,
 }: UseAssistantChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -77,6 +99,7 @@ export function useAssistantChat({
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [cardPromptTemplates, setCardPromptTemplates] = useState<CardPromptTemplate[]>([]);
   const [selectedCardTemplateId, setSelectedCardTemplateId] = useState<string | null>(null);
+  const [lastInjection, setLastInjection] = useState<ContextInjectionResult | null>(null);
   const streamAbortRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -235,6 +258,10 @@ export function useAssistantChat({
         fallbackModel: models.find((m) => m.id !== activeModel?.id && m.isEnabled !== false && isModelUsable(m)),
         history,
         images,
+        // 上下文注入（design/37）：按任务文本推断章节/实体目标，开关与单条关闭由此透传
+        contextTarget: inferContextTarget(project, text),
+        injectionEnabled,
+        disabledInjectionIds,
         cardTemplate: selectedCardTemplateId
           ? cardPromptTemplates.find((tpl) => tpl.id === selectedCardTemplateId)
           : undefined,
@@ -268,12 +295,15 @@ export function useAssistantChat({
     } catch {
       // 事件读取失败不影响主流程
     }
+    const citations = collectCitations(sessionManager.getEvents());
+    setLastInjection(sessionManager.getLastInjection());
     setMessages(prev => [...prev, {
       id: (Date.now() + 1).toString(),
       role: 'assistant' as const,
       content: result.ok ? result.reply : (result.error ?? t('chat.callFailedContent')),
       timestamp: Date.now(),
       error: result.ok ? undefined : t('chat.callFailed'),
+      citations: citations.length ? citations : undefined,
     }]);
     setIsLoading(false);
   };
@@ -334,6 +364,7 @@ export function useAssistantChat({
     cardPromptTemplates,
     selectedCardTemplateId,
     setSelectedCardTemplateId,
+    lastInjection,
     sendMessageInternal,
     handleSendMessage,
     handleStopStreaming,

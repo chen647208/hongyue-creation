@@ -71,6 +71,22 @@
 - 导出：编译/导出前引用与嵌入统一展开为被引块可见文本（跨章解析），目标缺失写
   `【失链：<id>】`，成环写 `【循环引用：<id>】`；产物不残留 `((^id))` 语法。
 
+## 修订标记与行内批注
+
+- 修订标记（docs/design/38 §2.1）：章节历史弹窗对任意编辑快照或修订记录点「按此版修订」，
+  以该版本为基线、与当前正文做字符级差异（`src/renderer/editor/revisionDiff.ts` 两级 LCS，
+  无第三方 diff 依赖）；逐处接受/拒绝，全部接受/全部拒绝与「应用结果」写回正文。
+  接受采用该版本文字，拒绝保留当前文字；全部拒绝的结果与当前正文逐字一致。
+  应用走既有正文写回路径（`onApplyContent`），字数与导出仍按 `chapter.content` 单一真源计算。
+- 行内批注（docs/design/38 §2.2）：正文选中文字后经选区菜单「批注」或在左栏批注面板新建，
+  支持回复、解决/重开与删除。锚定为块稳定标识 + 块内纯文本偏移 + 原文引用
+  （`src/renderer/editor/annotations.ts`）：块重排按标识仍能定位，偏移漂移按引用重定位，
+  找不到即判失锚并在面板提示。编辑器以装饰显示未解决批注，不修改正文。
+- 存储：批注存 `Chapter.annotations` 侧车字段，经既有投影桥以 JSON 属性随章节落库，
+  不改 SQL schema；批注不写入正文 DSL，不进入字数（`computeChapterStats`）与导出
+  （`buildExportContent`）——导出结果与无批注时逐字一致（见单测）。
+- 批注面板：`components/WritingAnnotationsPanel.tsx` 挂在写作左栏，与 `WritingBlockRefsPanel` 同层。
+
 ## 素材隔离
 
 - 标记：`Chapter.material`（布尔，缺省 false）是素材的单一真源；经投影桥存为章节节点的

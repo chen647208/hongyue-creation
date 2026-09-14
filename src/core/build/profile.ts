@@ -11,8 +11,18 @@
  * Build Profile（docs/design/07 §2）：选择 → 变换 → 渲染 的声明式定义。
  * Profile 是一等公民：多套并存、可 diff、可分享。序列化支持 JSON 与
  * YAML（.novel/builds/*.yml，js-yaml 双向往返，验收 2）。
+ * 编译档案（docs/design/39）：在 profile 上追加 compile 编排（分卷/前后置页/目录/标题层级）。
  */
 import yaml from 'js-yaml';
+
+/** 素材口径：exclude 剔除素材；include 保留原序；prefer 保留并前移。 */
+export type MaterialPolicy = 'exclude' | 'include' | 'prefer';
+
+/** 编译范围：按构建序（1 起，含端点）截取；缺省即全选。 */
+export interface BuildRange {
+  from?: number;
+  to?: number;
+}
 
 export interface BuildSelection {
   /** 参与构建的类型模板 id；'*' 后缀为类别通配（如 'card.*'） */
@@ -27,18 +37,28 @@ export interface BuildSelection {
    * 素材口径：exclude（默认）剔除标记为素材的节点；include 保留原序；
    * prefer 保留并把素材排在非素材之前。缺席按 exclude。
    */
-  materialPolicy?: 'exclude' | 'include' | 'prefer';
+  materialPolicy?: MaterialPolicy;
+  /**
+   * 编译范围：按构建序取 [from, to]（1 起、含端点）。from 缺省 1，to 缺省末尾。
+   * 只截取正文主体；compile.frontMatter/backMatter 由 id 指定，不受范围影响。
+   */
+  range?: BuildRange;
+}
+
+/** 标题处理：模板、隐藏类型、重编号、输出层级。 */
+export interface BuildHeadings {
+  /** %N 章节号 %T 标题 %POV 视角 */
+  chapter: string;
+  scene: string;
+  /** 隐藏的类型列表 */
+  hide: string[];
+  renumber: boolean;
+  /** 章节标题基础层级（md/html 输出，1..6）；缺省 2。 */
+  level?: number;
 }
 
 export interface BuildTransform {
-  headings: {
-    /** %N 章节号 %T 标题 %POV 视角 */
-    chapter: string;
-    scene: string;
-    /** 隐藏的类型列表 */
-    hide: string[];
-    renumber: boolean;
-  };
+  headings: BuildHeadings;
   content: {
     includeSynopsis: boolean;
     includeComments: boolean;
@@ -56,6 +76,28 @@ export interface BuildRender {
   stripUnicode: boolean;
 }
 
+/** 目录（TOC）配置。 */
+export interface BuildToc {
+  enabled: boolean;
+  /** 目录标题，如「目录」。 */
+  title: string;
+  /** 收录的最大深度（相对章节层级）；缺省 1，只收章节标题。 */
+  maxDepth?: number;
+}
+
+/** 编译编排：分卷、前后置页、目录。标题层级见 transform.headings.level。 */
+export interface BuildCompile {
+  toc?: BuildToc;
+  /** 分卷类型模板 id（如 'novel.part'），命中即产出分卷标题。 */
+  volumeTypes?: string[];
+  /** 分卷标题模板：%N 卷号 %T 标题。缺省「第%N卷 %T」。 */
+  volumeHeading?: string;
+  /** 前置页节点 id，按给定顺序置于正文前（前言/序）。 */
+  frontMatter?: string[];
+  /** 后置页节点 id，按给定顺序置于正文后（后记/附录）。 */
+  backMatter?: string[];
+}
+
 export interface BuildProfile {
   /** 稳定标识（注册表 key）；缺省时回落 name。 */
   id?: string;
@@ -67,7 +109,17 @@ export interface BuildProfile {
   selection: BuildSelection;
   transform: BuildTransform;
   render: BuildRender;
+  /** 编译编排（docs/design/39）；缺席即纯正文导出。 */
+  compile?: BuildCompile;
 }
+
+/** 编译默认值：profile 缺省字段回落到此，保证默认档案等价纯正文导出。 */
+export const COMPILE_DEFAULTS = {
+  chapterLevel: 2,
+  volumeHeading: '第%N卷 %T',
+  tocTitle: '目录',
+  tocMaxDepth: 1,
+} as const;
 
 export const DEFAULT_BUILD_PROFILE: BuildProfile = {
   id: 'core.default',
@@ -106,9 +158,42 @@ export const COMPENDIUM_BUILD_PROFILE: BuildProfile = {
   render: { chapterPageBreak: true, stripUnicode: false },
 };
 
+/** 成稿编译档示例：章节重编号、生成目录、识别分卷（novel.part）。 */
+export const MANUSCRIPT_BUILD_PROFILE: BuildProfile = {
+  id: 'core.manuscript',
+  name: '成稿（含目录）',
+  description: '章节编号 + 目录 + 分卷标题，导出可交付稿件',
+  format: 'md',
+  selection: {
+    includeTypes: ['novel.chapter', 'novel.part'],
+    includeInactive: false,
+    exclude: [],
+    rootSwitches: { cards: false, meta: false },
+    materialPolicy: 'exclude',
+  },
+  transform: {
+    headings: { chapter: '%N、%T', scene: '* * *', hide: [], renumber: true, level: 2 },
+    content: { includeSynopsis: false, includeComments: false, stripTags: ['draft-only'], resolveRefs: 'displayName' },
+  },
+  render: { chapterPageBreak: false, stripUnicode: false },
+  compile: {
+    toc: { enabled: true, title: '目录', maxDepth: 2 },
+    volumeTypes: ['novel.part'],
+    volumeHeading: '第%N卷 %T',
+    frontMatter: [],
+    backMatter: [],
+  },
+};
+
 /** 深拷贝往返（验收 2：编辑→保存→重载无损）。 */
 export function roundtripProfile(profile: BuildProfile): BuildProfile {
   return JSON.parse(JSON.stringify(profile)) as BuildProfile;
+}
+
+/** 标题层级收进 1..6；非法或缺省回落 COMPILE_DEFAULTS.chapterLevel。 */
+export function clampHeadingLevel(level?: number): number {
+  if (level === undefined || !Number.isFinite(level)) return COMPILE_DEFAULTS.chapterLevel;
+  return Math.min(6, Math.max(1, Math.round(level)));
 }
 
 /** Profile → YAML 文本（.yml 分享单元）。 */
@@ -126,7 +211,96 @@ export function parseProfileYaml(text: string): BuildProfile {
   for (const key of ['name', 'format', 'selection', 'transform', 'render']) {
     if (!(key in m)) throw new Error(`Profile YAML 缺少字段：${key}`);
   }
-  return m as unknown as BuildProfile;
+  const profile = m as unknown as BuildProfile;
+  const errors = validateProfile(profile);
+  if (errors.length > 0) throw new Error(`编译档案无效：${errors.join('；')}`);
+  return profile;
+}
+
+/**
+ * 校验编译档案，返回可读错误列表（空数组即通过）。
+ * 供导入/保存与导出前检查共用；不抛错，调用方决定如何提示。
+ */
+export function validateProfile(profile: BuildProfile | null | undefined): string[] {
+  const errors: string[] = [];
+  if (!profile || typeof profile !== 'object') return ['编译档案必须是对象'];
+  if (typeof profile.name !== 'string' || profile.name.trim() === '') errors.push('缺少档案名称 name');
+  if (typeof profile.format !== 'string' || profile.format.trim() === '') errors.push('缺少导出格式 format');
+  if (!Array.isArray(profile.selection?.includeTypes)) errors.push('selection.includeTypes 必须是数组');
+
+  const policy = profile.selection?.materialPolicy;
+  if (policy !== undefined && policy !== 'exclude' && policy !== 'include' && policy !== 'prefer') {
+    errors.push(`未知素材口径 materialPolicy：${String(policy)}`);
+  }
+
+  const range = profile.selection?.range;
+  if (range) {
+    if (range.from !== undefined && (!Number.isInteger(range.from) || range.from < 1)) {
+      errors.push('范围起点 range.from 必须是不小于 1 的整数');
+    }
+    if (range.to !== undefined && (!Number.isInteger(range.to) || range.to < 1)) {
+      errors.push('范围终点 range.to 必须是不小于 1 的整数');
+    }
+    if (range.from !== undefined && range.to !== undefined && range.from > range.to) {
+      errors.push('范围起点 range.from 不能大于终点 range.to');
+    }
+  }
+
+  const level = profile.transform?.headings?.level;
+  if (level !== undefined && (!Number.isInteger(level) || level < 1 || level > 6)) {
+    errors.push('标题层级 level 必须是 1..6 的整数');
+  }
+
+  const toc = profile.compile?.toc;
+  if (toc !== undefined && typeof toc.enabled !== 'boolean') errors.push('目录开关 compile.toc.enabled 必须是布尔值');
+  if (toc?.maxDepth !== undefined && (!Number.isInteger(toc.maxDepth) || toc.maxDepth < 1)) {
+    errors.push('目录深度 compile.toc.maxDepth 必须是不小于 1 的整数');
+  }
+
+  for (const key of ['frontMatter', 'backMatter'] as const) {
+    const value = profile.compile?.[key];
+    if (value !== undefined && (!Array.isArray(value) || value.some((id) => typeof id !== 'string'))) {
+      errors.push(`compile.${key} 必须是节点 id 字符串数组`);
+    }
+  }
+  const volumeTypes = profile.compile?.volumeTypes;
+  if (volumeTypes !== undefined && (!Array.isArray(volumeTypes) || volumeTypes.some((t) => typeof t !== 'string'))) {
+    errors.push('compile.volumeTypes 必须是字符串数组');
+  }
+  if (profile.compile?.volumeHeading !== undefined && typeof profile.compile.volumeHeading !== 'string') {
+    errors.push('compile.volumeHeading 必须是字符串');
+  }
+
+  return errors;
+}
+
+/** 装配编译档案：补齐缺省字段并深拷贝；不修改入参。 */
+export function normalizeProfile(profile: BuildProfile): BuildProfile {
+  const clone = roundtripProfile(profile);
+  clone.selection = {
+    ...clone.selection,
+    materialPolicy: clone.selection.materialPolicy ?? 'exclude',
+  };
+  clone.transform = {
+    ...clone.transform,
+    headings: {
+      ...clone.transform.headings,
+      hide: clone.transform.headings.hide ?? [],
+      level: clampHeadingLevel(clone.transform.headings.level),
+    },
+  };
+  const toc = clone.compile?.toc;
+  clone.compile = {
+    ...clone.compile,
+    volumeTypes: clone.compile?.volumeTypes ?? [],
+    volumeHeading: clone.compile?.volumeHeading ?? COMPILE_DEFAULTS.volumeHeading,
+    frontMatter: clone.compile?.frontMatter ?? [],
+    backMatter: clone.compile?.backMatter ?? [],
+    toc: toc
+      ? { enabled: toc.enabled, title: toc.title || COMPILE_DEFAULTS.tocTitle, maxDepth: toc.maxDepth ?? COMPILE_DEFAULTS.tocMaxDepth }
+      : undefined,
+  };
+  return clone;
 }
 
 /** 前缀匹配类型：'card.*' 匹配所有 card.*；否则精确相等。 */

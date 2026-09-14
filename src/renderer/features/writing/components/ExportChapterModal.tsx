@@ -7,13 +7,16 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { AlignLeft, Check, Code, FileDown, FileOutput, FileText, Globe, type LucideIcon,Package } from 'lucide-react';
+import type { BuildProfile } from '@core/build';
+import { AlignLeft, Check, Code, FileDown, FileOutput, FileText, Globe, type LucideIcon,Package, Trash2 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { buildProfileRegistry, profileKey } from '@/shared/services/buildProfiles';
 import { Button } from '@/shared/ui/Button';
+import { Checkbox } from '@/shared/ui/Checkbox';
 import { DialogTitle } from '@/shared/ui/Dialog';
+import { Input } from '@/shared/ui/Input';
 import MarkdownView from '@/shared/ui/Markdown';
 import { ModalShell } from '@/shared/ui/ModalShell';
 import { Select } from '@/shared/ui/Select';
@@ -21,7 +24,7 @@ import { cn } from '@/shared/utils/cn';
 
 import type { Chapter, Project } from '../../../../shared/types';
 import { computeChapterStats } from '../services/writingStatsService';
-import type { ExportFormat } from '../types';
+import type { ExportCompileOptions,ExportFormat } from '../types';
 import { buildExportContent } from '../utils';
 
 interface ExportChapterModalProps {
@@ -32,6 +35,13 @@ interface ExportChapterModalProps {
   format: ExportFormat;
   exportProfileId: string;
   onExportProfileChange: (id: string) => void;
+  exportProfile: BuildProfile;
+  exportCompile: ExportCompileOptions;
+  onExportCompileChange: (patch: Partial<ExportCompileOptions>) => void;
+  exportUserProfiles: BuildProfile[];
+  onSaveExportProfile: (name: string) => void;
+  onDeleteExportProfile: (id: string) => void;
+  exportError: string | null;
   onClose: () => void;
   onToggleAll: () => void;
   onToggleChapter: (chapterId: string) => void;
@@ -49,6 +59,8 @@ const FORMAT_OPTIONS: Array<{ value: ExportFormat; label: string; icon: LucideIc
   { value: 'docx', label: 'DOCX', icon: Package },
 ];
 
+const MATERIAL_POLICY_OPTIONS = ['exclude', 'include', 'prefer'] as const;
+
 const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
   isOpen,
   project,
@@ -57,6 +69,13 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
   format,
   exportProfileId,
   onExportProfileChange,
+  exportProfile,
+  exportCompile,
+  onExportCompileChange,
+  exportUserProfiles,
+  onSaveExportProfile,
+  onDeleteExportProfile,
+  exportError,
   onClose,
   onToggleAll,
   onToggleChapter,
@@ -66,14 +85,29 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
   const { t } = useTranslation('writing');
   const sortedChapters = [...chapters].sort((a, b) => a.order - b.order);
   const [showPreview, setShowPreview] = useState(false);
+  const [profileName, setProfileName] = useState('');
   const profiles = buildProfileRegistry.list();
   const selectedProfile = profiles.find((p) => profileKey(p) === exportProfileId);
+  const isUserProfile = selectedProfile ? exportUserProfiles.some((p) => profileKey(p) === exportProfileId) : false;
   const previewText = useMemo(
     // PDF/ePub/DOCX 预览复用 HTML 渲染（打印即所见）
-    () => (showPreview ? buildExportContent(project, selectedChapterIds, format === 'pdf' || format === 'epub' || format === 'docx' ? 'html' : format, selectedProfile) : ''),
-    [showPreview, project, selectedChapterIds, format, selectedProfile],
+    () =>
+      showPreview
+        ? buildExportContent(
+            project,
+            selectedChapterIds,
+            format === 'pdf' || format === 'epub' || format === 'docx' ? 'html' : format,
+            exportProfile,
+          )
+        : '',
+    [showPreview, project, selectedChapterIds, format, exportProfile],
   );
   const previewStats = useMemo(() => (showPreview ? computeChapterStats(previewText) : null), [showPreview, previewText]);
+
+  const handleSave = () => {
+    onSaveExportProfile(profileName);
+    setProfileName('');
+  };
 
   return (
     <ModalShell
@@ -99,6 +133,95 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
                 <option key={profileKey(p)} value={profileKey(p)}>{p.name}</option>
               ))}
             </Select>
+            {isUserProfile && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-muted-foreground"
+                onClick={() => onDeleteExportProfile(exportProfileId)}
+                title={t('export.deleteProfileTitle')}
+                aria-label={t('export.deleteProfileTitle')}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            )}
+          </div>
+        )}
+
+        <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-6 py-2">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            {t('export.materialLabel')}
+            <Select
+              value={exportCompile.materialPolicy}
+              onChange={(e) => onExportCompileChange({ materialPolicy: e.target.value as ExportCompileOptions['materialPolicy'] })}
+              aria-label={t('export.materialLabel')}
+              className="h-7 w-auto min-w-[110px] text-xs"
+            >
+              {MATERIAL_POLICY_OPTIONS.map((value) => (
+                <option key={value} value={value}>{t(`export.material_${value}`)}</option>
+              ))}
+            </Select>
+          </label>
+          <Checkbox
+            id="export-toc"
+            checked={exportCompile.tocEnabled}
+            onChange={(e) => onExportCompileChange({ tocEnabled: e.target.checked })}
+            label={t('export.tocLabel')}
+            className="text-xs"
+          />
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            {t('export.headingLevelLabel')}
+            <Select
+              value={String(exportCompile.headingLevel)}
+              onChange={(e) => onExportCompileChange({ headingLevel: Number(e.target.value) })}
+              aria-label={t('export.headingLevelLabel')}
+              className="h-7 w-auto min-w-[64px] text-xs"
+            >
+              {[1, 2, 3, 4].map((level) => (
+                <option key={level} value={String(level)}>{level}</option>
+              ))}
+            </Select>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            {t('export.rangeLabel')}
+            <Input
+              type="number"
+              min={1}
+              value={exportCompile.rangeFrom ?? ''}
+              onChange={(e) => onExportCompileChange({ rangeFrom: e.target.value === '' ? null : Number(e.target.value) })}
+              aria-label={t('export.rangeFrom')}
+              placeholder={t('export.rangeFrom')}
+              className="h-7 w-16 text-xs"
+            />
+            <span aria-hidden>-</span>
+            <Input
+              type="number"
+              min={1}
+              value={exportCompile.rangeTo ?? ''}
+              onChange={(e) => onExportCompileChange({ rangeTo: e.target.value === '' ? null : Number(e.target.value) })}
+              aria-label={t('export.rangeTo')}
+              placeholder={t('export.rangeTo')}
+              className="h-7 w-16 text-xs"
+            />
+          </label>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-6 py-2">
+          <Input
+            value={profileName}
+            onChange={(e) => setProfileName(e.target.value)}
+            placeholder={t('export.profilePlaceholder')}
+            aria-label={t('export.profilePlaceholder')}
+            className="h-7 flex-1 text-xs"
+          />
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSave}>
+            {t('export.saveProfile')}
+          </Button>
+        </div>
+
+        {exportError && (
+          <div role="alert" className="shrink-0 border-b border-destructive/30 bg-destructive/10 px-6 py-2 text-xs text-destructive">
+            {exportError}
           </div>
         )}
 

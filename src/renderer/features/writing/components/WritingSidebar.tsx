@@ -18,6 +18,7 @@ import { Textarea } from '@/shared/ui/Textarea';
 import type { WritingSidebarProps } from '../types';
 import ChapterNavigationSection from './ChapterNavigationSection';
 import ChapterSummarySection from './ChapterSummarySection';
+import WritingAnnotationsPanel from './WritingAnnotationsPanel';
 import WritingBlockRefsPanel from './WritingBlockRefsPanel';
 import WritingEntityPanel from './WritingEntityPanel';
 
@@ -42,6 +43,7 @@ const WritingSidebar: React.FC<WritingSidebarProps> = ({
   onBatchDeleteChapter,
   onInsertEntity,
   blockRefs,
+  annotationPanel,
 }) => {
   const { t } = useTranslation('writing');
   return (
@@ -95,6 +97,8 @@ const WritingSidebar: React.FC<WritingSidebarProps> = ({
         />
 
         <WritingBlockRefsPanel {...blockRefs} />
+
+        <WritingAnnotationsPanel {...annotationPanel} />
       </div>
     </div>
   );

@@ -6,7 +6,8 @@
  * 本程序为自由软件：您可依据 GNU Affero 通用公共许可证第 3 版（AGPL-3.0-only）修改与分发；
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
-import { BookOpenText, Bot, CircleStop, ListChecks, PenLine, RotateCcw, Trash2, X } from 'lucide-react';
+import type { Citation } from '@core/ai';
+import { BookOpenText, Bot, CircleStop, Layers, ListChecks, PenLine, RotateCcw, Trash2, X } from 'lucide-react';
 import React, { useEffect, useMemo,useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -26,6 +27,7 @@ import { asRecord, asStr,type LooseRecord } from '../../shared/utils/loose';
 import AssistantChatWorkspace from './components/AssistantChatWorkspace';
 import AssistantContextPanel from './components/AssistantContextPanel';
 import AssistantEditPanel from './components/AssistantEditPanel';
+import AssistantInjectionPanel from './components/AssistantInjectionPanel';
 import { useAssistantCards } from './hooks/useAssistantCards';
 import { useAssistantChat } from './hooks/useAssistantChat';
 import { useModelSelection } from './hooks/useModelSelection';
@@ -45,6 +47,14 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
   // 卡片落库（AI 归因 + 未知命令提示）见 useAssistantCards
   const { commitAICard, addCardToProject } = useAssistantCards({ project, updateActiveProject, t });
 
+  // 自动上下文注入（design/37）：整体开关 + 单条取消（下次会话生效），最近一次结果见 lastInjection
+  const [injectionPanelOpen, setInjectionPanelOpen] = useState(false);
+  const [injectionEnabled, setInjectionEnabled] = useState(true);
+  const [disabledInjectionIds, setDisabledInjectionIds] = useState<string[]>([]);
+  const toggleInjectionEntry = (id: string) => {
+    setDisabledInjectionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
   // 聊天编排（消息/发送/停止/会话记忆/卡片模板）见 useAssistantChat
   const chat = useAssistantChat({
     project,
@@ -54,12 +64,15 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
     addCardToProject,
     t,
     language: i18n.language,
+    injectionEnabled,
+    disabledInjectionIds,
   });
   const {
     messages, setMessages, input, setInput, isLoading, planMode, setPlanMode,
     pendingImages, setPendingImages, pendingFiles, setPendingFiles, lastToolChain,
     streamingMessageId, cardPromptTemplates, selectedCardTemplateId, setSelectedCardTemplateId,
     sendMessageInternal, handleSendMessage, handleStopStreaming, handleRetry, handleClearChat, lastUserText,
+    lastInjection,
   } = chat;
 
   const [outputMode, setOutputMode] = useState<OutputMode>('streaming');
@@ -141,6 +154,15 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
 
      setContextPanelOpen(false);
      void sendMessageInternal(finalInstruction, [attachment]);
+  };
+
+  const handleOpenSource = (citation: Citation) => {
+    // 出处可点跳：章节引用落到「章节」分类并选中该章，知识库引用落到「知识库」分类
+    setActiveCategory(citation.sourceKind === 'knowledge' ? 'knowledge' : 'chapters');
+    setSubSelectionId(citation.refId);
+    setInjectionPanelOpen(false);
+    setEditPanelOpen(false);
+    setContextPanelOpen(true);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -521,11 +543,20 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setContextPanelOpen(!contextPanelOpen)}
+              onClick={() => { setContextPanelOpen(!contextPanelOpen); setInjectionPanelOpen(false); }}
               className={cn('size-7 text-muted-foreground hover:text-foreground', contextPanelOpen && 'bg-primary/10 text-primary')}
               title={t('window.contextTitle')}
             >
               <BookOpenText className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => { setInjectionPanelOpen(!injectionPanelOpen); setContextPanelOpen(false); setEditPanelOpen(false); }}
+              className={cn('size-7 text-muted-foreground hover:text-foreground', injectionPanelOpen && 'bg-primary/10 text-primary')}
+              title={t('window.injectionTitle')}
+            >
+              <Layers className="size-4" />
             </Button>
             {streamingMessageId && (
               <Button
@@ -607,6 +638,17 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
             />
           )}
 
+          {injectionPanelOpen && (
+            <AssistantInjectionPanel
+              injection={lastInjection}
+              enabled={injectionEnabled}
+              onEnabledChange={setInjectionEnabled}
+              disabledIds={disabledInjectionIds}
+              onToggleEntry={toggleInjectionEntry}
+              onClose={() => setInjectionPanelOpen(false)}
+            />
+          )}
+
           <AssistantChatWorkspace
             chatContainerRef={chatContainerRef}
             contextPanelOpen={contextPanelOpen}
@@ -631,6 +673,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
             setSelectedCardTemplateId={setSelectedCardTemplateId}
             bookId={project?.id ?? null}
             attachmentsRefreshKey={attachmentsRefreshKey}
+            onOpenSource={handleOpenSource}
           />
         </>
     </div>

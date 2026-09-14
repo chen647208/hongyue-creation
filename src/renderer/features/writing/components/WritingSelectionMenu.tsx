@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { WandSparkles, X } from 'lucide-react';
+import { MessageSquarePlus, WandSparkles, X } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -20,6 +20,7 @@ const WritingSelectionMenu: React.FC<WritingSelectionMenuProps> = ({
   isEditModalOpen,
   hasModel,
   onOpenEditModal,
+  onAddAnnotation,
   onClearSelection,
 }) => {
   const { t } = useTranslation('writing');
@@ -34,6 +35,9 @@ const WritingSelectionMenu: React.FC<WritingSelectionMenuProps> = ({
     >
       <Button size="sm" onClick={onOpenEditModal} disabled={!hasModel} title={!hasModel ? t('output.noModelHint') : undefined}>
         <WandSparkles className="size-3.5" /> {t('selectionMenu.polishExpand')}
+      </Button>
+      <Button variant="outline" size="sm" onClick={onAddAnnotation} title={t('selectionMenu.addAnnotationTitle')}>
+        <MessageSquarePlus className="size-3.5" /> {t('selectionMenu.addAnnotation')}
       </Button>
       <div className="mx-0.5 h-5 w-px bg-border" />
       <Button

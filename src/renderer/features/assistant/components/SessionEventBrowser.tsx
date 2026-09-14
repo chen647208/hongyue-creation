@@ -49,6 +49,8 @@ function eventLine(e: AiEvent, t: TFunction<'assistant'>): { label: string; tone
       return { label: e.ok ? t('events.toolResultOk') : t('events.toolResultFail', { error: e.error ?? '' }), tone: e.ok ? 'ok' : 'err' };
     case 'write.direct':
       return { label: t('events.writeDirect', { toolId: e.toolId }), tone: 'muted' };
+    case 'context.injection':
+      return { label: t('events.contextInjection', { entries: e.entries, chars: e.totalChars, budget: e.budgetChars, dropped: e.dropped }), tone: 'muted' };
     case 'turn.end':
       return { label: t('events.turnEnd', { turns: e.turns }), tone: 'muted' };
     case 'session.end':
