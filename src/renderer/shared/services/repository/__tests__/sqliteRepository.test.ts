@@ -8,19 +8,16 @@
  */
 
 import { indexService } from '@core/index';
-import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
-import Database from 'better-sqlite3-multiple-ciphers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APP_STATE_VERSION } from '../../../../../shared/constants/versions';
-import { SQL,type SqlId } from '../../../../../shared/sql/catalog';
 import type { AppState, Chapter,KnowledgeItem, Project } from '../../../../../shared/types';
 import { BUILTIN_ITEM_TYPES,ensureBuiltinItemTypes } from '../builtinTypes';
 import { jsonRepository } from '../jsonRepository';
 import { migrate,SCHEMA_VERSION } from '../schema';
 import { SqliteRepository } from '../sqliteRepository';
-import type { SqlDriver, SqlRunResult, SqlValue } from '../types';
-import { runWasmRequest } from '../wasmSql';
+import type { SqlDriver, SqlValue } from '../types';
+import { nodeSqliteFixture,wasmFixture } from './drivers';
 
 /**
  * 同一套 SqliteRepository 逻辑，分别用两种真实 SQLite 引擎驱动：
@@ -28,88 +25,6 @@ import { runWasmRequest } from '../wasmSql';
  *   - @sqlite.org/sqlite-wasm（网页 OPFS worker 所用）
  * 两端共用 schema/迁移/增量写/FTS5(trigram) 检索，这里即其正确性来源。
  */
-
-interface DriverFixture {
-  name: string;
-  create(): Promise<{
-    driver: SqlDriver;
-    rawGet<T>(sql: string, params?: SqlValue[]): T | undefined;
-    rawAll<T>(sql: string, params?: SqlValue[]): T[];
-    dispose(): void;
-  }>;
-}
-
-const nodeSqliteFixture: DriverFixture = {
-  name: 'better-sqlite3',
-  async create() {
-    const db = new Database(':memory:');
-    const driver: SqlDriver = {
-      exec: async (id) => { db.exec(SQL[id]); },
-      run: async (id, params = []) => {
-        const r = db.prepare(SQL[id]).run(...(params as unknown as never[]));
-        return { changes: Number(r.changes), lastInsertRowid: Number(r.lastInsertRowid) };
-      },
-      all: async <T>(id: SqlId, params: SqlValue[] = []) => db.prepare(SQL[id]).all(...(params as never[])) as T[],
-      get: async <T>(id: SqlId, params: SqlValue[] = []) => db.prepare(SQL[id]).get(...(params as never[])) as T | undefined,
-      transaction: async (fn) => {
-        db.exec('BEGIN');
-        try {
-          const result = await fn(driver);
-          db.exec('COMMIT');
-          return result;
-        } catch (e) {
-          try { db.exec('ROLLBACK'); } catch { /* noop */ }
-          throw e;
-        }
-      },
-      close: async () => { db.close(); },
-    };
-    return {
-      driver,
-      rawGet: <T>(sql: string, params: SqlValue[] = []) => db.prepare(sql).get(...(params as never[])) as T,
-      rawAll: <T>(sql: string, params: SqlValue[] = []) => db.prepare(sql).all(...(params as never[])) as T[],
-      dispose: () => { try { db.close(); } catch { /* noop */ } },
-    };
-  },
-};
-
-const wasmFixture: DriverFixture = {
-  name: '@sqlite.org/sqlite-wasm',
-  async create() {
-    const initModule = sqlite3InitModule as unknown as (
-      config?: Record<string, unknown>
-    ) => ReturnType<typeof sqlite3InitModule>;
-    const sqlite3 = await initModule({ print: () => {}, printErr: () => {} });
-    const db = new sqlite3.oo1.DB(':memory:');
-    const capi = sqlite3.capi;
-    const req = (method: 'exec' | 'run' | 'all' | 'get', sql: string, params: SqlValue[] = []) =>
-      runWasmRequest(db, capi, { method, sql, params });
-    const driver: SqlDriver = {
-      exec: async (id) => { req('exec', SQL[id]); },
-      run: async (id, params = []) => req('run', SQL[id], params) as SqlRunResult,
-      all: async <T>(id: SqlId, params: SqlValue[] = []) => req('all', SQL[id], params) as T[],
-      get: async <T>(id: SqlId, params: SqlValue[] = []) => req('get', SQL[id], params) as T | undefined,
-      transaction: async (fn) => {
-        req('exec', SQL['engine.begin']);
-        try {
-          const result = await fn(driver);
-          req('exec', SQL['engine.commit']);
-          return result;
-        } catch (e) {
-          try { req('exec', SQL['engine.rollback']); } catch { /* noop */ }
-          throw e;
-        }
-      },
-      close: async () => { db.close(); },
-    };
-    return {
-      driver,
-      rawGet: <T>(sql: string, params: SqlValue[] = []) => req('get', sql, params) as T,
-      rawAll: <T>(sql: string, params: SqlValue[] = []) => req('all', sql, params) as T[],
-      dispose: () => { try { db.close(); } catch { /* noop */ } },
-    };
-  },
-};
 
 const chapter = (id: string, title: string, content: string): Chapter =>
   ({ id, title, content, order: 0, summary: '' } as unknown as Chapter);
