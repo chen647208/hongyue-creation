@@ -44,6 +44,9 @@
 - 拖拽分配：把字段拖入字段区显示该列，把类型拖入类型区按该类型筛选（原生 HTML5 拖放，无额外依赖）。
 - 布局持久化：视图类型、列、隐藏列、排序、类型筛选、读者设备宽度、内容区高度写入 `views` 表的 `ViewDefinition.config`，经 `genericModelStore` 读写；上次选中视图按作品记在 `localStore` 的 `views.selected`。
 - 视图管理：具名视图以可拖拽标签排列，拖动即重排并写回 `orderIndex`；底部拖动条调整内容区高度。
+- 导出：任意视图的投影结果（含计算列）经 `viewExport.ts` 序列化为 Markdown / CSV / HTML 表格；列头、竖线与换行（Markdown）、逗号与引号（CSV）、HTML 实体分别转义。桌面端走主进程另存为对话框，浏览器回退下载（`shared/services/fileSave.ts`）。
+- 计算列：公式操作符为四则、极值、文本拼接与文本长度；操作数写 `$名` 时取 `ComputedColumn.params` 中的数值（视图参数），引擎内不内置业务常数。
+- 视图预设：`viewPresets.ts` 以数据资源提供 ViewLayout 模板，视图面板「插入预设」按预设新建视图。分镜表预设（对应 `storyboard.shot`）列出镜号/景别/画面/台词/音效/时长，口播时长为计算列 `台词字数 ÷ $speechRate`，语速为可在自定义区修改的视图参数。
 
 ## 双轴时间线
 

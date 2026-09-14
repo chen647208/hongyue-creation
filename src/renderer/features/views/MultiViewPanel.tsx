@@ -10,26 +10,31 @@
 /** 多视图面板：同一份作品数据可在表格/卡片/图之间切换，布局存入 ViewDefinition。 */
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import type { Project } from '@shared/types';
-import { BookOpen, LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2 } from 'lucide-react';
+import { BookmarkPlus, BookOpen, FileDown, LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2 } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { useGenericModelStore } from '@/app/stores/genericModelStore';
 import { useTranslation } from '@/i18n';
+import { dt } from '@/i18n/dynamic';
+import { dialogService } from '@/shared/services/dialogService';
+import { saveTextFile } from '@/shared/services/fileSave';
 import { localStore } from '@/shared/services/localStore';
 import { Button } from '@/shared/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/shared/ui/DropdownMenu';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/shared/ui/DropdownMenu';
 import { Input } from '@/shared/ui/Input';
 import { Select } from '@/shared/ui/Select';
 import { ViewModeToggle } from '@/shared/ui/ViewModeToggle';
 import { cn } from '@/shared/utils/cn';
 
 import { buildEntityView } from './buildEntityView';
-import type { AggregationKind, ConditionOperator, QueryLeaf, ViewRow } from './types';
+import type { AggregationKind, ConditionOperator, QueryLeaf, ViewColumn, ViewRow } from './types';
 import ViewCards from './ViewCards';
+import { serializeViewTable, type TableFormat } from './viewExport';
 import ViewGraph from './ViewGraph';
 import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from './viewLayout';
 import ViewOutline from './ViewOutline';
+import { VIEW_PRESETS, type ViewPreset } from './viewPresets';
 import { aggregateRows, applyViewQuery } from './viewQuery';
 import ViewReader from './ViewReader';
 import ViewTable from './ViewTable';
@@ -161,6 +166,13 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     summary: t('views.col.summary'),
     detail: t('views.col.detail'),
   };
+  // 列标签：内置列走映射；预设列的 label 为 world 命名空间 i18n 键（`views.` 前缀）。
+  const columnLabel = (column: ViewColumn): string => {
+    const mapped = columnLabels[column.key];
+    if (mapped) return mapped;
+    return column.label.startsWith('views.') ? dt(`world:${column.label}`) : column.label;
+  };
+  const paramLabel = (name: string): string => dt(`world:views.computed.param.${name}`, { defaultValue: name });
   const queryFieldLabels: Record<string, string> = {
     kind: t('views.query.fields.kind'),
     title: t('views.query.fields.title'),
@@ -210,7 +222,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
       }),
     [data, layout.conditions, layout.computed, layout.aggregations],
   );
-  const displayColumns = projection.columns.map((column) => ({ ...column, label: columnLabels[column.key] ?? column.label }));
+  const displayColumns = projection.columns.map((column) => ({ ...column, label: columnLabel(column) }));
 
   const availableFields = useMemo(() => {
     const keys = new Set<string>();
@@ -243,6 +255,52 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   const removeAggregation = (index: number) => {
     const next = (layout.aggregations ?? []).filter((_, position) => position !== index);
     setLayout({ aggregations: next.length > 0 ? next : undefined });
+  };
+
+  const computedColumns = layout.computed ?? [];
+
+  const updateComputedParam = (key: string, name: string, value: number) => {
+    setLayout({
+      computed: computedColumns.map((column) =>
+        column.key === key ? { ...column, params: { ...(column.params ?? {}), [name]: value } } : column,
+      ),
+    });
+  };
+
+  const removeComputed = (key: string) => {
+    const next = computedColumns.filter((column) => column.key !== key);
+    setLayout({ computed: next.length > 0 ? next : undefined });
+  };
+
+  const insertPreset = async (preset: ViewPreset) => {
+    const id = `view:${project.id}:${crypto.randomUUID()}`;
+    await useGenericModelStore.getState().saveView({
+      id,
+      workId: project.id,
+      name: dt(`world:${preset.nameKey}`),
+      viewType: 'entity',
+      config: serializeViewLayout(preset.layout),
+      orderIndex: entityViews.length,
+    });
+    selectView(id);
+  };
+
+  const exportTable = (format: TableFormat) => {
+    const columns = displayColumns.filter((column) => !layout.hidden.includes(column.key));
+    const labels = Object.fromEntries(columns.map((column) => [column.key, column.label]));
+    const content = serializeViewTable({ columns, rows }, format, { labels });
+    const extension = format === 'md' ? 'md' : format === 'csv' ? 'csv' : 'html';
+    const mime = format === 'csv' ? 'text/csv' : format === 'html' ? 'text/html' : 'text/markdown';
+    const safeName = (activeView?.name ?? project.title).replace(/[\\/:*?"<>|]/g, '_');
+    const filename = `${project.title}_${safeName}.${extension}`;
+    void saveTextFile(filename, content, {
+      mime,
+      extension,
+      filterName: t('views.export.label'),
+      dialogTitle: t('views.export.label'),
+    }).catch((error) => {
+      dialogService.alert(t('views.export.failed', { error: error instanceof Error ? error.message : String(error) }));
+    });
   };
 
   const bodyHeight = liveHeight ?? layout.height ?? 440;
@@ -340,6 +398,36 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                   {column.label}
                 </DropdownMenuCheckboxItem>
               ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" title={t('views.preset.insert')}>
+                <BookmarkPlus className="size-3.5" />
+                {t('views.preset.insert')}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{t('views.preset.insert')}</DropdownMenuLabel>
+              {VIEW_PRESETS.map((preset) => (
+                <DropdownMenuItem key={preset.id} onSelect={() => void insertPreset(preset)}>
+                  <span>{dt(`world:${preset.nameKey}`)}</span>
+                  <span className="truncate text-2xs text-muted-foreground">{dt(`world:${preset.descriptionKey}`)}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" title={t('views.export.label')}>
+                <FileDown className="size-3.5" />
+                {t('views.export.label')}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => exportTable('md')}>{t('views.export.markdown')}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => exportTable('csv')}>{t('views.export.csv')}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => exportTable('html')}>{t('views.export.html')}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -458,6 +546,35 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                 <Plus className="size-3" />
                 {t('views.query.addAggregation')}
               </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-1 border-t border-border pt-2">
+              <span className="text-muted-foreground">{t('views.computed.title')}</span>
+              {computedColumns.length === 0 && <span className="text-muted-foreground/70">{t('views.computed.empty')}</span>}
+              {computedColumns.map((column) => (
+                <span key={column.key} className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5">
+                  <span>{columnLabel({ key: column.key, label: column.label })}</span>
+                  {Object.entries(column.params ?? {}).map(([name, value]) => (
+                    <label key={name} className="flex items-center gap-1">
+                      <span className="text-muted-foreground">{paramLabel(name)}</span>
+                      <Input
+                        type="number"
+                        value={value}
+                        onChange={(event) => updateComputedParam(column.key, name, Number(event.target.value))}
+                        aria-label={paramLabel(name)}
+                        className="h-6 w-16 text-2xs"
+                      />
+                    </label>
+                  ))}
+                  <button
+                    type="button"
+                    aria-label={t('views.computed.remove')}
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => removeComputed(column.key)}
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </span>
+              ))}
             </div>
           </div>
         </details>

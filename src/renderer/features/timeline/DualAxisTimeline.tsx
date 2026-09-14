@@ -8,17 +8,22 @@
  */
 
 /** 双轴时间线：张力曲线、多轨叙事、故事时间；可拖拽/裁剪/换轨/拆分/标记/吸附/缩放。 */
-import type { Project } from '@shared/types';
-import { AlertTriangle, Check, Flag, GitMerge, Plus, Scissors, Search, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
+import { uuidv7 } from '@core/entities';
+import type { Chapter, Project } from '@shared/types';
+import { AlertTriangle, ArrowDown, ArrowUp, Check, Flag, GitMerge, LayoutGrid, Plus, Redo2, Scissors, Search, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useTranslation } from '@/i18n';
 import { Button } from '@/shared/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
+import { Select } from '@/shared/ui/Select';
 import { cn } from '@/shared/utils/cn';
 
+import { commitDraftMatrix, moveInDraftMatrix, projectDraftMatrix } from './draftMatrix';
 import { checkTimelineConsistency, type TimelineIssue } from './timelineConsistency';
 import { buildTimelineModel, MIN_CLIP_DURATION, reorderChapters, snapTo, splitChapter, type TimelineClip } from './timelineModel';
+import { insertClip, type InsertMode, slideClip, type TimelineOperationKind } from './timelineOperations';
+import { useTimelineHistory } from './useTimelineHistory';
 
 interface DualAxisTimelineProps {
   project: Project;
@@ -54,9 +59,16 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
   const [selected, setSelected] = useState<string[]>([]);
   const [issues, setIssues] = useState<TimelineIssue[] | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  const [insertMode, setInsertMode] = useState<InsertMode>('ripple');
+  const [showMatrix, setShowMatrix] = useState(false);
   const [viewport, setViewport] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const dragOrigin = useRef<{ clipId: string; mode: DragMode; base: number } | null>(null);
+
+  const { canUndo, canRedo, commit, undo, redo } = useTimelineHistory(project, onUpdate);
+  const recordChapters = (kind: TimelineOperationKind, label: string, chapters: Chapter[]): void => {
+    commit({ kind, label, author: 'user' }, chapters);
+  };
 
   // 视口裁剪：只渲染可见范围内的片段，长书滚动不退化。
   useEffect(() => {
@@ -136,14 +148,14 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
       return;
     }
     if (state.mode === 'resize') {
-      onUpdate({ chapters: project.chapters.map((c) => (c.id === chapterId ? { ...c, duration: Math.max(MIN_CLIP_DURATION, state.value) } : c)) });
+      recordChapters('slide', t('dual.opSlide'), slideClip(project.chapters, chapterId, state.value));
     } else if (state.mode === 'tension') {
       onUpdate({ chapters: project.chapters.map((c) => (c.id === chapterId ? { ...c, tension: state.value } : c)) });
     } else {
       const targetTrackId = state.targetTrackId ?? chapter.trackId ?? model.tracks[0]?.id ?? 'main';
       const list = narrativeClips.filter((clip) => (clip.trackId ?? 'main') === targetTrackId && clip.entityId !== chapterId).sort((a, b) => a.start - b.start);
       const targetIndex = list.filter((clip) => clip.start + clip.duration / 2 < state.value).length;
-      onUpdate({ chapters: reorderChapters(project.chapters, model.tracks, chapterId, targetTrackId, targetIndex) });
+      recordChapters('move', t('dual.opMove'), reorderChapters(project.chapters, model.tracks, chapterId, targetTrackId, targetIndex));
     }
     dragOrigin.current = null;
     setDrag(null);
@@ -153,14 +165,14 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
     const chapterIds = selected.map((id) => id.replace('chapter:', '')).filter((id) => chaptersById.has(id));
     if (chapterIds.length < 2) return;
     const groupId = `group:${crypto.randomUUID()}`;
-    onUpdate({ chapters: project.chapters.map((chapter) => (chapterIds.includes(chapter.id) ? { ...chapter, groupId } : chapter)) });
+    recordChapters('move', t('dual.opMerge'), project.chapters.map((chapter) => (chapterIds.includes(chapter.id) ? { ...chapter, groupId } : chapter)));
     setSelected([]);
   };
 
   const unmergeSelected = () => {
     const chapterIds = selected.map((id) => id.replace('chapter:', '')).filter((id) => chaptersById.get(id)?.groupId);
     if (chapterIds.length === 0) return;
-    onUpdate({ chapters: project.chapters.map((chapter) => (chapterIds.includes(chapter.id) ? { ...chapter, groupId: undefined } : chapter)) });
+    recordChapters('move', t('dual.opUnmerge'), project.chapters.map((chapter) => (chapterIds.includes(chapter.id) ? { ...chapter, groupId: undefined } : chapter)));
     setSelected([]);
   };
 
@@ -196,11 +208,46 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
     const fraction = (playhead - target.start) / target.duration;
     const [left, right] = splitChapter(chapter, fraction, `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`);
     const next = project.chapters.flatMap((c) => (c.id === chapter.id ? [left, right] : [c])).map((c, order) => ({ ...c, order }));
-    onUpdate({ chapters: next });
+    recordChapters('insert', t('dual.opSplit'), next);
   };
 
   const toggleSelect = (clipId: string) => {
     setSelected((prev) => (prev.includes(clipId) ? prev.filter((id) => id !== clipId) : [...prev, clipId]));
+  };
+
+  /** 插入片段：有选中片段时相对其落位，否则追加到末尾；语义由 insertMode 决定。 */
+  const insertSegment = () => {
+    const sorted = [...project.chapters].sort((a, b) => a.order - b.order);
+    const selectedChapterId = selected.find((id) => id.startsWith('chapter:'))?.replace('chapter:', '');
+    const index = selectedChapterId ? sorted.findIndex((chapter) => chapter.id === selectedChapterId) : -1;
+    const position = index < 0 ? sorted.length : index + (insertMode === 'overwrite' ? 0 : 1);
+    const newChapter: Chapter = {
+      id: `chapter_${Date.now()}_${uuidv7()}`,
+      title: t('dual.newClipTitle'),
+      summary: '',
+      content: '',
+      order: 0,
+      duration: 1,
+      trackId: selectedChapterId ? chaptersById.get(selectedChapterId)?.trackId : undefined,
+    };
+    recordChapters('insert', t('dual.opInsert'), insertClip(sorted, { index: position, chapter: newChapter, mode: insertMode }));
+  };
+
+  // 草稿矩阵是 chapters 的投影，改一处写回同一份数据，成稿轨道随之更新
+  const matrix = useMemo(() => projectDraftMatrix(project), [project]);
+  const clipLabel = (clipId: string): string => chaptersById.get(clipId)?.title ?? clipId;
+
+  const moveMatrixClip = (clipId: string, direction: -1 | 1) => {
+    const lane = matrix.lanes.find((entry) => entry.clipIds.includes(clipId));
+    if (!lane) return;
+    const from = lane.clipIds.indexOf(clipId);
+    const to = from + direction;
+    if (to < 0 || to >= lane.clipIds.length) return;
+    recordChapters('move', t('dual.opMove'), commitDraftMatrix(project.chapters, moveInDraftMatrix(matrix, clipId, lane.trackId, to)));
+  };
+
+  const moveMatrixClipToTrack = (clipId: string, trackId: string) => {
+    recordChapters('move', t('dual.opMove'), commitDraftMatrix(project.chapters, moveInDraftMatrix(matrix, clipId, trackId, 0)));
   };
 
   const axisLabel = (id: 'narrative' | 'story'): string => (id === 'narrative' ? t('dual.axis.narrative') : t('dual.axis.story'));
@@ -244,6 +291,14 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
           <Button size="sm" variant="outline" disabled={selected.length === 0} onClick={() => void unmergeSelected()}><Undo2 className="size-3.5" />{t('dual.unmerge')}</Button>
           <Button size="sm" variant="outline" onClick={addMarker}><Flag className="size-3.5" />{t('dual.addMarker')}</Button>
           <Button size="sm" variant="outline" onClick={addTrack}><Plus className="size-3.5" />{t('dual.addTrack')}</Button>
+          <Button size="sm" variant="outline" disabled={!canUndo} onClick={undo} aria-label={t('dual.undo')} title={t('dual.undo')}><Undo2 className="size-3.5" /></Button>
+          <Button size="sm" variant="outline" disabled={!canRedo} onClick={redo} aria-label={t('dual.redo')} title={t('dual.redo')}><Redo2 className="size-3.5" /></Button>
+          <Select value={insertMode} onChange={(event) => setInsertMode(event.target.value as InsertMode)} className="h-8 w-auto text-sm" aria-label={t('dual.insertMode')}>
+            <option value="ripple">{t('dual.modeRipple')}</option>
+            <option value="overwrite">{t('dual.modeOverwrite')}</option>
+          </Select>
+          <Button size="sm" variant="outline" onClick={insertSegment}><Plus className="size-3.5" />{t('dual.insertClip')}</Button>
+          <Button size="sm" variant={showMatrix ? 'default' : 'outline'} onClick={() => setShowMatrix((value) => !value)}><LayoutGrid className="size-3.5" />{t('dual.matrix')}</Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -399,26 +454,26 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                           const index = list.findIndex((entry) => entry.entityId === chapterId);
                           if (event.key === 'ArrowLeft' && index > 0) {
                             event.preventDefault();
-                            onUpdate({ chapters: reorderChapters(project.chapters, model.tracks, chapterId, trackId, index - 1) });
+                            recordChapters('move', t('dual.opMove'), reorderChapters(project.chapters, model.tracks, chapterId, trackId, index - 1));
                           } else if (event.key === 'ArrowRight' && index < list.length - 1) {
                             event.preventDefault();
-                            onUpdate({ chapters: reorderChapters(project.chapters, model.tracks, chapterId, trackId, index + 1) });
+                            recordChapters('move', t('dual.opMove'), reorderChapters(project.chapters, model.tracks, chapterId, trackId, index + 1));
                           } else if (event.key === 'ArrowUp') {
                             event.preventDefault();
                             const trackIndex = model.tracks.findIndex((entry) => entry.id === trackId);
                             const target = model.tracks[trackIndex - 1];
-                            if (target) onUpdate({ chapters: reorderChapters(project.chapters, model.tracks, chapterId, target.id, 0) });
+                            if (target) recordChapters('move', t('dual.opMove'), reorderChapters(project.chapters, model.tracks, chapterId, target.id, 0));
                           } else if (event.key === 'ArrowDown') {
                             event.preventDefault();
                             const trackIndex = model.tracks.findIndex((entry) => entry.id === trackId);
                             const target = model.tracks[trackIndex + 1];
-                            if (target) onUpdate({ chapters: reorderChapters(project.chapters, model.tracks, chapterId, target.id, Number.MAX_SAFE_INTEGER) });
+                            if (target) recordChapters('move', t('dual.opMove'), reorderChapters(project.chapters, model.tracks, chapterId, target.id, Number.MAX_SAFE_INTEGER));
                           } else if (event.shiftKey && event.key === 'ArrowRight') {
                             event.preventDefault();
-                            onUpdate({ chapters: project.chapters.map((c) => (c.id === chapterId ? { ...c, duration: Math.max(MIN_CLIP_DURATION, (c.duration ?? 1) + 0.5) } : c)) });
+                            recordChapters('slide', t('dual.opSlide'), slideClip(project.chapters, chapterId, (chaptersById.get(chapterId)?.duration ?? 1) + 0.5));
                           } else if (event.shiftKey && event.key === 'ArrowLeft') {
                             event.preventDefault();
-                            onUpdate({ chapters: project.chapters.map((c) => (c.id === chapterId ? { ...c, duration: Math.max(MIN_CLIP_DURATION, (c.duration ?? 1) - 0.5) } : c)) });
+                            recordChapters('slide', t('dual.opSlide'), slideClip(project.chapters, chapterId, (chaptersById.get(chapterId)?.duration ?? 1) - 0.5));
                           }
                         }}
                         onPointerDown={(event) => {
@@ -477,6 +532,34 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {showMatrix && (
+          <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-medium">{t('dual.matrixTitle')}</span>
+              <span className="text-2xs text-muted-foreground">{t('dual.matrixHint')}</span>
+            </div>
+            {matrix.lanes.map((lane) => (
+              <div key={lane.trackId} className="space-y-1">
+                <div className="text-2xs font-medium text-muted-foreground">{matrix.tracks.find((track) => track.id === lane.trackId)?.label ?? lane.trackId}</div>
+                {lane.clipIds.length === 0 ? (
+                  <p className="px-2 py-1 text-2xs text-muted-foreground">{t('dual.matrixEmpty')}</p>
+                ) : (
+                  lane.clipIds.map((clipId, index) => (
+                    <div key={clipId} className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
+                      <span className="min-w-0 flex-1 truncate text-xs">{clipLabel(clipId)}</span>
+                      <Button size="icon" variant="ghost" className="size-6" aria-label={t('dual.moveUp')} disabled={index === 0} onClick={() => moveMatrixClip(clipId, -1)}><ArrowUp className="size-3" /></Button>
+                      <Button size="icon" variant="ghost" className="size-6" aria-label={t('dual.moveDown')} disabled={index === lane.clipIds.length - 1} onClick={() => moveMatrixClip(clipId, 1)}><ArrowDown className="size-3" /></Button>
+                      <Select value={lane.trackId} onChange={(event) => moveMatrixClipToTrack(clipId, event.target.value)} className="h-6 w-auto text-2xs" aria-label={t('dual.moveTrack')}>
+                        {matrix.tracks.map((track) => (<option key={track.id} value={track.id}>{track.label}</option>))}
+                      </Select>
+                    </div>
+                  ))
+                )}
+              </div>
+            ))}
           </div>
         )}
 

@@ -311,5 +311,11 @@
     "input": "输入 {{n}}",
     "output": "输出 {{n}}",
     "cacheRead": "缓存命中 {{n}}"
+  },
+  "trial": {
+    "label": "AI 试错：{{label}}",
+    "rollback": "回到任务前",
+    "confirm": "确认回滚",
+    "cancel": "取消"
   }
 }

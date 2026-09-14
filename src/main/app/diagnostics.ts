@@ -16,10 +16,10 @@ import path from 'node:path';
 
 import { app, type BrowserWindow, dialog, ipcMain } from 'electron';
 
+import { zipStore } from '../../core/build/zipStore.js';
 import { IPC } from '../channels.js';
 import { logger } from '../logger.js';
 import { type AppInfo,collectDiagnostics } from './diagnosticsCore.js';
-import { zipStore } from './zipStore.js';
 
 export function registerDiagnosticsIpc(getMainWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.exportDiagnostics, async () => {

@@ -47,9 +47,13 @@
 ## 导出与成稿字数
 
 - 导出统一走 `src/core/build` 三段式管线（选择→变换→渲染）：
-  `utils.ts` 的 `buildExportContent` 是管线适配器，txt/md/html 三格式
-  由渲染器注册表产出（渲染器与变换器均为插件贡献点）。
-- 导出弹窗内置「预览」：md 渲染 / html iframe / txt 等宽面板 + 成稿字数。
+  `utils.ts` 的 `buildExportContent` 是管线适配器，txt/md/html/rtf 由渲染器注册表产出
+  （渲染器与变换器均为插件贡献点）；`pdf/ePub/DOCX/ODT` 复用 HTML 管线产出后打包
+  （`buildExportPackage` → 主进程 STORE zip，`core/build/package.ts` 与 `core/build/odt.ts`
+  只产出文件集）。ODT 为最小 ODF：mimetype 首项无压缩 + manifest + content + styles，
+  标题按 `BuildHeadings.level` 写入 `text:outline-level`。
+- 导出弹窗的「编译编排」提供分卷/前言/后置节点选择器，以及素材口径、目录开关与深度、
+  标题层级、章节范围；这些覆盖项叠加在所选档案之上，预览与落盘同源。
 - 统计面板的 `builtCharCount` 与导出同源（`runBuild` 单一口径）。
 - Profile 支持 JSON/YAML 双序列化（`serializeProfileYaml`/`parseProfileYaml`），
   `.yml` 可 diff 可分享。

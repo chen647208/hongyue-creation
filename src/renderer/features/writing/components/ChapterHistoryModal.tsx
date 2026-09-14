@@ -12,7 +12,7 @@ import { Bot, Camera, Check, ChevronLeft, Copy, History, Redo2, RotateCcw, Trash
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { listSnapshots, removeSnapshot } from '@/shared/services/chapterSnapshotService';
+import { appendSnapshot, createSnapshot, listSnapshots, removeSnapshot } from '@/shared/services/chapterSnapshotService';
 import { dialogService } from '@/shared/services/dialogService';
 import { repository } from '@/shared/services/repository';
 import { Button } from '@/shared/ui/Button';
@@ -124,11 +124,28 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
     auto: { text: t('chapterHistory.sourceAuto'), cls: DEFAULT_SOURCE_CLS },
     manual: { text: t('chapterHistory.sourceManual'), cls: MANUAL_SOURCE_CLS },
     'before-clear': { text: t('chapterHistory.sourceBeforeClear'), cls: BEFORE_CLEAR_SOURCE_CLS },
+    'before-rollback': { text: t('chapterHistory.sourceBeforeRollback'), cls: BEFORE_CLEAR_SOURCE_CLS },
   };
   const fallbackSourceLabel = { text: t('chapterHistory.sourceAuto'), cls: DEFAULT_SOURCE_CLS };
 
   const handleRestoreSnapshot = (content: string) => {
-    onApplyContent(content);
+    if (onUpdateChapter) {
+      const withSnapshot = appendSnapshot(chapter, createSnapshot(chapter.content ?? '', 'before-rollback'));
+      onUpdateChapter({ ...withSnapshot, content });
+    } else {
+      onApplyContent(content);
+    }
+    onClose();
+  };
+
+  const handleApplyReview = () => {
+    if (onUpdateChapter) {
+      const withSnapshot = appendSnapshot(chapter, createSnapshot(chapter.content ?? '', 'before-rollback'));
+      onUpdateChapter({ ...withSnapshot, content: reviewMerged });
+    } else {
+      onApplyContent(reviewMerged);
+    }
+    dialogService.alert(t('chapterHistory.reviewApplied'));
     onClose();
   };
 
@@ -158,11 +175,7 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
           </Button>
           <Button
             size="sm"
-            onClick={() => {
-              onApplyContent(reviewMerged);
-              dialogService.alert(t('chapterHistory.reviewApplied'));
-              onClose();
-            }}
+            onClick={handleApplyReview}
           >
             <Redo2 className="size-3.5" /> {t('chapterHistory.reviewApply')}
           </Button>

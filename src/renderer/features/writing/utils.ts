@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { buildDocxFiles, buildEpubFiles, type BuildProfile,clampHeadingLevel, COMPILE_DEFAULTS,roundtripProfile, runBuild } from '@core/build';
+import { buildDocxFiles, buildEpubFiles, buildOdtFiles, type BuildProfile,clampHeadingLevel, COMPILE_DEFAULTS,roundtripProfile, runBuild } from '@core/build';
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '@core/entities';
 import { Bot, Brain, Cpu, Feather, type LucideIcon,Server } from 'lucide-react';
 
@@ -139,13 +139,17 @@ export const applyExportCompileOptions = (profile: BuildProfile, options: Export
     headings: { ...next.transform.headings, level: clampHeadingLevel(options.headingLevel) },
   };
   const existingToc = next.compile?.toc;
+  const tocDepth = Number.isInteger(options.tocDepth) ? Math.max(1, options.tocDepth) : COMPILE_DEFAULTS.tocMaxDepth;
   next.compile = {
     ...next.compile,
     toc: {
       enabled: options.tocEnabled,
       title: existingToc?.title || i18n.t('writing:export.tocTitle'),
-      maxDepth: existingToc?.maxDepth ?? COMPILE_DEFAULTS.tocMaxDepth,
+      maxDepth: tocDepth,
     },
+    volumeIds: options.volumeIds,
+    frontMatter: options.frontMatterIds,
+    backMatter: options.backMatterIds,
   };
   return next;
 };
@@ -243,8 +247,8 @@ export const buildExportContent = (project: Project, selectedChapterIds: Set<str
   return `${header}${text}\n\n`;
 };
 
-const EXPORT_EXT: Record<ExportFormat, string> = { txt: 'txt', md: 'md', html: 'html', rtf: 'rtf', pdf: 'pdf', epub: 'epub', docx: 'docx' };
-const EXPORT_MIME: Record<ExportFormat, string> = { txt: 'text/plain', md: 'text/markdown', html: 'text/html', rtf: 'application/rtf', pdf: 'application/pdf', epub: 'application/epub+zip', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+const EXPORT_EXT: Record<ExportFormat, string> = { txt: 'txt', md: 'md', html: 'html', rtf: 'rtf', pdf: 'pdf', epub: 'epub', docx: 'docx', odt: 'odt' };
+const EXPORT_MIME: Record<ExportFormat, string> = { txt: 'text/plain', md: 'text/markdown', html: 'text/html', rtf: 'application/rtf', pdf: 'application/pdf', epub: 'application/epub+zip', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', odt: 'application/vnd.oasis.opendocument.text' };
 
 export const buildExportFilename = (projectTitle: string, format: ExportFormat = 'txt', now: Date = new Date()) => {
   const safeTitle = projectTitle.replace(/[\\/:*?"<>|]/g, '_');
@@ -273,9 +277,9 @@ export const saveExportFile = async (filename: string, content: string, format: 
     printWindow.print();
     return;
   }
-  // ePub/DOCX：调用方传文件集（buildExportPackage），此处只负责保存
-  if (format === 'epub' || format === 'docx') {
-    throw new Error('ePub/DOCX 请走 savePackageFile（需文件集）');
+  // ePub/DOCX/ODT：调用方传文件集（buildExportPackage），此处只负责保存
+  if (format === 'epub' || format === 'docx' || format === 'odt') {
+    throw new Error('ePub/DOCX/ODT 请走 savePackageFile（需文件集）');
   }
   if (api?.saveFileDialog && api?.writeFile) {
     const result = await api.saveFileDialog({
@@ -291,12 +295,12 @@ export const saveExportFile = async (filename: string, content: string, format: 
 };
 
 /**
- * 出版文件集：HTML 管线产出 → ePub / DOCX 文件映射（主进程 STORE 打包）。
+ * 出版文件集：HTML 管线产出 → ePub / DOCX / ODT 文件映射（主进程 STORE 打包）。
  */
 export const buildExportPackage = (
   project: Project,
   selectedChapterIds: Set<string>,
-  format: 'epub' | 'docx',
+  format: 'epub' | 'docx' | 'odt',
   profileOverride?: BuildProfile,
   compileOptions?: ExportCompileOptions,
 ): Record<string, string> => {
@@ -309,7 +313,9 @@ export const buildExportPackage = (
     .replace(/<p class="intro">[\s\S]*?<\/p>/i, '')
     .trim();
   const input = { title: project.title, intro: project.intro, htmlBody: chaptersOnly };
-  return format === 'epub' ? buildEpubFiles(input) : buildDocxFiles(input);
+  if (format === 'epub') return buildEpubFiles(input);
+  if (format === 'docx') return buildDocxFiles(input);
+  return buildOdtFiles(input);
 };
 
 /**
@@ -318,7 +324,7 @@ export const buildExportPackage = (
 export const savePackageFile = async (
   filename: string,
   files: Record<string, string>,
-  format: 'epub' | 'docx',
+  format: 'epub' | 'docx' | 'odt',
   fallbackHtml: string,
 ): Promise<void> => {
   const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
@@ -326,7 +332,7 @@ export const savePackageFile = async (
     await api.exportPackage(files, filename);
     return;
   }
-  downloadTextFile(filename.replace(/\.(epub|docx)$/, '.html'), fallbackHtml, 'text/html');
+  downloadTextFile(filename.replace(/\.(epub|docx|odt)$/, '.html'), fallbackHtml, 'text/html');
 };
 
 export const downloadTextFile = (filename: string, content: string, mime = 'text/plain') => {

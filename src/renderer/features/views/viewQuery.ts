@@ -97,11 +97,28 @@ function formatNumber(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
 
-/** 对一行按计算列求值，返回显示文本；操作数不足或除零返回空串。 */
+/**
+ * 读出一个操作数：`$名` 取 params 中的数值，其余按字段读取。
+ */
+function readOperand(row: ViewRow, operand: string, params: Record<string, number> | undefined): unknown {
+  if (!operand.startsWith('$')) return readField(row, operand);
+  return params?.[operand.slice(1)];
+}
+
+/** 对一行按计算列求值，返回显示文本；操作数不足、参数缺失或除零返回空串。 */
 export function evaluateFormula(column: ComputedColumn, row: ViewRow): string {
-  const operands = column.operands.map((field) => readField(row, field));
+  const invalidParam = column.operands.some((operand) => {
+    if (!operand.startsWith('$')) return false;
+    const value = column.params?.[operand.slice(1)];
+    return typeof value !== 'number' || !Number.isFinite(value);
+  });
+  if (invalidParam) return '';
+  const operands = column.operands.map((operand) => readOperand(row, operand, column.params));
   if (column.operator === 'concat') {
     return operands.map((value) => toText(value)).filter((text) => text !== '').join(' ');
+  }
+  if (column.operator === 'length') {
+    return String(toText(operands[0]).length);
   }
   const numbers = operands.map((value) => toNumber(value)).filter((value): value is number => value !== null);
   if (numbers.length === 0) return '';
@@ -195,11 +212,13 @@ export function applyViewQuery(data: EntityViewData, query: ViewQuery | undefine
     .filter((row) => evaluateCondition(query?.conditions, row))
     .map((row) => {
       if (computed.length === 0) return row;
-      const cells = { ...row.cells };
+      // 按定义顺序求值：后一列可读取前一列刚写入的 cells（口播时长依赖字数计算列）。
+      let current: ViewRow = { ...row, cells: { ...row.cells } };
       for (const column of computed) {
-        cells[column.key] = evaluateFormula(column, row);
+        const value = evaluateFormula(column, current);
+        current = { ...current, cells: { ...current.cells, [column.key]: value } };
       }
-      return { ...row, cells };
+      return current;
     });
   const columns =
     computed.length === 0

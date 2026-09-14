@@ -130,6 +130,17 @@ describe('evaluateFormula', () => {
     expect(evaluateFormula({ key: 'x', label: 'x', operator: 'divide', operands: ['age', 'zero'] }, rows[0]!)).toBe('');
     expect(evaluateFormula({ key: 'x', label: 'x', operator: 'add', operands: ['missing'] }, rows[0]!)).toBe('');
   });
+
+  it('length 取文本长度，$参数 取用户参数', () => {
+    expect(evaluateFormula({ key: 'x', label: 'x', operator: 'length', operands: ['note'] }, rows[0]!)).toBe('11');
+    const withParam = { key: 'x', label: 'x', operator: 'divide' as const, operands: ['age', '$rate'], params: { rate: 10 } };
+    expect(evaluateFormula(withParam, rows[0]!)).toBe('3');
+  });
+
+  it('参数缺失时整条公式返回空串', () => {
+    const missing = { key: 'x', label: 'x', operator: 'divide' as const, operands: ['age', '$rate'] };
+    expect(evaluateFormula(missing, rows[0]!)).toBe('');
+  });
 });
 
 describe('aggregateRows', () => {
@@ -184,5 +195,17 @@ describe('applyViewQuery', () => {
     });
     expect(result.columns.map((column) => column.key)).toEqual(['kind', 'title', 'computed:double']);
     expect(result.rows[0]?.cells['computed:double']).toBe('60');
+  });
+
+  it('后一计算列可读前一计算列的结果', () => {
+    const data = makeData(makeRows());
+    const result = applyViewQuery(data, {
+      computed: [
+        { key: 'computed:len', label: '长度', operator: 'length', operands: ['note'] },
+        { key: 'computed:half', label: '半长', operator: 'divide', operands: ['computed:len', '$d'], params: { d: 2 } },
+      ],
+    });
+    expect(result.rows[0]?.cells['computed:len']).toBe('11');
+    expect(result.rows[0]?.cells['computed:half']).toBe('5.5');
   });
 });

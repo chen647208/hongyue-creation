@@ -56,15 +56,20 @@ export interface QueryGroup {
 /** 集合条件：叶子或分组，可序列化进 ViewDefinition.config。 */
 export type QueryCondition = QueryLeaf | QueryGroup;
 
-/** 计算列的操作符：四则、极值与文本拼接。 */
-export type FormulaOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'min' | 'max' | 'concat';
+/** 计算列的操作符：四则、极值、文本拼接与文本长度。 */
+export type FormulaOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'min' | 'max' | 'concat' | 'length';
 
-/** 计算列：对 operands 中的字段做简单计算，结果写入 row.cells[key]。 */
+/**
+ * 计算列：对 operands 中的字段做简单计算，结果写入 row.cells[key]。
+ * operands 写字段名取行内值；写 `$参数名` 取 params 中的数值（语速一类不内置常数）。
+ */
 export interface ComputedColumn {
   key: string;
   label: string;
   operator: FormulaOperator;
   operands: string[];
+  /** 视图/用户参数（数值），操作数 `$名` 在此取值。 */
+  params?: Record<string, number>;
   width?: number;
 }
 

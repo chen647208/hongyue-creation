@@ -57,9 +57,54 @@ const FORMAT_OPTIONS: Array<{ value: ExportFormat; label: string; icon: LucideIc
   { value: 'pdf', label: 'PDF', icon: FileDown },
   { value: 'epub', label: 'ePub', icon: Package },
   { value: 'docx', label: 'DOCX', icon: Package },
+  { value: 'odt', label: 'ODT', icon: Package },
 ];
 
 const MATERIAL_POLICY_OPTIONS = ['exclude', 'include', 'prefer'] as const;
+
+/**
+ * 节点多选：把章节指派为分卷/前言/后置角色。
+ * 候选项为本次导出选中的章节；点按切换，选中态用主色标记。
+ */
+const MatterPicker: React.FC<{
+  label: string;
+  hint: string;
+  chapters: Chapter[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+}> = ({ label, hint, chapters, selectedIds, onToggle }) => {
+  const selected = new Set(selectedIds);
+  return (
+    <div className="flex items-start gap-2">
+      <span className="w-12 shrink-0 pt-0.5 text-xs text-muted-foreground">{label}</span>
+      {chapters.length === 0 ? (
+        <span className="pt-0.5 text-xs text-muted-foreground">{hint}</span>
+      ) : (
+        <div className="flex max-h-20 flex-1 flex-wrap gap-1 overflow-y-auto">
+          {chapters.map((chapter) => {
+            const on = selected.has(chapter.id);
+            return (
+              <button
+                key={chapter.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onToggle(chapter.id)}
+                className={cn(
+                  'rounded-full border px-2 py-0.5 text-2xs transition-colors',
+                  on ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent/40',
+                )}
+              >
+                {chapter.title}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const toggleId = (ids: string[], id: string): string[] => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
 
 const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
   isOpen,
@@ -84,6 +129,8 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
 }) => {
   const { t } = useTranslation('writing');
   const sortedChapters = [...chapters].sort((a, b) => a.order - b.order);
+  // 角色选择器候选项限定为本次导出选中的章节（未选中的不会出现在产物里）。
+  const selectableChapters = sortedChapters.filter((chapter) => selectedChapterIds.has(chapter.id));
   const [showPreview, setShowPreview] = useState(false);
   const [profileName, setProfileName] = useState('');
   const profiles = buildProfileRegistry.list();
@@ -96,7 +143,7 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
         ? buildExportContent(
             project,
             selectedChapterIds,
-            format === 'pdf' || format === 'epub' || format === 'docx' ? 'html' : format,
+            format === 'pdf' || format === 'epub' || format === 'docx' || format === 'odt' ? 'html' : format,
             exportProfile,
           )
         : '',
@@ -170,6 +217,20 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
             className="text-xs"
           />
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            {t('export.tocDepthLabel')}
+            <Select
+              value={String(exportCompile.tocDepth)}
+              onChange={(e) => onExportCompileChange({ tocDepth: Number(e.target.value) })}
+              disabled={!exportCompile.tocEnabled}
+              aria-label={t('export.tocDepthLabel')}
+              className="h-7 w-auto min-w-[56px] text-xs"
+            >
+              {[1, 2, 3, 4, 5, 6].map((depth) => (
+                <option key={depth} value={String(depth)}>{depth}</option>
+              ))}
+            </Select>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
             {t('export.headingLevelLabel')}
             <Select
               value={String(exportCompile.headingLevel)}
@@ -204,6 +265,31 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
               className="h-7 w-16 text-xs"
             />
           </label>
+        </div>
+
+        <div className="shrink-0 space-y-1.5 border-b border-border px-6 py-2">
+          <div className="text-xs font-medium text-muted-foreground">{t('export.compileSection')}</div>
+          <MatterPicker
+            label={t('export.volumeLabel')}
+            hint={t('export.matterEmpty')}
+            chapters={selectableChapters}
+            selectedIds={exportCompile.volumeIds}
+            onToggle={(id) => onExportCompileChange({ volumeIds: toggleId(exportCompile.volumeIds, id) })}
+          />
+          <MatterPicker
+            label={t('export.frontMatterLabel')}
+            hint={t('export.matterEmpty')}
+            chapters={selectableChapters}
+            selectedIds={exportCompile.frontMatterIds}
+            onToggle={(id) => onExportCompileChange({ frontMatterIds: toggleId(exportCompile.frontMatterIds, id) })}
+          />
+          <MatterPicker
+            label={t('export.backMatterLabel')}
+            hint={t('export.matterEmpty')}
+            chapters={selectableChapters}
+            selectedIds={exportCompile.backMatterIds}
+            onToggle={(id) => onExportCompileChange({ backMatterIds: toggleId(exportCompile.backMatterIds, id) })}
+          />
         </div>
 
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-6 py-2">

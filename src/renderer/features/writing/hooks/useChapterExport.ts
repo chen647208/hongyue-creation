@@ -11,7 +11,7 @@
  * 章节导出编排（从 WritingEditor 抽出）：选择章节/格式/编译档案/覆盖项并执行落盘。
  * 编译覆盖项叠加在所选档案之上，预览与落盘共用同一生效档案（所见即导出）。
  */
-import { type BuildProfile, clampHeadingLevel, validateProfile } from '@core/build';
+import { type BuildProfile, clampHeadingLevel, COMPILE_DEFAULTS, validateProfile } from '@core/build';
 import type { TFunction } from 'i18next';
 import { useMemo, useState } from 'react';
 
@@ -45,9 +45,13 @@ function optionsFromProfile(profile: BuildProfile | undefined): ExportCompileOpt
   return {
     materialPolicy: profile?.selection.materialPolicy ?? 'exclude',
     tocEnabled: profile?.compile?.toc?.enabled ?? false,
+    tocDepth: profile?.compile?.toc?.maxDepth ?? COMPILE_DEFAULTS.tocMaxDepth,
     headingLevel: clampHeadingLevel(profile?.transform.headings.level),
     rangeFrom: profile?.selection.range?.from ?? null,
     rangeTo: profile?.selection.range?.to ?? null,
+    volumeIds: profile?.compile?.volumeIds ?? [],
+    frontMatterIds: profile?.compile?.frontMatter ?? [],
+    backMatterIds: profile?.compile?.backMatter ?? [],
   };
 }
 
@@ -140,7 +144,7 @@ export function useChapterExport({ project, t }: UseChapterExportOptions) {
     setError(null);
     const filename = buildExportFilename(project.title, format);
     try {
-      if (format === 'epub' || format === 'docx') {
+      if (format === 'epub' || format === 'docx' || format === 'odt') {
         const files = buildExportPackage(project, selectedIds, format, effectiveProfile);
         const fallbackHtml = buildExportContent(project, selectedIds, 'html', effectiveProfile);
         await savePackageFile(filename, files, format, fallbackHtml);

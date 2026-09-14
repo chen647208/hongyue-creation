@@ -311,5 +311,11 @@
     "input": "in {{n}}",
     "output": "out {{n}}",
     "cacheRead": "cache {{n}}"
+  },
+  "trial": {
+    "label": "AI trial: {{label}}",
+    "rollback": "Back to before task",
+    "confirm": "Confirm rollback",
+    "cancel": "Cancel"
   }
 }

@@ -14,6 +14,7 @@ export {
   escapeXml,
   wrapTitle,
 } from './cover.js';
+export { buildOdtFiles, htmlToOdtBlocks } from './odt.js';
 export {
   buildDocxFiles,
   buildEpubFiles,

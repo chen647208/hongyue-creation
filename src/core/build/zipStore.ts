@@ -9,8 +9,9 @@
 
 /**
  * STORE 模式 zip 打包器（docs/design/13）：无压缩，只写结构。
- * ePub/DOCX 本质是 zip；手写约 80 行，零依赖，可单测。
- * 文件顺序按传入顺序（ePub 要求 mimetype 首项无压缩，调用方保证）。
+ * ePub/DOCX/ODT 本质是 zip；手写约 80 行，零依赖，可单测。
+ * 文件顺序按传入顺序（ePub/ODT 要求 mimetype 首项无压缩，调用方保证）。
+ * 打包逻辑归构建层：主进程只做另存对话框与落盘（exportPackage / diagnostics）。
  */
 
 const CRC_TABLE: Uint32Array = (() => {

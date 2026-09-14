@@ -231,8 +231,8 @@ export interface ChapterSnapshot {
   content: string;
   timestamp: number;
   charCount: number;
-  /** 快照来源：自动定时 / 手动 / 清空前 */
-  source: 'auto' | 'manual' | 'before-clear';
+  /** 快照来源：自动定时 / 手动 / 清空前 / 回滚前 */
+  source: 'auto' | 'manual' | 'before-clear' | 'before-rollback';
 }
 
 /**

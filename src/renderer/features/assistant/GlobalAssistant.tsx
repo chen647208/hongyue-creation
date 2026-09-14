@@ -28,6 +28,7 @@ import AssistantChatWorkspace from './components/AssistantChatWorkspace';
 import AssistantContextPanel from './components/AssistantContextPanel';
 import AssistantEditPanel from './components/AssistantEditPanel';
 import AssistantInjectionPanel from './components/AssistantInjectionPanel';
+import TrialSnapshotButton from './components/TrialSnapshotButton';
 import { useAssistantCards } from './hooks/useAssistantCards';
 import { useAssistantChat } from './hooks/useAssistantChat';
 import { useModelSelection } from './hooks/useModelSelection';
@@ -648,6 +649,8 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
               onClose={() => setInjectionPanelOpen(false)}
             />
           )}
+
+          {onUpdate ? <TrialSnapshotButton projectId={project?.id} onUpdate={onUpdate} /> : null}
 
           <AssistantChatWorkspace
             chatContainerRef={chatContainerRef}

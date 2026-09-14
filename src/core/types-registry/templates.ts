@@ -414,6 +414,8 @@ const SCRIPT_TEMPLATES: TypeTemplate[] = [
       { key: 'duration', label: '时长（秒）', type: 'number' },
       { key: 'image', label: '画面', type: 'image' },
       { key: 'description', label: '画面描述', type: 'richtext' },
+      { key: 'dialogue', label: '台词', type: 'richtext' },
+      { key: 'sound', label: '音效', type: 'text' },
       { key: 'scene', label: '所属场次', type: 'ref', refType: 'script.scene' },
     ],
     views: ['corkboard', 'table'],

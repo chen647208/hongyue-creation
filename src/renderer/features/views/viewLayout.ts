@@ -37,7 +37,7 @@ const CONDITION_OPERATORS: readonly ConditionOperator[] = [
   'notEmpty',
 ];
 
-const FORMULA_OPERATORS: readonly FormulaOperator[] = ['add', 'subtract', 'multiply', 'divide', 'min', 'max', 'concat'];
+const FORMULA_OPERATORS: readonly FormulaOperator[] = ['add', 'subtract', 'multiply', 'divide', 'min', 'max', 'concat', 'length'];
 
 const AGGREGATION_KINDS: readonly AggregationKind[] = ['count', 'sum', 'avg', 'longest', 'latest'];
 
@@ -101,6 +101,13 @@ function parseComputedColumns(value: unknown): ComputedColumn[] | undefined {
       operands,
     };
     if (typeof record.width === 'number') column.width = record.width;
+    if (typeof record.params === 'object' && record.params !== null && !Array.isArray(record.params)) {
+      const params: Record<string, number> = {};
+      for (const [name, value] of Object.entries(record.params as Record<string, unknown>)) {
+        if (typeof value === 'number' && Number.isFinite(value)) params[name] = value;
+      }
+      if (Object.keys(params).length > 0) column.params = params;
+    }
     columns.push(column);
   }
   return columns.length > 0 ? columns : undefined;

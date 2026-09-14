@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildEntityView } from '../buildEntityView';
 import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from '../viewLayout';
+import { findViewPreset } from '../viewPresets';
 
 function makeCharacter(overrides: Partial<Character> & Pick<Character, 'id' | 'name'>): Character {
   return {
@@ -144,5 +145,27 @@ describe('viewLayout 编解码', () => {
     expect(restored.conditions).toBeUndefined();
     expect(restored.computed).toBeUndefined();
     expect(restored.aggregations).toBeUndefined();
+  });
+});
+
+describe('视图预设', () => {
+  it('分镜表预设含分镜列与口播时长计算列', () => {
+    const preset = findViewPreset('preset:storyboard');
+    expect(preset?.templateId).toBe('storyboard.shot');
+    const columns = preset?.layout.columns.map((column) => column.key) ?? [];
+    expect(columns).toEqual(
+      expect.arrayContaining(['shotNumber', 'framing', 'image', 'dialogue', 'sound', 'duration']),
+    );
+    const speak = preset?.layout.computed?.find((column) => column.key === 'computed:shotSpeakDuration');
+    expect(speak?.operands).toEqual(['computed:shotWordCount', '$speechRate']);
+    expect(speak?.params?.speechRate).toBeGreaterThan(0);
+    expect(findViewPreset('preset:missing')).toBeUndefined();
+  });
+
+  it('预设布局序列化往返保留计算列参数', () => {
+    const preset = findViewPreset('preset:storyboard');
+    const restored = parseViewLayout(serializeViewLayout(preset!.layout));
+    expect(restored.computed).toEqual(preset!.layout.computed);
+    expect(restored.kind).toBe('table');
   });
 });

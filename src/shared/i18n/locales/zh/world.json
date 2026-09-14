@@ -39,6 +39,38 @@
       "summary": "摘要",
       "detail": "详情"
     },
+    "export": {
+      "label": "导出表格",
+      "markdown": "Markdown 表格",
+      "csv": "CSV 表格",
+      "html": "HTML 表格",
+      "failed": "导出失败：{{error}}"
+    },
+    "preset": {
+      "insert": "插入预设",
+      "storyboard": {
+        "name": "分镜表",
+        "description": "镜号、景别、画面、台词、音效、时长与口播时长",
+        "col": {
+          "shotNumber": "镜号",
+          "framing": "景别",
+          "image": "画面",
+          "dialogue": "台词",
+          "sound": "音效",
+          "duration": "时长（秒）",
+          "wordCount": "台词字数",
+          "speakDuration": "口播时长（秒）"
+        }
+      }
+    },
+    "computed": {
+      "title": "计算列",
+      "empty": "暂无计算列，插入预设获取示例",
+      "remove": "移除计算列",
+      "param": {
+        "speechRate": "语速（字/秒）"
+      }
+    },
     "query": {
       "conditions": "筛选条件",
       "noConditions": "暂无筛选条件，显示全部",

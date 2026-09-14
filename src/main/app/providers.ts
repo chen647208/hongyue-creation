@@ -259,7 +259,7 @@ export const fileProvider: Provider = {
         }
         clean[name] = content;
       }
-      const { zipStore } = await import('./zipStore.js');
+      const { zipStore } = await import('../../core/build/zipStore.js');
       const zip = zipStore(clean);
       const saveOptions = {
         title: '导出文件',

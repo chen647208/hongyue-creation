@@ -203,6 +203,7 @@ export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBloc
   const blockTexts = collectBlockTexts(nodes.map((n) => n.body));
 
   const volumeTypes = compile?.volumeTypes ?? [];
+  const volumeIdSet = new Set(compile?.volumeIds ?? []);
   const volumeHeading = compile?.volumeHeading ?? COMPILE_DEFAULTS.volumeHeading;
   const frontIds = compile?.frontMatter ?? [];
   const backIds = compile?.backMatter ?? [];
@@ -221,7 +222,7 @@ export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBloc
     // 素材按口径纳入设定集时不受 hide 限制（否则设定集只选到却不渲染）
     if (headings.hide.includes(node.type) && !node.material) continue;
 
-    if (volumeTypes.some((pattern) => typeMatches(node.type, pattern))) {
+    if (volumeIdSet.has(node.id) || volumeTypes.some((pattern) => typeMatches(node.type, pattern))) {
       volumeNo += 1;
       const text = headingText(volumeHeading, volumeNo, node.title);
       const volumeLevel = Math.max(1, level - 1);

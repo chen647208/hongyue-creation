@@ -20,10 +20,18 @@ import type { BlockRefIndex, ResolvedBlockProjection } from '../../editor/blockR
 export interface ExportCompileOptions {
   materialPolicy: MaterialPolicy;
   tocEnabled: boolean;
+  /** 目录收录深度（相对章节层级）；1 只收章节，更大含分卷与更深标题。 */
+  tocDepth: number;
   headingLevel: number;
   /** 章节范围（按构建序，1 起，含端点）；null 表示不限。 */
   rangeFrom: number | null;
   rangeTo: number | null;
+  /** 作为分卷标题的节点 id（章节）。 */
+  volumeIds: string[];
+  /** 前置页节点 id，按给定顺序置于正文前。 */
+  frontMatterIds: string[];
+  /** 后置页节点 id，按给定顺序置于正文后。 */
+  backMatterIds: string[];
 }
 
 /** 编辑器纸张样式。 */
@@ -36,7 +44,7 @@ export interface EditorCollaboration {
 }
 
 /** 导出格式（单源，避免 types↔utils 循环）。 */
-export type ExportFormat = 'txt' | 'md' | 'html' | 'rtf' | 'pdf' | 'epub' | 'docx';
+export type ExportFormat = 'txt' | 'md' | 'html' | 'rtf' | 'pdf' | 'epub' | 'docx' | 'odt';
 
 /** 单章统计（单源，避免 types↔service 循环）。 */
 export interface ChapterStats {

@@ -45,6 +45,7 @@ import { aiGatewayClient } from '@/shared/services/ai/gatewayClient.js';
 import { syncMcpTools } from '@/shared/services/mcpClient';
 import { runPluginLogic } from '@/shared/services/pluginService';
 
+import { aiTrialSnapshots } from './aiTrialSnapshotService';
 import { buildHistoryText } from './chatHistory.js';
 import { runSkillHandler } from './skillHandlerService';
 
@@ -200,6 +201,14 @@ export class AiSessionManager {
       sink,
     });
     this.lastSession = session;
+
+    // AI 试错门：会话开始前落一份章节快照，会话内可回滚；不写正式历史
+    aiTrialSnapshots.begin({
+      sessionId,
+      bookId: input.bookId,
+      label: input.task,
+      chapters: input.project?.chapters ?? [],
+    });
 
     // MCP：自举内置 server（进程内直连）+ 本轮启用的外部 server（失败记事件不进聊天）
     if (typeof window !== 'undefined' && window.electronAPI?.mcpClient) {

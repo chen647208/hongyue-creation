@@ -39,6 +39,38 @@
       "summary": "Summary",
       "detail": "Detail"
     },
+    "export": {
+      "label": "Export table",
+      "markdown": "Markdown table",
+      "csv": "CSV table",
+      "html": "HTML table",
+      "failed": "Export failed: {{error}}"
+    },
+    "preset": {
+      "insert": "Insert preset",
+      "storyboard": {
+        "name": "Storyboard",
+        "description": "Shot number, framing, image, dialogue, sound, duration and spoken length",
+        "col": {
+          "shotNumber": "Shot no.",
+          "framing": "Framing",
+          "image": "Image",
+          "dialogue": "Dialogue",
+          "sound": "Sound",
+          "duration": "Duration (s)",
+          "wordCount": "Dialogue length",
+          "speakDuration": "Spoken length (s)"
+        }
+      }
+    },
+    "computed": {
+      "title": "Computed columns",
+      "empty": "No computed columns. Insert a preset for an example.",
+      "remove": "Remove computed column",
+      "param": {
+        "speechRate": "Speech rate (chars/s)"
+      }
+    },
     "query": {
       "conditions": "Filters",
       "noConditions": "No filters, showing all",

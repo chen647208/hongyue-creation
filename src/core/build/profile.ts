@@ -90,6 +90,8 @@ export interface BuildCompile {
   toc?: BuildToc;
   /** 分卷类型模板 id（如 'novel.part'），命中即产出分卷标题。 */
   volumeTypes?: string[];
+  /** 分卷节点 id；导出对话框按章节指定分卷标题时使用，与 volumeTypes 取并集。 */
+  volumeIds?: string[];
   /** 分卷标题模板：%N 卷号 %T 标题。缺省「第%N卷 %T」。 */
   volumeHeading?: string;
   /** 前置页节点 id，按给定顺序置于正文前（前言/序）。 */
@@ -257,7 +259,7 @@ export function validateProfile(profile: BuildProfile | null | undefined): strin
     errors.push('目录深度 compile.toc.maxDepth 必须是不小于 1 的整数');
   }
 
-  for (const key of ['frontMatter', 'backMatter'] as const) {
+  for (const key of ['frontMatter', 'backMatter', 'volumeIds'] as const) {
     const value = profile.compile?.[key];
     if (value !== undefined && (!Array.isArray(value) || value.some((id) => typeof id !== 'string'))) {
       errors.push(`compile.${key} 必须是节点 id 字符串数组`);
@@ -293,6 +295,7 @@ export function normalizeProfile(profile: BuildProfile): BuildProfile {
   clone.compile = {
     ...clone.compile,
     volumeTypes: clone.compile?.volumeTypes ?? [],
+    volumeIds: clone.compile?.volumeIds ?? [],
     volumeHeading: clone.compile?.volumeHeading ?? COMPILE_DEFAULTS.volumeHeading,
     frontMatter: clone.compile?.frontMatter ?? [],
     backMatter: clone.compile?.backMatter ?? [],
