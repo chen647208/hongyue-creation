@@ -24,7 +24,7 @@ interface VersionBadgeProps {
 export const VersionBadge: React.FC<VersionBadgeProps> = ({ className, prefix = '' }) => (
   <span
     className={cn(
-      'rounded border border-border px-1.5 py-0.5 font-mono text-2xs text-muted-foreground',
+      'rounded border border-border px-1.5 py-0.5 font-mono text-2xs text-foreground/70',
       className
     )}
     title={getDisplayVersion()}
