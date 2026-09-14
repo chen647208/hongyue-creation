@@ -1178,6 +1178,8 @@ export interface ElectronAPI {
   pluginFetch: (url: string) => Promise<{ ok: boolean; status?: number; text?: string; error?: string }>;
   /** 校验插件包签名（Ed25519，主进程持私钥无关的公开校验）。 */
   pluginVerifySignature: (contentBase64: string, signatureBase64: string, publicKeyPem: string) => Promise<boolean>;
+  pluginTrustedKeysSync?: (keys: string[]) => Promise<{ ok: boolean }>;
+  pluginTrustedKeysList?: () => Promise<string[]>;
   /** 校验 sha256 摘要信封（完整性，不认证来源）。 */
   pluginDigestMatches: (contentBase64: string, digestBase64: string) => Promise<boolean>;
   /** 用外部 cosign bundle 校验 blob；缺信任锚或 cosign 不可用返回 false。 */

@@ -27,6 +27,7 @@ import { allowPath, allowRoot, assertPathAllowed } from './fsAccess.js';
 import { registerPluginFsIpc } from './pluginFs.js';
 import { sandboxHost } from './pluginSandbox/host.js';
 import { type CosignVerifyInput, sha256Matches, verifyCosignBlob,verifyEd25519 } from './pluginSignature.js';
+import { isTrustedPluginKey, listTrustedPluginKeys, setTrustedPluginKeys } from './pluginTrust.js';
 import { destroyTray, registerShellIpc } from './tray.js';
 import { applyWindowSecurity, createWindow, getMainWindow } from './window.js';
 
@@ -177,9 +178,20 @@ export const fileProvider: Provider = {
     });
     ipcMain.handle(
       IPC.pluginVerifySignature,
-      (_event, contentBase64: string, signatureBase64: string, publicKeyPem: string) =>
-        verifyEd25519(Buffer.from(contentBase64, 'base64'), signatureBase64, publicKeyPem),
+      (_event, contentBase64: string, signatureBase64: string, publicKeyPem: string) => {
+        // 主进程持有信任清单：不在清单内的公钥一律拒绝，渲染层不得自定锚点。
+        if (typeof publicKeyPem !== 'string' || !isTrustedPluginKey(publicKeyPem)) {
+          return false;
+        }
+        return verifyEd25519(Buffer.from(contentBase64, 'base64'), signatureBase64, publicKeyPem);
+      },
     );
+    ipcMain.handle(IPC.pluginTrustedKeysSync, (_event, keys: unknown) => {
+      if (!Array.isArray(keys)) throw new TypeError('Invalid keys');
+      setTrustedPluginKeys(keys.filter((key): key is string => typeof key === 'string'));
+      return { ok: true };
+    });
+    ipcMain.handle(IPC.pluginTrustedKeysList, () => listTrustedPluginKeys());
     ipcMain.handle(IPC.pluginDigestMatches, (_event, contentBase64: string, digestBase64: string) =>
       sha256Matches(Buffer.from(contentBase64, 'base64'), digestBase64),
     );

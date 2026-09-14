@@ -98,6 +98,7 @@ function readTrustedPluginKeys(): string[] | undefined {
 export function saveTrustedPluginKeys(keys: readonly string[]): void {
   localStore.setItem(STORAGE_KEYS.trustedPluginKeys, JSON.stringify(keys));
   setTrustedPluginKeys(keys);
+  void window.electronAPI?.pluginTrustedKeysSync?.([...keys]);
 }
 
 /** 配置允许的插件来源白名单；空清单表示不限制来源。 */
@@ -373,6 +374,17 @@ export async function bootstrapPlugins(deps: PluginDeps, hostVersion: string, di
   try {
     const storedKeys = readTrustedPluginKeys();
     if (storedKeys) setTrustedPluginKeys(storedKeys);
+    // 信任清单同步到主进程：签名校验以主进程清单为准。
+    const trustApi = typeof window === 'undefined' ? undefined : window.electronAPI;
+    if (trustApi?.pluginTrustedKeysList) {
+      const mainKeys = await trustApi.pluginTrustedKeysList();
+      if (mainKeys.length > 0) {
+        setTrustedPluginKeys(mainKeys);
+        localStore.setItem(STORAGE_KEYS.trustedPluginKeys, JSON.stringify(mainKeys));
+      } else if (storedKeys && trustApi.pluginTrustedKeysSync) {
+        await trustApi.pluginTrustedKeysSync([...storedKeys]);
+      }
+    }
     const storedSources = readAllowedPluginSources();
     if (storedSources) setAllowedPluginSources(storedSources);
     await discoverAndLoad(host);

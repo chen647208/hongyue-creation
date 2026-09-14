@@ -34,6 +34,8 @@ export const IPC = {
   pluginSandboxRun: 'plugin-sandbox-run',
   pluginFetch: 'plugin-fetch',
   pluginVerifySignature: 'plugin-verify-signature',
+  pluginTrustedKeysSync: 'plugin-trusted-keys-sync',
+  pluginTrustedKeysList: 'plugin-trusted-keys-list',
   pluginDigestMatches: 'plugin-digest-matches',
   pluginCosignVerify: 'plugin-cosign-verify',
   crashGetConfig: 'crash:get-config',

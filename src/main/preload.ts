@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pluginFetch: (url: string) => ipcRenderer.invoke(IPC.pluginFetch, url),
   pluginVerifySignature: (contentBase64: string, signatureBase64: string, publicKeyPem: string) =>
     ipcRenderer.invoke(IPC.pluginVerifySignature, contentBase64, signatureBase64, publicKeyPem),
+  pluginTrustedKeysSync: (keys: string[]) => ipcRenderer.invoke(IPC.pluginTrustedKeysSync, keys),
+  pluginTrustedKeysList: () => ipcRenderer.invoke(IPC.pluginTrustedKeysList),
   pluginDigestMatches: (contentBase64: string, digestBase64: string) =>
     ipcRenderer.invoke(IPC.pluginDigestMatches, contentBase64, digestBase64),
   pluginCosignVerify: (contentBase64: string, envelope: { bundle: string; publicKey?: string; certificateIdentity?: string; certificateOidcIssuer?: string }) =>
