@@ -8,7 +8,7 @@ import { cleanupUserDataDir, createBook, launchApp } from './helpers';
 const require = createRequire(import.meta.url);
 const axeSource = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
-interface AxeNode { target: unknown }
+interface AxeNode { target: unknown; html?: string; failureSummary?: string }
 interface AxeViolation { id: string; impact?: string | null; help: string; nodes: AxeNode[] }
 
 /** 跑 axe（wcag2a/aa）并只返回 serious/critical 违规。 */
@@ -30,6 +30,8 @@ const summary = (label: string, violations: AxeViolation[]) =>
     nodes: v.nodes.length,
     help: v.help,
     targets: v.nodes.map((n) => n.target),
+    html: v.nodes.map((n) => n.html),
+    detail: v.nodes.map((n) => n.failureSummary),
   }));
 
 /**
