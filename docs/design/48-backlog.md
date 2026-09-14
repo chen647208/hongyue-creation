@@ -15,13 +15,9 @@
 
 | 编号 | 任务 | 依据 | 依赖 | 验收 | 规模 |
 |---|---|---|---|---|---|
-| 0.1 | `features/cards/` 空目录归位：卡片能力从 `shared/services/cards` 收敛到功能域 | 审计 | 无 | 目录与 `core.cards` feature 声明一致，导入路径统一 | 小 |
 | 0.2 | `foreshadowing`/`consistency` 域分层归位：核心逻辑回功能域 | 审计 | 无 | 域内自带服务与面板，shared 只留跨域通用 | 小 |
 | 0.3 | 插件逻辑贡献执行面补齐：`contributes.logic/renderers/editor` 在宿主全量落地 | 审计、22 | 无 | 声明后的逻辑/渲染/编辑器贡献可被加载与调用，权限门生效 | 中 |
-| 0.4 | 工具参数校验补齐为 JSON Schema 校验引擎 | 审计、05 | 无 | 非法参数在调用前被拒并给出字段路径 | 中 |
-| 0.5 | `webnovel`/`literary` 发行档落地，与 `full` 区分 | 审计、29 | 无 | 两档有各自的 bundle/开关集合，切换后功能区差异可测 | 中 |
-| 0.6 | MCP server `search_nodes` 改用 FTS，替代 LIKE | 审计、05 | 无 | 中文检索命中与仓库检索一致 | 小 |
-| 0.7 | 覆盖率门线提升：renderer/main 阶梯上调 | 审计 | 0.1–0.6 | 门线只升不降，`verify` 通过 | 中 |
+| 0.7 | 覆盖率门线提升：renderer/main 阶梯上调 | 审计 | 无 | 门线只升不降，`verify` 通过 | 中 |
 
 ## 阶段 1 查询、块引用与素材隔离（45，推荐先做）
 
@@ -127,6 +123,7 @@
 
 ## 有意挂起（不做，非欠账）
 
+- 卡片服务从 `shared/services/cards` 迁入 `features/cards`：会重新引入 `assistant→cards`、`settings→cards` 跨 feature 依赖债（与 02 的边界规则和既有清理方向相反）；卡片服务属跨功能共享，保留在 `shared/services/cards`，`features/cards` 目录仅在未来出现卡片专属 UI 时使用。
 - 正文以文件为源、追加式事件日志（用户已明确暂缓，见 28）。
 - 协作 B/C 档的评论权限与工作流（协作只留缝，见 29）。
 - 平台化：发布、社区、收益、全勤、平台合规预审。

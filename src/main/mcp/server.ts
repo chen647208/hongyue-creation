@@ -27,6 +27,8 @@ import path from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 import { uuidv7 } from '../../core/entities/uuid.js';
+import { DEFAULT_SEARCH_LIMIT,MIN_SEARCH_QUERY_LENGTH, toFtsPhrase,toLikePattern } from '../../shared/constants/search.js';
+import { SQL } from '../../shared/sql/catalog.js';
 import {
   APP_DATA_DIR_NAME,
   dataDirOverride,
@@ -103,11 +105,52 @@ function getNode(nodeId: string): (NodeRow & { attrs: Array<{ name: string; valu
   return { ...node, attrs };
 }
 
-function searchNodes(bookId: string, keyword: string): Array<{ id: string; type: string; title: string }> {
-  const like = `%${keyword}%`;
-  return getDb()
-    .prepare(`SELECT id, type, title FROM nodes WHERE book_id = ? AND erased = 0 AND (title LIKE ? OR body LIKE ?) LIMIT 50`)
-    .all(bookId, like, like) as Array<{ id: string; type: string; title: string }>;
+/** catalog `fts.search` 返回列的命中子集。 */
+interface FtsHitRow {
+  node_id: string;
+  type: string;
+  title: string;
+}
+
+/** `search_nodes` 的单条命中：节点 id、类型、标题。 */
+interface SearchNodeHit {
+  id: string;
+  type: string;
+  title: string;
+}
+
+/**
+ * 标题/正文检索：走 catalog 的 `fts.search`（`nodes_fts`，FTS5 trigram）。
+ * SQL 文本取自语句目录，查询词经 `toFtsPhrase` 包成短语后走绑定参数，不拼接 SQL。
+ * 传入连接以便单测直接复用内存库。
+ */
+export function querySearchNodes(database: Database.Database, bookId: string, keyword: string): SearchNodeHit[] {
+  const q = keyword.trim();
+  if (q.length < MIN_SEARCH_QUERY_LENGTH) return [];
+  const ftsRows = database
+    .prepare(SQL['fts.search'])
+    .all(toFtsPhrase(q), bookId, bookId, DEFAULT_SEARCH_LIMIT) as FtsHitRow[];
+  // 标题回退：FTS 只索引章节/知识库正文，其余节点（角色/地点/势力等）按标题匹配
+  const likeRows = database
+    .prepare(SQL['nodes.selectByTitleLike'])
+    .all(bookId, toLikePattern(q), DEFAULT_SEARCH_LIMIT) as SearchNodeHit[];
+  const seen = new Set<string>();
+  const hits: SearchNodeHit[] = [];
+  for (const row of ftsRows) {
+    if (seen.has(row.node_id)) continue;
+    seen.add(row.node_id);
+    hits.push({ id: row.node_id, type: row.type, title: row.title });
+  }
+  for (const row of likeRows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    hits.push(row);
+  }
+  return hits.slice(0, DEFAULT_SEARCH_LIMIT);
+}
+
+function searchNodes(bookId: string, keyword: string): SearchNodeHit[] {
+  return querySearchNodes(getDb(), bookId, keyword);
 }
 
 // ── 写提案（进待审箱，不直接落库）─────────────────────────────────────

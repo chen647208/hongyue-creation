@@ -38,8 +38,13 @@
 - **装配回滚**：装配中途抛错时，已注册项逆序释放（`ContributionSink`），插件置 `failed`，宿主无残留。
 - **状态面板**：设置 → 插件——状态徽标、错误 cause 链详情、一键禁用/启用
   （配置级，持久化于 localStorage）。
-- **发行档**：完整 / 网文 / 严肃文学 / 纯写作（minimal）。minimal 经
-  `ai.request` 拦截器即时禁用全部 AI 请求（会话与工具），切回即恢复。
+- **发行档**：完整 / 网文 / 严肃文学 / 纯写作（minimal）。单源在
+  `core/plugin/bundles.ts` 的 `RELEASE_PROFILES`：bundle 选择 + `disabledFeatures`
+  默认关闭集合（依赖被禁的功能连带禁用）；切换后工作台分区与装配树按可用 feature 集合变化。
+  - 完整：15 项全开。
+  - 网文：保留写作/章节/大纲/角色/世界/知识库/一致性/伏笔/AI 助手，默认关闭时间线。
+  - 严肃文学：保留写作/大纲/角色/世界/知识库/伏笔/AI 助手，默认关闭章节细纲/一致性/时间线。
+  - 纯写作（minimal）：仅核心写作包，经 `ai.request` 拦截器即时禁用全部 AI 请求（会话与工具），切回即恢复。
 - **SDK**：`sdk/`（`@hongyue/plugin-sdk`，MIT 独立发行，与宿主 AGPL 解耦）。
 - **用户写法技能**：设置 → 插件 → 写法技能。技能是数据不是代码——导入带 frontmatter 的
   `SKILL.md` 落到 `<userData>/skills/user/<slug>/SKILL.md`，命中触发词即注入；可删除。

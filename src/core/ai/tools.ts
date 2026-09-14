@@ -8,6 +8,7 @@
  */
 
 import { uuidv7 } from '../entities/uuid';
+import { formatSchemaIssue, validateSchemaValue } from './schemaValidation.js';
 
 
 /**
@@ -81,33 +82,17 @@ export function lintToolSchema(id: string, schema: Record<string, unknown>): str
 }
 
 /**
- * 参数校验：必填项存在、基本类型匹配（内置与 MCP 工具统一）。
- * 只做浅层校验（string/number/integer/boolean/array/object），不引入 JSON Schema 引擎。
+ * 参数校验：必填项、类型、枚举、数组元素与嵌套字段（内置与 MCP 工具统一）。
+ * 委托给纯函数 validateSchemaValue；返回首条问题的单行文本，通过返回 null。
  */
 export function validateToolArgs(id: string, schema: Record<string, unknown>, args: unknown): string | null {
   if (args !== undefined && (args === null || typeof args !== 'object' || Array.isArray(args))) {
     return `${id}: 参数必须是对象`;
   }
-  const obj = (args ?? {}) as Record<string, unknown>;
-  const props = (schema.properties ?? {}) as Record<string, { type?: unknown }>;
-  const required = Array.isArray(schema.required) ? (schema.required as string[]) : [];
-  for (const key of required) {
-    if (obj[key] === undefined) return `${id}: 缺少必填参数 "${key}"`;
-  }
-  for (const [key, prop] of Object.entries(props)) {
-    const value = obj[key];
-    if (value === undefined || !prop || typeof prop.type !== 'string') continue;
-    const t = prop.type;
-    const ok =
-      (t === 'string' && typeof value === 'string') ||
-      (t === 'number' && typeof value === 'number') ||
-      (t === 'integer' && Number.isInteger(value)) ||
-      (t === 'boolean' && typeof value === 'boolean') ||
-      (t === 'array' && Array.isArray(value)) ||
-      (t === 'object' && typeof value === 'object' && value !== null && !Array.isArray(value));
-    if (!ok) return `${id}: 参数 "${key}" 类型应为 ${t}`;
-  }
-  return null;
+  const issues = validateSchemaValue(args ?? {}, schema, { unknownProperties: 'allow' });
+  const first = issues[0];
+  if (!first) return null;
+  return `${id}: ${formatSchemaIssue(first)}`;
 }
 
 export class ToolRegistry {

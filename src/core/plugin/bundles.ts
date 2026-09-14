@@ -12,7 +12,8 @@
  *
  * bundle = 一组功能贡献 + 依赖声明；内置 15 feature 以 bundle 声明
  * （dogfooding：官方功能与社区插件同路径）。profile = 发行档：选择启用
- * 哪些 bundle + 全局策略（如 minimal 禁全部 AI）。装配树把「当前生效的
+ * 哪些 bundle + 全局策略（如 minimal 禁全部 AI）+ 默认关闭的 feature 集合
+ * （disabledFeatures，依赖被禁的 feature 连带禁用）。装配树把「当前生效的
  * 每一行装配 + 来源」打印出来（--dump-config 的 GUI 版数据层）。
  */
 
@@ -40,6 +41,8 @@ export interface Profile {
   plugins: string[];
   /** 全局策略：如 { 'ai.request': 'deny' } */
   policies?: Record<string, string>;
+  /** 档位默认关闭的内置 feature id；依赖被禁的 feature 在装配树中连带禁用。 */
+  disabledFeatures?: readonly string[];
 }
 
 /** 内置 15 feature 声明（dogfooding 的核心清单；与 features/ 目录一一对应）。 */
@@ -72,9 +75,9 @@ export type ReleaseProfileName = 'full' | 'webnovel' | 'literary' | 'minimal';
 
 /** 发行档清单单源：设置面板选项、装配树、AI 策略判断均以此为准。 */
 export const RELEASE_PROFILES: readonly (Profile & { name: ReleaseProfileName })[] = [
-  { name: 'full', description: '完整功能', plugins: ['com.hongyue.bundle.core', 'com.hongyue.bundle.world', 'com.hongyue.bundle.ai'], policies: {} },
-  { name: 'webnovel', description: '网文（专属 bundle 落地前与 full 等效）', plugins: ['com.hongyue.bundle.core', 'com.hongyue.bundle.world', 'com.hongyue.bundle.ai'], policies: {} },
-  { name: 'literary', description: '严肃文学（专属 bundle 落地前与 full 等效）', plugins: ['com.hongyue.bundle.core', 'com.hongyue.bundle.world', 'com.hongyue.bundle.ai'], policies: {} },
+  { name: 'full', description: '完整功能（15 项全开）', plugins: ['com.hongyue.bundle.core', 'com.hongyue.bundle.world', 'com.hongyue.bundle.ai'], policies: {} },
+  { name: 'webnovel', description: '网文连载：保留写作/章节/角色/世界/知识库/一致性/伏笔/AI 助手，默认关闭时间线', plugins: ['com.hongyue.bundle.core', 'com.hongyue.bundle.world', 'com.hongyue.bundle.ai'], policies: {}, disabledFeatures: ['core.timeline'] },
+  { name: 'literary', description: '严肃文学：保留写作/大纲/角色/世界/知识库/伏笔/AI 助手，默认关闭章节细纲/一致性/时间线', plugins: ['com.hongyue.bundle.core', 'com.hongyue.bundle.world', 'com.hongyue.bundle.ai'], policies: {}, disabledFeatures: ['core.chapters', 'core.consistency', 'core.timeline'] },
   { name: 'minimal', description: '纯写作最小集（拒绝全部 AI 请求）', plugins: ['com.hongyue.bundle.core'], policies: { 'ai.request': 'deny' } },
 ];
 
@@ -111,15 +114,20 @@ export function assemblyTree(profile: Profile, bundles: readonly Bundle[] = BUIL
   }
 
   const aiDenied = profile.policies?.['ai.request'] === 'deny';
+  const disabledByProfile = new Set(profile.disabledFeatures ?? []);
   const rows: AssemblyRow[] = [];
   for (const feature of BUILTIN_FEATURES) {
     const source = featureSource.get(feature.id);
     let enabled = true;
     let reason: string | undefined;
-    // 原因优先级：自身策略 > 依赖传播 > bundle 未启用
+    // 原因优先级：自身策略 > 档位默认关闭 > 依赖传播 > bundle 未启用
     if (feature.ai && aiDenied) {
       enabled = false;
       reason = 'profile 策略拒绝（ai.request: deny）';
+    }
+    if (enabled && disabledByProfile.has(feature.id)) {
+      enabled = false;
+      reason = '档位默认关闭';
     }
     if (enabled && feature.dependsOn) {
       for (const dep of feature.dependsOn) {

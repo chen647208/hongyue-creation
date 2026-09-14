@@ -11,9 +11,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import Database from 'better-sqlite3-multiple-ciphers';
 import { afterEach,beforeEach, describe, expect, it } from 'vitest';
 
-import { dispatch } from '../server.js';
+import { dispatch,querySearchNodes } from '../server.js';
 
 let dir = '';
 let prevEnv: string | undefined;
@@ -76,5 +77,60 @@ describe('mcp dispatch', () => {
 
   it('未知方法抛错', () => {
     expect(() => dispatch('nope/method', {})).toThrow('未知方法');
+  });
+});
+
+describe('search_nodes（FTS）', () => {
+  function makeDb(): Database.Database {
+    const db = new Database(':memory:');
+    db.exec(`CREATE VIRTUAL TABLE nodes_fts USING fts5(
+      book_id UNINDEXED, node_id UNINDEXED, type UNINDEXED, title, content, tokenize = 'trigram'
+    )`);
+    db.exec(`CREATE TABLE nodes (
+      id TEXT PRIMARY KEY, book_id TEXT, type TEXT, title TEXT, body TEXT, erased INTEGER NOT NULL DEFAULT 0
+    )`);
+    const insFts = db.prepare('INSERT INTO nodes_fts(book_id, node_id, type, title, content) VALUES(?,?,?,?,?)');
+    const insNode = db.prepare('INSERT INTO nodes(id, book_id, type, title, body, erased) VALUES(?,?,?,?,?,0)');
+    // 章节与知识库进 FTS；角色卡只进 nodes（标题回退覆盖）
+    insFts.run('book1', 'ch1', 'novel.chapter', '古城堡的清晨', '他走进沉睡千年的古城堡');
+    insFts.run('book1', 'kn1', 'meta.knowledge', '魔法体系', '星辰之力驱动的魔法学院');
+    insFts.run('book2', 'ch2', 'novel.chapter', '古城堡之谜', '另一本书的古城堡');
+    insNode.run('ch1', 'book1', 'novel.chapter', '古城堡的清晨', '他走进沉睡千年的古城堡');
+    insNode.run('kn1', 'book1', 'meta.knowledge', '魔法体系', '星辰之力驱动的魔法学院');
+    insNode.run('card1', 'book1', 'world.character', '古城堡的领主', '');
+    insNode.run('ch2', 'book2', 'novel.chapter', '古城堡之谜', '另一本书的古城堡');
+    return db;
+  }
+
+  it('正文命中 + 标题回退：结果映射为 {id,type,title}，字段形态固定', () => {
+    const db = makeDb();
+    try {
+      const hits = querySearchNodes(db, 'book1', '古城堡');
+      expect(hits.map((h) => h.id).sort()).toEqual(['card1', 'ch1']);
+      for (const hit of hits) {
+        expect(Object.keys(hit).sort()).toEqual(['id', 'title', 'type']);
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  it('按标题命中且限定 bookId', () => {
+    const db = makeDb();
+    try {
+      expect(querySearchNodes(db, 'book1', '魔法体系').map((h) => h.id)).toEqual(['kn1']);
+      expect(querySearchNodes(db, 'book1', '古城堡之谜')).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('查询词短于 trigram 门槛返回空', () => {
+    const db = makeDb();
+    try {
+      expect(querySearchNodes(db, 'book1', '古城')).toEqual([]);
+    } finally {
+      db.close();
+    }
   });
 });

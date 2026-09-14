@@ -184,6 +184,7 @@ export const SQL = {
   'nodes.selectAll': `SELECT * FROM nodes`,
   'nodes.selectAllLite': `SELECT id, book_id, type, title, path, created_at, updated_at, erased, hash FROM nodes`,
   'nodes.selectByBook': `SELECT * FROM nodes WHERE book_id = ?`,
+  'nodes.selectByTitleLike': `SELECT id, type, title FROM nodes WHERE book_id = ? AND erased = 0 AND title LIKE ? ESCAPE '\\' LIMIT ?`,
   'nodes.wordCountByBook': `SELECT book_id, SUM(length(body)) AS words FROM nodes WHERE type = 'novel.chapter' AND erased = 0 GROUP BY book_id`,
   'nodes.selectDistinctBooks': `SELECT DISTINCT book_id FROM nodes`,
   'nodes.selectHashesByBook': `SELECT id, hash, body FROM nodes WHERE book_id = ?`,

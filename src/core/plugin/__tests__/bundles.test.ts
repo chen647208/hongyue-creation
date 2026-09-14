@@ -54,6 +54,57 @@ describe('bundle 装配树（design/04 §7）', () => {
   it('profileDeniesAi：仅 minimal 拒绝 AI', () => {
     expect(profileDeniesAi('minimal')).toBe(true);
     expect(profileDeniesAi('full')).toBe(false);
-    expect(enabledFeatureIds('minimal').has('core.assistant')).toBe(false);
+    expect(profileDeniesAi('webnovel')).toBe(false);
+    expect(profileDeniesAi('literary')).toBe(false);
+  });
+
+  it('webnovel 档：关闭时间线，保留网文日常链（写作/章节/一致性/伏笔/AI 助手）', () => {
+    const webnovel = enabledFeatureIds('webnovel');
+    const full = enabledFeatureIds('full');
+    expect(webnovel.has('core.timeline')).toBe(false);
+    expect(webnovel.has('core.writing')).toBe(true);
+    expect(webnovel.has('core.chapters')).toBe(true);
+    expect(webnovel.has('core.outline')).toBe(true);
+    expect(webnovel.has('core.characters')).toBe(true);
+    expect(webnovel.has('core.world')).toBe(true);
+    expect(webnovel.has('core.knowledge')).toBe(true);
+    expect(webnovel.has('core.consistency')).toBe(true);
+    expect(webnovel.has('core.foreshadowing')).toBe(true);
+    expect(webnovel.has('core.assistant')).toBe(true);
+    expect(webnovel.size).toBe(full.size - 1);
+  });
+
+  it('literary 档：关闭章节细纲/一致性/时间线，保留 AI 助手', () => {
+    const literary = enabledFeatureIds('literary');
+    const rows = assemblyTree(profileByName('literary'), BUILTIN_BUNDLES);
+    expect(literary.has('core.chapters')).toBe(false);
+    expect(literary.has('core.consistency')).toBe(false);
+    expect(literary.has('core.timeline')).toBe(false);
+    expect(literary.has('core.assistant')).toBe(true);
+    expect(literary.has('core.cards')).toBe(true);
+    expect(literary.has('core.outline')).toBe(true);
+    expect(literary.has('core.writing')).toBe(true);
+    expect(literary.has('core.characters')).toBe(true);
+    expect(literary.has('core.world')).toBe(true);
+    expect(literary.has('core.knowledge')).toBe(true);
+    expect(literary.has('core.foreshadowing')).toBe(true);
+    expect(rows.find((r) => r.feature === 'core.chapters')?.reason).toBe('档位默认关闭');
+  });
+
+  it('三档 feature 集合互不相同：full ⊃ webnovel ⊃ literary', () => {
+    const full = enabledFeatureIds('full');
+    const webnovel = enabledFeatureIds('webnovel');
+    const literary = enabledFeatureIds('literary');
+    expect(full.size).toBe(BUILTIN_FEATURES.length);
+    expect(literary.size).toBeLessThan(webnovel.size);
+    expect(webnovel.size).toBeLessThan(full.size);
+    expect(new Set([...webnovel].filter((id) => !full.has(id))).size).toBe(0);
+    expect(new Set([...literary].filter((id) => !webnovel.has(id))).size).toBe(0);
+  });
+
+  it('minimal 档位不变：只剩纯写作四项，AI 助手被策略拒绝', () => {
+    const minimal = enabledFeatureIds('minimal');
+    expect([...minimal].sort()).toEqual(['core.export', 'core.index', 'core.settings', 'core.writing']);
+    expect(minimal.has('core.assistant')).toBe(false);
   });
 });

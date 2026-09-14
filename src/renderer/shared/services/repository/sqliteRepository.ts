@@ -21,7 +21,7 @@ import {
 import { indexService } from '@core/index';
 import { entitiesToProject,projectToEntities } from '@core/project';
 
-import { MIN_SEARCH_QUERY_LENGTH } from '../../../../shared/constants/search';
+import { DEFAULT_SEARCH_LIMIT,MIN_SEARCH_QUERY_LENGTH, toFtsPhrase } from '../../../../shared/constants/search';
 import { APP_STATE_VERSION } from '../../../../shared/constants/versions';
 import type {
   AppState,
@@ -35,13 +35,6 @@ import { ensureBuiltinItemTypes } from './builtinTypes';
 import { jsonRepository } from './jsonRepository';
 import { META_KEYS,migrate, SCHEMA_VERSION,SETTING_KEYS } from './schema';
 import type { AttachmentMeta,CommitOptions,DbEncryptionStatus, FieldDefinition, ItemTypeDefinition, OperationLogEntry, RevisionStat, SearchHit, SearchOptions, SequenceItem, SqlDriver, StorageRepository, ViewDefinition } from './types';
-
-const DEFAULT_SEARCH_LIMIT = 50;
-
-/** 把用户查询安全地包成 FTS5 短语（双引号包裹，内部双引号翻倍），避免查询语法注入 */
-function toFtsPhrase(query: string): string {
-  return `"${query.replace(/"/g, '""')}"`;
-}
 
 /** 节点类型 → 检索 scope（与旧 chapters_fts/knowledge_fts 双域对齐） */
 function scopeOf(type: string): 'chapter' | 'knowledge' | null {
