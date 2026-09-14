@@ -187,6 +187,33 @@ for (const fixture of [nodeSqliteFixture, wasmFixture]) {
       expect(Number(row!.value)).toBe(SCHEMA_VERSION);
     });
 
+    it('旧库 fixture（v2 表结构）升级到最新：补齐 v3/v4/v5 且数据保留', async () => {
+      // 独立库：不能复用 beforeEach 的 repo（其构造函数已并发跑 migrate，会撞事务）
+      const old = await fixture.create();
+      try {
+        for (const id of [
+          'schema.meta', 'schema.settings',
+          'migration.v2.nodes', 'migration.v2.edges', 'migration.v2.attrs',
+          'migration.v2.revisions', 'migration.v2.attachments', 'migration.v2.blobs',
+          'migration.v2.entityChanges',
+        ] as const) {
+          await old.driver.exec(id);
+        }
+        await old.driver.run('nodes.upsert', ['n1', 'b1', 'novel.chapter', '第一章', '旧库正文', '', 1, 1, 0, 'h1']);
+
+        await migrate(old.driver);
+
+        const version = await old.driver.get<{ value: string }>('schema.versionSelect');
+        expect(Number(version!.value)).toBe(SCHEMA_VERSION);
+        const names = old.rawAll<{ name: string }>(`SELECT name FROM sqlite_master WHERE type='table'`).map((t) => t.name);
+        expect(names).toEqual(expect.arrayContaining(['item_types', 'fields', 'sequence_items', 'views']));
+        const node = old.rawGet<{ body: string }>(`SELECT body FROM nodes WHERE id='n1'`);
+        expect(node!.body).toBe('旧库正文');
+      } finally {
+        old.dispose();
+      }
+    });
+
     it('init 首启从旧 JSON 迁移一次并写入迁移哨兵', async () => {
       const spy = vi.spyOn(jsonRepository, 'loadAll').mockResolvedValue(baseState([project('legacy1')]));
       await repo.init();
