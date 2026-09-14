@@ -213,7 +213,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                   }}
                   onClick={() => selectView(view.id)}
                   className={cn(
-                    'cursor-grab rounded border px-2 py-0.5 text-2xs',
+                    'motion-hover motion-press cursor-grab rounded border px-2 py-0.5 text-2xs',
                     activeView?.id === view.id ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground',
                   )}
                 >

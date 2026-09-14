@@ -17,11 +17,38 @@
  * {"reply": string, "toolCalls": [{"callId": string, "toolId": string, "args": object}]}
  * 无工具调用即为最终答复。解析/修复复用渲染端 callJSON 的容错语义。
  */
-import type { AIMessageImage, AIResponse, ModelConfig } from '../../shared/types';
-import type { ApprovalRouter } from './approval.js';
+import type { AIMessageImage, AIResponse, ModelConfig, Project } from '../../shared/types';
+import type { ApprovalProposal, ApprovalRouter } from './approval.js';
 import type { PromptAssembler } from './promptAssembler.js';
+import { diffLines } from './proposalDiff.js';
 import type { AiSession } from './session.js';
 import type { ToolRegistry } from './tools.js';
+
+/** 写类提案的 diff 文本（unified 风格）与可执行载荷。 */
+function unifiedDiff(diff: ReturnType<typeof diffLines>): string {
+  return diff.map((line) => `${line.op === 'add' ? '+' : line.op === 'del' ? '-' : ' '}${line.text}`).join('\n');
+}
+
+function isProjectLike(value: unknown): value is { id: string; chapters: Project['chapters'] } {
+  return typeof value === 'object' && value !== null && Array.isArray((value as { chapters?: unknown }).chapters);
+}
+
+function buildToolProposal(toolId: string, args: unknown, project: unknown): ApprovalProposal {
+  const title = `工具 ${toolId}`;
+  if (typeof args !== 'object' || args === null || !isProjectLike(project)) return { title };
+  const record = args as Record<string, unknown>;
+  const body = [record.content, record.text, record.body].find((value): value is string => typeof value === 'string');
+  const nodeId = [record.chapterId, record.nodeId].find((value): value is string => typeof value === 'string');
+  if (!body || !nodeId) return { title };
+  const chapter = project.chapters.find((item) => item.id === nodeId);
+  if (!chapter) return { title };
+  return {
+    title: `修改「${chapter.title}」`,
+    summary: '批准后写入正文并记录修订',
+    diff: unifiedDiff(diffLines(chapter.content, body)),
+    exec: { kind: 'chapter-write', bookId: project.id, nodeId: chapter.id, title: chapter.title, body },
+  };
+}
 
 export interface AgentTurnToolCall {
   callId: string;
@@ -214,10 +241,11 @@ export async function runAgentSession(deps: AgentLoopDeps, task: string): Promis
 
         // read 直接放行，不产生审批事件；write:* 必须记录审批判定（审计链）
         if (spec.permission !== 'read') {
+          const proposal = buildToolProposal(call.toolId, call.args, ctx.project);
           const { allowed, decision } = await deps.router.authorize(spec.permission, {
             callId: call.callId,
             toolId: call.toolId,
-            proposal: { title: `工具 ${call.toolId}（${spec.permission}）` },
+            proposal,
           });
           await deps.session.emit({
             t: 'tool.approval', turn, callId: call.callId,

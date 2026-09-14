@@ -74,6 +74,21 @@
   }
 }
 
+/* 动效工具类：只作用于颜色/边框/阴影与按下的轻微缩放，时长取 motion 变量。 */
+.motion-hover {
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease);
+}
+.motion-press {
+  transition: transform var(--motion-fast) var(--motion-ease);
+}
+.motion-press:active {
+  transform: scale(0.98);
+}
+
 .dark {
   --background: #171513;
   --foreground: #e8e6e3;
