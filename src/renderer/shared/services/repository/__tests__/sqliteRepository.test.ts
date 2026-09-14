@@ -484,11 +484,18 @@ for (const fixture of [nodeSqliteFixture, wasmFixture]) {
       expect(snap!.foreshadowOpen.some((f) => f.nodeId === 'fs1')).toBe(true);
     });
 
-    it('loadAll 冷启动从持久实体重建派生索引', async () => {
-      await repo.saveProject(project('idx2', { characters: [{ id: 'c1', name: '苏墨' } as never] }));
+    it('冷启动仅重建活动书索引；其余书在打开时重建', async () => {
+      const a = project('idx-a', { characters: [{ id: 'c1', name: '苏墨' } as never] });
+      const b = project('idx-b', { characters: [{ id: 'c2', name: '林砚' } as never] });
+      await repo.saveAll(baseState([a, b])); // activeProjectId = idx-a
       indexService.clear(); // 模拟进程重启：内存缓存丢失，实体仍在库
+
       await repo.loadAll();
-      expect(indexService.get('idx2')?.tags.get('苏墨')?.nodeId).toBe('c1');
+      expect(indexService.get('idx-a')?.tags.get('苏墨')?.nodeId).toBe('c1');
+      expect(indexService.get('idx-b')).toBeUndefined(); // 未打开不重建
+
+      await repo.loadBookContent('idx-b');
+      expect(indexService.get('idx-b')?.tags.get('林砚')?.nodeId).toBe('c2');
     });
 
     it('deleteProject 后派生索引失效', async () => {

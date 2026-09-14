@@ -218,9 +218,10 @@ export class SqliteRepository implements StorageRepository {
     for (const r of attrRows) ensure(r.book_id).attrs.push(rowToAttr(r));
 
     const projects: Project[] = [];
+    // 派生索引是内存缓存：冷启动只重建活动书，其余书在打开（loadBookContent）时延迟重建
+    const activeId = metaRows.find((r) => r.key === 'activeProjectId')?.value ?? null;
     for (const [bookId, group] of byBook) {
-      // 索引是实体的派生缓存：冷启动从已加载实体全量重建（指纹短路避免重复 loadAll 重算）
-      indexService.rebuild(bookId, group);
+      if (bookId === activeId) indexService.rebuild(bookId, group);
       try {
         const project = entitiesToProject(group);
         project.hydrated = false;
@@ -349,6 +350,8 @@ export class SqliteRepository implements StorageRepository {
       edges: edgeRows.filter((row) => row.book_id === bookId).map((row) => rowToEdge(row)),
       attrs: attrRows.filter((row) => row.book_id === bookId).map((row) => rowToAttr(row)),
     };
+    // 打开即重建该书派生索引（冷启动只建活动书，这里补齐其余书）
+    indexService.rebuild(bookId, group);
     return { ...entitiesToProject(group), hydrated: true };
   }
 

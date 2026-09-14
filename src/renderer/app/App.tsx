@@ -35,7 +35,7 @@ import { dialogService } from '../shared/services/dialogService';
 import { eventToKeybinding, resolveKeybindings } from '../shared/services/keybindings';
 import { getStorageBackendStatus } from '../shared/services/repository';
 import { registerAssistantRuntime } from './app-shell/assistantRuntimeSetup';
-import Bookshelf from './app-shell/Bookshelf';
+import { BookshelfScreen } from './app-shell/BookshelfScreen';
 import CommandPalette from './app-shell/CommandPalette';
 import { registerCoreSlots } from './app-shell/coreSlots';
 import DialogHost from './app-shell/DialogHost';
@@ -99,7 +99,7 @@ const App: React.FC = () => {
 
   // 双 store 订阅
   const activeProject = useProjectStore(selectActiveProject);
-  const projects = useProjectStore(s => s.projects);
+  const projectCount = useProjectStore(s => s.projects.length);
   const activeBookId = useProjectStore(s => s.activeProjectId);
   const models = useSettingsStore(s => s.models);
   const activeModelId = useSettingsStore(s => s.activeModelId);
@@ -247,10 +247,10 @@ const App: React.FC = () => {
 
   // 首启向导：无书且没走过向导时弹出，三类人群一次分流
   useEffect(() => {
-    if (projects.length === 0 && !isOnboardingDone()) {
+    if (projectCount === 0 && !isOnboardingDone()) {
       setShowOnboarding(true);
     }
-  }, [projects.length]);
+  }, [projectCount]);
 
   const handleOnboardingDone = useCallback((persona: OnboardingPersona, title: string) => {
     markOnboardingDone(persona);
@@ -300,9 +300,7 @@ const App: React.FC = () => {
 
         {view === 'bookshelf' ? (
           <div className="min-w-0 flex-1">
-            <Bookshelf
-              books={projects}
-              activeBookId={activeBookId}
+            <BookshelfScreen
               onOpenBook={actions.openBook}
               onCreateBook={actions.createBook}
               onCreateQuickBook={actions.createQuickBook}
