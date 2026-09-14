@@ -15,8 +15,24 @@ import { ModelListService } from '../modelListService';
 const model = (over: Partial<ModelConfig>): ModelConfig =>
   ({ id: 'm', name: 'M', provider: 'openai-chat', endpoint: 'https://api.x/v1', apiKey: 'sk-x', modelName: 'x', ...over });
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+interface HttpRequest {
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  apiKeyRef?: string;
+  apiKeyHeader?: string;
+  apiKeyScheme?: string;
+  apiKeyQueryParam?: string;
+}
+
+function ok(body: unknown, status = 200): { ok: boolean; status: number; statusText: string; text: string } {
+  return { ok: status >= 200 && status < 300, status, statusText: status === 200 ? 'OK' : 'Error', text: JSON.stringify(body) };
+}
+
+function stubHttp(impl: (request: HttpRequest) => unknown): ReturnType<typeof vi.fn> {
+  const httpMock = vi.fn().mockImplementation(impl);
+  vi.stubGlobal('window', { electronAPI: { aiGateway: { http: httpMock } } });
+  return httpMock;
 }
 
 afterEach(() => {
@@ -25,7 +41,7 @@ afterEach(() => {
 
 describe('ModelListService.fetchModels', () => {
   it('成功获取非空列表：覆盖 availableModels 并写入缓存时间', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ data: [{ id: 'a' }, { id: 'b' }] })));
+    stubHttp(() => ok({ data: [{ id: 'a' }, { id: 'b' }] }));
     const m = model({ availableModels: ['builtin-1'] });
     const result = await ModelListService.fetchModels(m);
     expect(result).toEqual(['a', 'b']);
@@ -35,7 +51,7 @@ describe('ModelListService.fetchModels', () => {
   });
 
   it('实时返回空列表：保留内置推荐兜底，不覆盖、不写缓存时间', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ data: [] })));
+    stubHttp(() => ok({ data: [] }));
     const m = model({ availableModels: ['deepseek-v4-pro', 'deepseek-v4-flash'] });
     const result = await ModelListService.fetchModels(m);
     expect(result).toEqual(['deepseek-v4-pro', 'deepseek-v4-flash']);
@@ -44,7 +60,7 @@ describe('ModelListService.fetchModels', () => {
   });
 
   it('请求失败：抛出错误且保留内置列表（供上层静默兜底）', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('boom', { status: 500 })));
+    stubHttp(() => ({ ok: false, status: 500, statusText: 'Server Error', text: 'boom' }));
     const m = model({ availableModels: ['builtin-keep'] });
     await expect(ModelListService.fetchModels(m)).rejects.toThrow();
     expect(m.availableModels).toEqual(['builtin-keep']);
@@ -52,40 +68,39 @@ describe('ModelListService.fetchModels', () => {
   });
 
   it('缓存有效（1 小时内且已有列表）：直接返回缓存，不发请求', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    const httpMock = stubHttp(() => ok({ data: [] }));
     const m = model({ availableModels: ['cached'], modelsLastFetched: Date.now() });
     const result = await ModelListService.fetchModels(m);
     expect(result).toEqual(['cached']);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(httpMock).not.toHaveBeenCalled();
   });
 });
 
 describe('ModelListService 各协议列表端点', () => {
   it('Gemini 官方（端点留空）走原生 generativelanguage 列表并剥离 models/ 前缀', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse({ models: [{ name: 'models/gemini-3.7-flash' }, { name: 'models/gemini-3.5-flash' }] }),
-    );
-    vi.stubGlobal('fetch', fetchMock);
+    const httpMock = stubHttp(() => ok({ models: [{ name: 'models/gemini-3.7-flash' }, { name: 'models/gemini-3.5-flash' }] }));
     const result = await ModelListService.fetchModels(model({ provider: 'gemini', endpoint: '', apiKey: 'AIza-xyz' }));
-    expect(fetchMock.mock.calls[0]![0]).toContain('generativelanguage.googleapis.com/v1beta/models?key=AIza-xyz');
+    const request = httpMock.mock.calls[0]![0] as HttpRequest;
+    expect(request.url).toContain('generativelanguage.googleapis.com/v1beta/models');
+    expect(request.apiKeyQueryParam).toBe('key');
+    expect(request.apiKeyRef).toBe('AIza-xyz');
     expect(result).toEqual(['gemini-3.7-flash', 'gemini-3.5-flash']);
   });
 
   it('Anthropic 用 x-api-key 头并规范化 /v1/models', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: [{ id: 'claude-sonnet-5' }] }));
-    vi.stubGlobal('fetch', fetchMock);
+    const httpMock = stubHttp(() => ok({ data: [{ id: 'claude-sonnet-5' }] }));
     const result = await ModelListService.fetchModels(model({ provider: 'anthropic', endpoint: 'https://api.anthropic.com', apiKey: 'sk-ant' }));
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://api.anthropic.com/v1/models');
-    expect(init.headers).toMatchObject({ 'x-api-key': 'sk-ant' });
+    const request = httpMock.mock.calls[0]![0] as HttpRequest;
+    expect(request.url).toBe('https://api.anthropic.com/v1/models');
+    expect(request.apiKeyHeader).toBe('x-api-key');
+    expect(request.apiKeyScheme).toBe('raw');
+    expect(request.apiKeyRef).toBe('sk-ant');
     expect(result).toEqual(['claude-sonnet-5']);
   });
 
   it('Anthropic 兼容网关（已含 /v1）只补 /models', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: [{ id: 'MiniMax-M3' }] }));
-    vi.stubGlobal('fetch', fetchMock);
+    const httpMock = stubHttp(() => ok({ data: [{ id: 'MiniMax-M3' }] }));
     await ModelListService.fetchModels(model({ provider: 'anthropic', endpoint: 'https://api.minimaxi.com/anthropic/v1', apiKey: 'k' }));
-    expect(fetchMock.mock.calls[0]![0]).toBe('https://api.minimaxi.com/anthropic/v1/models');
+    expect((httpMock.mock.calls[0]![0] as HttpRequest).url).toBe('https://api.minimaxi.com/anthropic/v1/models');
   });
 });

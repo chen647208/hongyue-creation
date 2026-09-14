@@ -18,7 +18,7 @@
 
 ## 设计
 
-1. 仓储接口新增：
+1. 仓储接口扩展：
    - `loadBookSummaries?(): Promise<{ projects: ProjectShell[]; activeProjectId }>`（节点不含 body）。
    - `loadBookContent?(bookId): Promise<Project>`（含正文，必要时含修订/附件引用）。
 2. `AppState` 增加 `ProjectShell`：`chapters` 只保留骨架，`content` 置空；`hydrated: false` 标记。

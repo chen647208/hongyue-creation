@@ -194,8 +194,14 @@ export async function gatewayStream(
   });
 }
 
+/** 受控 HTTP：API Key 由主进程解引用注入，渲染端不持有明文（拉表/嵌入等）。 */
+export async function gatewayHttp(request: Parameters<Gateway['http']>[0]): Promise<{ ok: boolean; status: number; statusText: string; text: string }> {
+  return api().http(request);
+}
+
 /** 类型化客户端聚合出口。 */
 export const aiGatewayClient = {
   complete: gatewayComplete,
   stream: gatewayStream,
+  http: gatewayHttp,
 } as const;

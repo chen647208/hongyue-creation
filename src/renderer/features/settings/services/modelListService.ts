@@ -8,7 +8,7 @@
  */
 
 import { i18n } from '@/i18n';
-import { resolveModelApiKey } from '@/shared/services/credentialService';
+import { gatewayHttp } from '@/shared/services/ai/gatewayClient';
 
 import { type ModelConfig } from '../../../../shared/types';
 import { asRecord, asRecords, asStr } from '../../../shared/utils/loose';
@@ -19,11 +19,9 @@ export class ModelListService {
   
   // 从模型提供商API获取模型列表
   static async fetchModels(model: ModelConfig): Promise<string[]> {
-    // vault 引用先解为明文（渲染端直连场景；生成走主进程网关统一解）
-    const probe: ModelConfig = { ...model, apiKey: await resolveModelApiKey(model) };
     // 检查缓存是否有效
-    if (this.isCacheValid(probe)) {
-      return probe.availableModels || [];
+    if (this.isCacheValid(model)) {
+      return model.availableModels || [];
     }
     
     // 标记为正在获取
@@ -32,20 +30,20 @@ export class ModelListService {
     try {
       let models: string[] = [];
       
-      // 根据提供商类型使用不同的API（用已解引用的 probe 发请求，缓存写回原对象）
-      switch (probe.provider) {
+      // Key 由主进程网关解引用注入，渲染端不持有明文
+      switch (model.provider) {
         case 'openai-chat':
         case 'openai-responses':
-          models = await this.fetchFromOpenAICompatible(probe);
+          models = await this.fetchFromOpenAICompatible(model);
           break;
         case 'ollama':
-          models = await this.fetchFromOllama(probe);
+          models = await this.fetchFromOllama(model);
           break;
         case 'anthropic':
-          models = await this.fetchFromAnthropic(probe);
+          models = await this.fetchFromAnthropic(model);
           break;
         case 'gemini':
-          models = await this.fetchFromGemini(probe);
+          models = await this.fetchFromGemini(model);
           break;
         default:
           models = [];
@@ -77,17 +75,16 @@ export class ModelListService {
     
     const url = `${endpoint}/models`;
     
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${model.apiKey || ''}`,
-        'Content-Type': 'application/json'
-      }
+    const response = await gatewayHttp({
+      url,
+      headers: { 'Content-Type': 'application/json' },
+      apiKeyRef: model.apiKey,
     });
     
     if (!response.ok) {
       throw new Error(i18n.t('errors:requestFailedStatus', { status: response.status, detail: response.statusText }));
     }
-    const data = asRecord(await response.json());
+    const data = asRecord(JSON.parse(response.text) as unknown);
     return asRecords(data.data).map((m) => asStr(m.id)).filter((id) => id !== "");
   }
   
@@ -99,18 +96,21 @@ export class ModelListService {
     }
     const url = base.endsWith('/v1') ? `${base}/models` : `${base}/v1/models`;
     
-    const response = await fetch(url, {
+    const response = await gatewayHttp({
+      url,
       headers: {
-        'x-api-key': model.apiKey || '',
         'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
+      apiKeyRef: model.apiKey,
+      apiKeyHeader: 'x-api-key',
+      apiKeyScheme: 'raw',
     });
     
     if (!response.ok) {
       throw new Error(i18n.t('errors:requestFailedStatus', { status: response.status, detail: response.statusText }));
     }
-    const data = asRecord(await response.json());
+    const data = asRecord(JSON.parse(response.text) as unknown);
     return asRecords(data.data).map((m) => asStr(m.id)).filter((id) => id !== "");
   }
   
@@ -119,12 +119,12 @@ export class ModelListService {
     const endpoint = model.endpoint?.replace(/\/+$/, '') || 'http://localhost:11434';
     const url = `${endpoint}/api/tags`;
     
-    const response = await fetch(url);
+    const response = await gatewayHttp({ url });
     
     if (!response.ok) {
       throw new Error(i18n.t('errors:requestFailed', { provider: 'Ollama', message: `${response.status} ${response.statusText}` }));
     }
-    const data = asRecord(await response.json());
+    const data = asRecord(JSON.parse(response.text) as unknown);
     return asRecords(data.models).map((m) => asStr(m.name)).filter((n) => n !== "");
   }
   
@@ -136,16 +136,19 @@ export class ModelListService {
       return this.fetchFromOpenAICompatible(model);
     }
     const base = ep || 'https://generativelanguage.googleapis.com/v1beta';
-    const url = `${base}/models?key=${encodeURIComponent(model.apiKey || '')}`;
+    const url = `${base}/models`;
 
-    const response = await fetch(url, {
+    const response = await gatewayHttp({
+      url,
       headers: { 'Content-Type': 'application/json' },
+      apiKeyRef: model.apiKey,
+      apiKeyQueryParam: 'key',
     });
 
     if (!response.ok) {
       throw new Error(i18n.t('errors:requestFailedStatus', { status: response.status, detail: response.statusText }));
     }
-    const data = asRecord(await response.json());
+    const data = asRecord(JSON.parse(response.text) as unknown);
     return asRecords(data.models)
       .map((m) => asStr(m.name).replace(/^models\//, ''))
       .filter((id) => id !== '');

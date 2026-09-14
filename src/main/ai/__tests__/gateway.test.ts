@@ -16,7 +16,7 @@ import type { ProviderAdapter } from '../types.js';
 const { mockResolve } = vi.hoisted(() => ({ mockResolve: vi.fn() }));
 vi.mock('../resolve.js', () => ({ resolveAdapter: mockResolve }));
 
-import { runAdapterStream } from '../gateway.js';
+import { performAiHttp,runAdapterStream } from '../gateway.js';
 
 const model = (over: Partial<ModelConfig> = {}): ModelConfig =>
   ({ id: 'm1', name: 'T', provider: 'openai-chat', endpoint: 'https://x/v1', modelName: 'm', ...over });
@@ -81,5 +81,46 @@ describe('runAdapterStream（流式核心）', () => {
     await runAdapterStream(model(), 'p', 'r3', collect(events), {});
     expect(events).toHaveLength(1);
     expect(events[0]!.t).toBe('done');
+  });
+});
+
+describe('performAiHttp（受控 HTTP 网关）', () => {
+  const fakeFetch = (): ReturnType<typeof vi.fn> => vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    text: async () => '{"ok":1}',
+  }));
+
+  it('明文 Key 注入 Authorization: Bearer，并透传响应', async () => {
+    const fetchMock = fakeFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await performAiHttp({ url: 'https://api.x/models', apiKeyRef: 'sk-plain' });
+    expect(response).toEqual({ ok: true, status: 200, statusText: 'OK', text: '{"ok":1}' });
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-plain');
+    vi.unstubAllGlobals();
+  });
+
+  it('自定义头名与 raw 方案（Anthropic x-api-key）', async () => {
+    const fetchMock = fakeFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    await performAiHttp({ url: 'https://api.anthropic.com/v1/models', apiKeyRef: 'sk-ant', apiKeyHeader: 'x-api-key', apiKeyScheme: 'raw' });
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect((init.headers as Record<string, string>)['x-api-key']).toBe('sk-ant');
+    vi.unstubAllGlobals();
+  });
+
+  it('查询参数注入（Gemini key）不改动请求头', async () => {
+    const fetchMock = fakeFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    await performAiHttp({ url: 'https://generativelanguage.googleapis.com/v1beta/models', apiKeyRef: 'AIza', apiKeyQueryParam: 'key' });
+    const url = fetchMock.mock.calls[0]![0] as URL;
+    expect(url.searchParams.get('key')).toBe('AIza');
+    vi.unstubAllGlobals();
+  });
+
+  it('拒绝非 http/https 协议', async () => {
+    await expect(performAiHttp({ url: 'file:///etc/passwd' })).rejects.toThrow();
   });
 });

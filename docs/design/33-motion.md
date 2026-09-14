@@ -26,7 +26,7 @@
 
 - 统一用 CSS 变量定义时长与缓动（`--motion-fast/-base`、`--motion-ease`），组件只引用变量。
 - 不引入动画库；用 Tailwind `transition-*` 与自定义 keyframes。
-- 视觉回归（`e2e/visual.spec.ts`）截图前等待动效结束；新增动效如影响快照，先刷新基线再提交。
+- 视觉回归（`e2e/visual.spec.ts`）截图前等待动效结束；动效如影响快照，先刷新基线再提交。
 
 ## 验收
 

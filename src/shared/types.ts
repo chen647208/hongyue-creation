@@ -1260,6 +1260,18 @@ export interface ElectronAPI {
     openStream: (requestId: string, model: ModelConfig, prompt: string, options?: AiCallOptions) => Promise<boolean>;
     abort: (requestId: string) => Promise<boolean>;
     onStreamEvent: (listener: (event: AiStreamEvent) => void) => () => void;
+    /** 受控 HTTP（拉表/嵌入）：apiKeyRef 由主进程解引用，渲染端不经手明文。 */
+    http: (request: {
+      url: string;
+      method?: string;
+      headers?: Record<string, string>;
+      body?: string;
+      apiKeyRef?: string;
+      apiKeyHeader?: string;
+      apiKeyScheme?: 'bearer' | 'raw';
+      apiKeyQueryParam?: string;
+      timeoutMs?: number;
+    }) => Promise<{ ok: boolean; status: number; statusText: string; text: string }>;
   };
 
   // 安全密钥库（safeStorage/OS 钥匙串；渲染端持久化只存 vault: 引用）

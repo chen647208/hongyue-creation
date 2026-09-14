@@ -124,6 +124,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openStream: (requestId: string, model: unknown, prompt: string, options?: unknown) =>
       ipcRenderer.invoke(IPC.ai.streamOpen, requestId, model, prompt, options),
     abort: (requestId: string) => ipcRenderer.invoke(IPC.ai.abort, requestId),
+    http: (request: unknown) => ipcRenderer.invoke(IPC.ai.http, request),
     onStreamEvent: (listener: (event: unknown) => void) => {
       const handler = (_event: unknown, payload: unknown): void => listener(payload);
       ipcRenderer.on(IPC.ai.streamEvent, handler);

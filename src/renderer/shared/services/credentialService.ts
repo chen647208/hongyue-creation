@@ -8,15 +8,13 @@
  */
 
 import { isVaultRef,VAULT_REF_PREFIX } from '../../../shared/constants/vault';
-import type { EmbeddingModelConfig, ModelConfig } from '../../../shared/types';
 
 /**
  * 渲染端凭证门面：持久化只存 `vault:<id>` 引用，明文只活在编辑态内存。
  *
  * - 保存时 persistApiKey 明文→vault:set→引用；vault 不可用（无钥匙串/浏览器预览）
  *   则原样返回明文并由调用方提示（绝不静默假装加密）；
- * - 拉表/测连等渲染端直连场景用 resolveApiKey 解引用；
- * - 生成走主进程网关，由网关统一解引用，渲染端无需经手。
+ * - 拉表/测连/生成一律走主进程网关（`aiGateway.http`），由网关统一解引用，渲染端无需经手。
  */
 
 export async function isVaultAvailable(): Promise<boolean> {
@@ -46,36 +44,10 @@ export async function persistApiKey(
   }
 }
 
-/** 解引用：引用→vault:get，明文→原样，无 key→undefined。 */
-export async function resolveApiKey(
-  apiKey: string | undefined,
-  fallbackId?: string
-): Promise<string | undefined> {
-  if (!apiKey) return undefined;
-  if (!isVaultRef(apiKey)) return apiKey;
-  const id = fallbackId ?? apiKey.slice(VAULT_REF_PREFIX.length);
-  try {
-    if (typeof window === 'undefined' || !window.electronAPI?.vault) return undefined;
-    return (await window.electronAPI.vault.get(id)) ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 export async function removeApiKey(id: string): Promise<void> {
   try {
     await window.electronAPI?.vault.remove(id);
   } catch {
     // 删除幂等：vault 不可用或无该 key 都视为成功
   }
-}
-
-/** 模型配置的 Key 解引用（拉表/测连等渲染端直连前调用）。 */
-export async function resolveModelApiKey(model: ModelConfig): Promise<string | undefined> {
-  return resolveApiKey(model.apiKey, model.id);
-}
-
-/** 向量配置的 Key 解引用。 */
-export async function resolveEmbeddingApiKey(config: EmbeddingModelConfig): Promise<string | undefined> {
-  return resolveApiKey(config.apiKey, config.id);
 }

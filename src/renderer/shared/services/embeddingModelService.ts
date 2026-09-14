@@ -15,7 +15,7 @@ import {
   type EmbeddingModelConfig} from '../../../shared/types';
 import { logger } from '../utils/logger';
 import { asNum, asNumArr,asRecord, asRecords, asStr } from '../utils/loose';
-import { resolveEmbeddingApiKey } from './credentialService';
+import { gatewayHttp } from './ai/gatewayClient';
 import { embeddingConfigStore } from './embeddingConfigStore';
 
 /**
@@ -133,19 +133,18 @@ export class EmbeddingModelService {
   }
 
   /**
-   * 获取可用模型列表（vault 引用先解为明文探针，不写回调用方对象）
+   * 获取可用模型列表（Key 由主进程网关解引用注入）
    */
   async fetchModels(config: EmbeddingModelConfig): Promise<string[]> {
-    const probe: EmbeddingModelConfig = { ...config, apiKey: await resolveEmbeddingApiKey(config) };
-    switch (probe.provider) {
+    switch (config.provider) {
       case 'ollama':
-        return this.fetchOllamaModels(probe);
+        return this.fetchOllamaModels(config);
       case 'lmstudio':
       case 'siliconflow':
       case 'bailian':
       case 'volcano':
       case 'openai-compatible':
-        return this.fetchOpenAICompatibleModels(probe);
+        return this.fetchOpenAICompatibleModels(config);
       default:
         return [];
     }
@@ -159,18 +158,16 @@ export class EmbeddingModelService {
     const url = `${endpoint}/api/tags`;
 
     try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+      const response = await gatewayHttp({
+        url,
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (!response.ok) {
         throw new Error(`Ollama请求失败: ${response.status} ${response.statusText}`);
       }
 
-      const data = asRecord(await response.json());
+      const data = asRecord(JSON.parse(response.text) as unknown);
       // Ollama返回的模型列表格式：{ models: [{ name: 'xxx' }] }
       return asRecords(data.models).map((m) => asStr(m.name)).filter((name) => name !== '');
     } catch (error) {
@@ -187,17 +184,10 @@ export class EmbeddingModelService {
     const url = `${endpoint}/models`;
 
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-
-      if (config.apiKey) {
-        headers['Authorization'] = `Bearer ${config.apiKey}`;
-      }
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers
+      const response = await gatewayHttp({
+        url,
+        headers: { 'Content-Type': 'application/json' },
+        apiKeyRef: config.apiKey,
       });
 
       if (!response.ok) {
@@ -209,7 +199,7 @@ export class EmbeddingModelService {
         throw new Error(i18n.t('settings:embedding.apiRequestFailed', { status: response.status, detail: response.statusText }));
       }
 
-      const data = asRecord(await response.json());
+      const data = asRecord(JSON.parse(response.text) as unknown);
       // OpenAI兼容格式：{ data: [{ id: 'xxx' }] }
       const models = asRecords(data.data).map((m) => asStr(m.id)).filter((id) => id !== '');
       
@@ -256,24 +246,23 @@ export class EmbeddingModelService {
   }
 
   /**
-   * 实际调用API获取嵌入向量（vault 引用先解为明文探针，不写回调用方对象）
+   * 实际调用API获取嵌入向量（Key 由主进程网关解引用注入）
    */
   private async fetchEmbeddings(
     config: EmbeddingModelConfig,
     texts: string[]
   ): Promise<number[][]> {
-    const probe: EmbeddingModelConfig = { ...config, apiKey: await resolveEmbeddingApiKey(config) };
-    switch (probe.provider) {
+    switch (config.provider) {
       case 'ollama':
-        return this.fetchOllamaEmbeddings(probe, texts);
+        return this.fetchOllamaEmbeddings(config, texts);
       case 'lmstudio':
       case 'siliconflow':
       case 'bailian':
       case 'volcano':
       case 'openai-compatible':
-        return this.fetchOpenAICompatibleEmbeddings(probe, texts);
+        return this.fetchOpenAICompatibleEmbeddings(config, texts);
       default:
-        throw new Error(i18n.t('settings:embedding.unsupportedProvider', { provider: probe.provider }));
+        throw new Error(i18n.t('settings:embedding.unsupportedProvider', { provider: config.provider }));
     }
   }
 
@@ -289,23 +278,22 @@ export class EmbeddingModelService {
 
     // Ollama的embedding API一次只能处理一个文本
     for (const text of texts) {
-      const response = await fetch(`${endpoint}/api/embeddings`, {
+      const response = await gatewayHttp({
+        url: `${endpoint}/api/embeddings`,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: config.modelName,
           prompt: text
-        })
+        }),
+        timeoutMs: config.timeout,
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(i18n.t('settings:embedding.ollamaEmbedFailed', { status: response.status, detail: errorText }));
+        throw new Error(i18n.t('settings:embedding.ollamaEmbedFailed', { status: response.status, detail: response.text }));
       }
 
-      const data = asRecord(await response.json());
+      const data = asRecord(JSON.parse(response.text) as unknown);
       const embedding = asNumArr(data.embedding);
       
       if (embedding.length === 0) {
@@ -331,14 +319,6 @@ export class EmbeddingModelService {
     logger.debug(`调用Embedding API: ${url}`);
     logger.debug(`模型: ${config.modelName}, 文本数量: ${texts.length}`);
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    if (config.apiKey) {
-      headers['Authorization'] = `Bearer ${config.apiKey}`;
-    }
-
     // 准备请求体
     const requestBody: Record<string, unknown> = {
       model: config.modelName,
@@ -352,62 +332,50 @@ export class EmbeddingModelService {
     }
 
     logger.debug('请求体:', JSON.stringify(requestBody, null, 2));
+    logger.debug('发送请求...');
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+    const response = await gatewayHttp({
+      url,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      apiKeyRef: config.apiKey,
+      timeoutMs: config.timeout,
+    });
 
-    try {
-      logger.debug('发送请求...');
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
-        signal: controller.signal
-      });
+    logger.debug(`响应状态: ${response.status}`);
 
-      clearTimeout(timeoutId);
-
-      logger.debug(`响应状态: ${response.status}`);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.error('API错误响应:', errorText);
-        const errorData = asRecord(await response.json().catch(() => ({})));
-        const errorMessage = asStr(asRecord(errorData.error).message) || asStr(errorData.message) || i18n.t('settings:embedding.apiRequestFailed', { status: response.status, detail: errorText });
-        throw new Error(errorMessage);
-      }
-
-      const data = asRecord(await response.json());
-      logger.debug('API响应成功, 数据键:', Object.keys(data));
-
-      const items = asRecords(data.data);
-      if (items.length === 0) {
-        logger.error('API返回格式不正确:', data);
-        throw new Error(i18n.t('settings:embedding.embedBadFormat'));
-      }
-
-      logger.debug(`获取到 ${items.length} 个嵌入向量`);
-
-      // 按index排序，确保顺序正确
-      const sortedEmbeddings = items
-        .sort((a, b) => asNum(a.index) - asNum(b.index))
-        .map((item) => asNumArr(item.embedding));
-
-      logger.debug(`第一个嵌入向量维度: ${sortedEmbeddings[0]?.length}`);
-
-      // 如果需要归一化
-      if (config.normalizeEmbeddings) {
-        return sortedEmbeddings.map((emb) => this.normalizeVector(emb));
-      }
-
-      return sortedEmbeddings;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(i18n.t('settings:embedding.requestTimeout', { timeout: config.timeout }));
-      }
-      throw error;
+    if (!response.ok) {
+      logger.error('API错误响应:', response.text);
+      const errorData = asRecord(response.text ? JSON.parse(response.text) as unknown : {});
+      const errorMessage = asStr(asRecord(errorData.error).message) || asStr(errorData.message) || i18n.t('settings:embedding.apiRequestFailed', { status: response.status, detail: response.text });
+      throw new Error(errorMessage);
     }
+
+    const data = asRecord(JSON.parse(response.text) as unknown);
+    logger.debug('API响应成功, 数据键:', Object.keys(data));
+
+    const items = asRecords(data.data);
+    if (items.length === 0) {
+      logger.error('API返回格式不正确:', data);
+      throw new Error(i18n.t('settings:embedding.embedBadFormat'));
+    }
+
+    logger.debug(`获取到 ${items.length} 个嵌入向量`);
+
+    // 按index排序，确保顺序正确
+    const sortedEmbeddings = items
+      .sort((a, b) => asNum(a.index) - asNum(b.index))
+      .map((item) => asNumArr(item.embedding));
+
+    logger.debug(`第一个嵌入向量维度: ${sortedEmbeddings[0]?.length}`);
+
+    // 如果需要归一化
+    if (config.normalizeEmbeddings) {
+      return sortedEmbeddings.map((emb) => this.normalizeVector(emb));
+    }
+
+    return sortedEmbeddings;
   }
 
   /**

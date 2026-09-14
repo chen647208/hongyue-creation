@@ -84,6 +84,7 @@ export const IPC = {
     streamOpen: 'ai:stream:open',
     streamEvent: 'ai:stream:event',
     abort: 'ai:stream:abort',
+    http: 'ai:http',
   },
 
   // MCP 客户端（连接外部 MCP server：列表/调用走主进程 stdio）

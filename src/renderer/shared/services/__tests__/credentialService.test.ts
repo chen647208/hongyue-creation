@@ -14,8 +14,6 @@ import {
   isVaultAvailable,
   persistApiKey,
   removeApiKey,
-  resolveApiKey,
-  resolveModelApiKey,
 } from '../credentialService';
 
 function stubVault(impl?: Partial<{ isAvailable: boolean; store: Map<string, string> }>): Map<string, string> {
@@ -52,15 +50,13 @@ describe('credentialService', () => {
     expect(isVaultRef(undefined)).toBe(false);
   });
 
-  it('vault 可用：persist 入库返回引用，resolve 解回明文', async () => {
+  it('vault 可用：persist 入库返回引用', async () => {
     const store = stubVault();
     expect(await isVaultAvailable()).toBe(true);
     const { stored, encrypted } = await persistApiKey('m1', 'sk-secret');
     expect(stored).toBe(`${VAULT_REF_PREFIX}m1`);
     expect(encrypted).toBe(true);
     expect(store.get('m1')).toBe('sk-secret');
-    expect(await resolveApiKey(stored)).toBe('sk-secret');
-    expect(await resolveModelApiKey({ id: 'm1', apiKey: stored } as never)).toBe('sk-secret');
     // 已是引用不再重复入库
     const again = await persistApiKey('m1', stored);
     expect(again.stored).toBe(stored);
@@ -72,7 +68,6 @@ describe('credentialService', () => {
     stubVault();
     expect(await persistApiKey('m1', undefined)).toEqual({ stored: undefined, encrypted: true });
     expect(await persistApiKey('m1', '')).toEqual({ stored: undefined, encrypted: true });
-    expect(await resolveApiKey(undefined)).toBeUndefined();
   });
 
   it('vault 不可用：明文回落 + encrypted=false，调用方据此提示', async () => {
@@ -81,7 +76,6 @@ describe('credentialService', () => {
     const { stored, encrypted } = await persistApiKey('m1', 'sk-x');
     expect(stored).toBe('sk-x');
     expect(encrypted).toBe(false);
-    expect(await resolveApiKey(`${VAULT_REF_PREFIX}m1`)).toBeUndefined();
   });
 
   it('无 electronAPI（浏览器预览）：明文回落且不抛错', async () => {

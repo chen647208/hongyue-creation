@@ -165,3 +165,35 @@ test('查找替换：Ctrl+F 打开并全部替换', async () => {
     cleanupUserDataDir(userDataDir);
   }
 });
+
+test('数据库损坏：启动给出加载失败提示，不静默当空书库', async () => {
+  const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-e2e-corrupt-'));
+  // 预置一个非 SQLite 文件的 hongyue.db，触发打开/迁移失败
+  writeFileSync(join(userDataDir, 'hongyue.db'), 'this is not a sqlite database');
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/加载失败|完整性检查未通过|load failed|integrity/i).first()).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await app.close();
+    cleanupUserDataDir(userDataDir);
+  }
+});
+
+test('设置：打开数据存储页显示存储管理', async () => {
+  const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-e2e-settings-'));
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    await createBook(page);
+    await page.getByRole('button', { name: '设置' }).first().click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: '数据存储' }).click();
+    await expect(page.getByText('数据存储管理')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: /检查完整性|完整性/ })).toBeVisible();
+  } finally {
+    await app.close();
+    cleanupUserDataDir(userDataDir);
+  }
+});

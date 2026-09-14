@@ -19,7 +19,7 @@ import { app, ipcMain } from 'electron';
 
 import type { AiCallOptions, AIResponse, AiStreamEvent, ModelConfig } from '../../shared/types.js';
 import type { Provider } from '../app/container.js';
-import { withVaultKey } from '../app/secureStore.js';
+import { resolveVaultApiKey, VAULT_UNAVAILABLE, withVaultKey } from '../app/secureStore.js';
 import { IPC } from '../channels.js';
 import { aiT, initAiI18n } from './i18n.js';
 import { resolveAdapter } from './resolve.js';
@@ -74,6 +74,67 @@ export async function runAdapterStream(
     },
     options,
   );
+}
+
+/** 渲染端发起的受控 HTTP（拉表/嵌入等）：API Key 只在主进程解引用并注入。 */
+export interface GatewayHttpRequest {
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  /** vault 引用（或明文）；非空时由主进程解引用并按下方方式注入，渲染端不经手明文。 */
+  apiKeyRef?: string;
+  /** 注入的请求头名，默认 Authorization。 */
+  apiKeyHeader?: string;
+  /** 头值方案：bearer → `Bearer <key>`；raw → 原样。默认 bearer。 */
+  apiKeyScheme?: 'bearer' | 'raw';
+  /** 非空时以查询参数注入 Key（如 Gemini 的 key）。 */
+  apiKeyQueryParam?: string;
+  timeoutMs?: number;
+}
+
+export interface GatewayHttpResponse {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  text: string;
+}
+
+/** 执行一次受控 HTTP：只允许 http/https；解引用 Key；超时中止。 */
+export async function performAiHttp(request: GatewayHttpRequest): Promise<GatewayHttpResponse> {
+  if (!request || typeof request.url !== 'string') throw new TypeError('Invalid ai:http arguments');
+  const url = new URL(request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`不允许的协议：${url.protocol}`);
+  }
+  const headers: Record<string, string> = { ...(request.headers ?? {}) };
+  if (request.apiKeyRef) {
+    const key = await resolveVaultApiKey(request.apiKeyRef);
+    if (!key) throw new Error(VAULT_UNAVAILABLE);
+    if (request.apiKeyQueryParam) {
+      url.searchParams.set(request.apiKeyQueryParam, key);
+    } else {
+      headers[request.apiKeyHeader ?? 'Authorization'] = request.apiKeyScheme === 'raw' ? key : `Bearer ${key}`;
+    }
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), request.timeoutMs ?? 30_000);
+  try {
+    const response = await fetch(url, {
+      method: request.method ?? 'GET',
+      headers,
+      body: request.body,
+      signal: controller.signal,
+    });
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      text: await response.text(),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** AI 网关 Provider：boot 注册 IPC，shutdown 中止所有在途请求。 */
@@ -146,6 +207,8 @@ export const aiGatewayProvider: Provider = {
       }
       return true;
     });
+
+    ipcMain.handle(IPC.ai.http, (_event, request: GatewayHttpRequest): Promise<GatewayHttpResponse> => performAiHttp(request));
   },
   shutdown() {
     for (const controller of active.values()) controller.abort();
