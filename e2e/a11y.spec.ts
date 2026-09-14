@@ -23,7 +23,14 @@ async function blockingViolations(page: Page): Promise<AxeViolation[]> {
 }
 
 const summary = (label: string, violations: AxeViolation[]) =>
-  violations.map((v) => ({ page: label, id: v.id, impact: v.impact, nodes: v.nodes.length, help: v.help }));
+  violations.map((v) => ({
+    page: label,
+    id: v.id,
+    impact: v.impact,
+    nodes: v.nodes.length,
+    help: v.help,
+    targets: v.nodes.map((n) => n.target),
+  }));
 
 /**
  * 无障碍审计（棘轮门禁）：书架与工作台要求零 serious/critical；
