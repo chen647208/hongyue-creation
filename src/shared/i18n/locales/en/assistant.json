@@ -96,6 +96,7 @@
     "speakStopTitle": "Stop reading",
     "copyTitle": "Copy this message",
     "deleteTitle": "Delete this message",
+    "deleteConfirm": "Delete this message?",
     "editResendTitle": "Load into input to edit and resend",
     "toolChainTitle": "Tool chain ({{count}})",
     "retryTitle": "Regenerate from the last message (keeps the old answer)",

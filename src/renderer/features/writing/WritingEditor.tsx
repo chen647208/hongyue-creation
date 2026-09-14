@@ -17,6 +17,7 @@ import { type CommitOptions,useProjectStore } from '@/app/stores/projectStore';
 import { useSettingsStore, useUsableModel } from '@/app/stores/settingsStore';
 import { buildBlockTextMap, resolveAnnotation } from '@/editor/annotations';
 import { buildBlockRefIndex, resolveBlockProjection } from '@/editor/blockRefs';
+import { useViewportTier } from '@/shared/hooks/useViewportTier';
 import { dialogService } from '@/shared/services/dialogService';
 import { onEditorOps } from '@/shared/services/editorOps';
 import { openForeshadows, overdueForeshadows } from '@/shared/services/foreshadowService';
@@ -25,6 +26,7 @@ import { Button } from '@/shared/ui/Button';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { FeaturePanel } from '@/shared/ui/FeaturePanel';
 import { Slot } from '@/shared/ui/Slot';
+import { resolveWorkspaceChrome } from '@/shared/utils/layout';
 import { logger } from '@/shared/utils/logger';
 import { isModelUsable } from '@/shared/utils/modelReadiness';
 
@@ -64,6 +66,8 @@ import {
 
 const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId, onBack, onNavigateToCharacters, onOpenSettings }) => {
   const { t } = useTranslation(['writing', 'steps']);
+  // 窄视口侧栏改抽屉覆盖层：默认收起，避免挤压正文（docs/design/35 §2）
+  const isMobile = resolveWorkspaceChrome(useViewportTier()).writingSidebarOverlay;
   // 直读 store：模型/提示词/更新动作不再经 App→View 层层透传
   const prompts = useSettingsStore((s) => s.prompts);
   // 手写 bypass 下可能为 undefined，未填凭证的默认模型也不可用：AI 入口各自守卫，调用前收窄
@@ -81,7 +85,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
       cause: template.id,
     });
   const [activeChapterId, setActiveChapterId] = useState<string | null>(initialChapterId || null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => !isMobile);
   const [lastSaved, setLastSaved] = useState<number>(Date.now());
   const [saveDirty, setSaveDirty] = useState(false);
   const [typewriter, setTypewriter] = useState<boolean>(() => {
@@ -455,6 +459,51 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
   };
   const modalContextInfo = genModal.chapter ? getChapterContext(project.chapters, genModal.chapter) : { prevChapter: null, prevContextText: "", nextChapter: null, nextSummary: "" };
 
+  const sidebarNode = (
+    <WritingSidebar
+      project={project}
+      activeChapter={activeChapter}
+      activeChapterId={activeChapterId}
+      chapters={project.chapters}
+      summaryPrompts={summaryPrompts}
+      selectedSummaryPromptId={selectedSummaryPromptId}
+      isExtractingSummary={isExtractingSummary}
+      hasModel={isModelUsable(activeModel)}
+      onClose={() => setIsSidebarOpen(false)}
+      onChapterSummaryChange={updateChapterSummary}
+      onContentSummaryChange={updateChapterContentSummary}
+      onSummaryPromptChange={setSelectedSummaryPromptId}
+      onExtractSummary={handleExtractSummary}
+      onChapterClick={handleChapterClick}
+      onNavigateToCharacters={onNavigateToCharacters}
+      onDeleteChapter={handleDeleteChapter}
+      onChaptersChange={handleChaptersChange}
+      onBatchDeleteChapter={handleBatchDeleteChapter}
+      onInsertEntity={(name: string) => {
+        editorRef.current?.insertText(name);
+      }}
+      blockRefs={{
+        index: blockRefIndex,
+        activeBlockId,
+        onInsertRef: handleInsertBlockRef,
+        onInsertEmbed: handleInsertBlockEmbed,
+        onJump: handleJumpToBlock,
+      }}
+      annotationPanel={{
+        activeChapterId,
+        annotations: annotationController.annotations,
+        blockTexts: annotationBlockTexts,
+        onJump: handleJumpToBlock,
+        onAddFromSelection: handleAddAnnotation,
+        onReply: annotationController.reply,
+        onUpdateBody: annotationController.updateBody,
+        onResolve: annotationController.resolve,
+        onReopen: annotationController.reopen,
+        onDelete: annotationController.remove,
+      }}
+    />
+  );
+
   return (
     <div className="relative flex h-full overflow-hidden bg-background">
       
@@ -541,50 +590,21 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
         onOpenSettings={onOpenSettings}
       />
 
-      {/* Sidebar & Editor Areas */}
+      {/* Sidebar & Editor Areas：手机档侧栏改抽屉覆盖层，桌面档保持并排分栏 */}
       {isSidebarOpen && !isFocusMode && (
-        <WritingSidebar
-          project={project}
-          activeChapter={activeChapter}
-          activeChapterId={activeChapterId}
-          chapters={project.chapters}
-          summaryPrompts={summaryPrompts}
-          selectedSummaryPromptId={selectedSummaryPromptId}
-          isExtractingSummary={isExtractingSummary}
-          hasModel={isModelUsable(activeModel)}
-          onClose={() => setIsSidebarOpen(false)}
-          onChapterSummaryChange={updateChapterSummary}
-          onContentSummaryChange={updateChapterContentSummary}
-          onSummaryPromptChange={setSelectedSummaryPromptId}
-          onExtractSummary={handleExtractSummary}
-          onChapterClick={handleChapterClick}
-          onNavigateToCharacters={onNavigateToCharacters}
-          onDeleteChapter={handleDeleteChapter}
-          onChaptersChange={handleChaptersChange}
-          onBatchDeleteChapter={handleBatchDeleteChapter}
-          onInsertEntity={(name: string) => {
-            editorRef.current?.insertText(name);
-          }}
-          blockRefs={{
-            index: blockRefIndex,
-            activeBlockId,
-            onInsertRef: handleInsertBlockRef,
-            onInsertEmbed: handleInsertBlockEmbed,
-            onJump: handleJumpToBlock,
-          }}
-          annotationPanel={{
-            activeChapterId,
-            annotations: annotationController.annotations,
-            blockTexts: annotationBlockTexts,
-            onJump: handleJumpToBlock,
-            onAddFromSelection: handleAddAnnotation,
-            onReply: annotationController.reply,
-            onUpdateBody: annotationController.updateBody,
-            onResolve: annotationController.resolve,
-            onReopen: annotationController.reopen,
-            onDelete: annotationController.remove,
-          }}
-        />
+        isMobile ? (
+          <div className="fixed inset-0 z-overlay" role="dialog" aria-modal="true" aria-label={t('sidebar.title')}>
+            <button
+              type="button"
+              aria-label={t('sidebar.close')}
+              className="absolute inset-0 bg-foreground/40"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+            <div className="absolute inset-y-0 left-0 max-w-[85vw] shadow-xl">{sidebarNode}</div>
+          </div>
+        ) : (
+          sidebarNode
+        )
       )}
 
       <div className="relative flex h-full min-w-0 flex-1 flex-col bg-muted/30">

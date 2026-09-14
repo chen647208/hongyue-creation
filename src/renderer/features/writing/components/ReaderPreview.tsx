@@ -49,8 +49,8 @@ const ReaderPreview: React.FC<ReaderPreviewProps> = ({ project, chapter }) => {
           title={t('tools.preview.title')}
           srcDoc={html}
           sandbox=""
-          className="mx-auto rounded-lg border border-border bg-white"
-          style={{ width: WIDTHS[device], height: 360 }}
+          className="mx-auto rounded-lg border border-border bg-card"
+          style={{ width: WIDTHS[device], maxWidth: '100%', height: 360 }}
         />
       ) : (
         <p className="py-8 text-center text-sm text-muted-foreground">{t('tools.preview.empty')}</p>

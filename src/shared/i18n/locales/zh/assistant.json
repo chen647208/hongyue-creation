@@ -96,6 +96,7 @@
     "speakStopTitle": "停止朗读",
     "copyTitle": "复制本条",
     "deleteTitle": "删除本条",
+    "deleteConfirm": "确定删除这条消息？",
     "editResendTitle": "回填到输入框改后重发",
     "toolChainTitle": "本轮调用链（{{count}}）",
     "retryTitle": "按上轮原文重新生成（旧答案保留）",

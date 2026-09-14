@@ -3,10 +3,15 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>红月创作</title>
     <link rel="icon" type="image/x-icon" href="/icon.ico">
-
+    <link rel="icon" type="image/svg+xml" href="/app-icon.svg">
+    <link rel="apple-touch-icon" href="/icon.png">
+    <!-- PWA：manifest 提供主屏安装与显示名；离线壳需构建期 service worker，见 design/35 -->
+    <link rel="manifest" href="./manifest.webmanifest">
+    <meta name="theme-color" content="#1c1917">
+    <meta name="color-scheme" content="light dark">
 </head>
 <body class="h-screen overflow-hidden">
     <div id="root" class="h-full"></div>

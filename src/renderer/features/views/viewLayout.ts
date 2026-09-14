@@ -8,6 +8,8 @@
  */
 
 /** 视图布局的默认值与编解码：config 为自由结构，读取时逐字段校验。 */
+import { validateFormulaExpr } from '@shared/formulaScript';
+
 import { ENTITY_VIEW_COLUMNS } from './buildEntityView';
 import type {
   AggregationKind,
@@ -88,18 +90,24 @@ function parseComputedColumns(value: unknown): ComputedColumn[] | undefined {
   for (const item of value) {
     if (typeof item !== 'object' || item === null) continue;
     const record = item as Record<string, unknown>;
+    if (typeof record.key !== 'string' || record.key === '') continue;
     const operands = Array.isArray(record.operands)
       ? record.operands.filter((operand): operand is string => typeof operand === 'string' && operand !== '')
       : [];
-    if (typeof record.key !== 'string' || record.key === '' || !isFormulaOperator(record.operator) || operands.length === 0) {
-      continue;
-    }
+    // 计算列有两种形态：公式脚本表达式，或扁平 operator+operands；两者都没有即丢弃。
+    const parsedExpression = record.expression !== undefined ? validateFormulaExpr(record.expression) : undefined;
+    const hasFlat = isFormulaOperator(record.operator) && operands.length > 0;
+    if (parsedExpression && !parsedExpression.ok) continue; // deny-by-default：非法表达式不注册
+    if (!parsedExpression && !hasFlat) continue;
     const column: ComputedColumn = {
       key: record.key,
       label: typeof record.label === 'string' ? record.label : record.key,
-      operator: record.operator,
-      operands,
     };
+    if (parsedExpression) column.expression = parsedExpression.expr;
+    else {
+      column.operator = record.operator as ComputedColumn['operator'];
+      column.operands = operands;
+    }
     if (typeof record.width === 'number') column.width = record.width;
     if (typeof record.params === 'object' && record.params !== null && !Array.isArray(record.params)) {
       const params: Record<string, number> = {};
@@ -111,6 +119,16 @@ function parseComputedColumns(value: unknown): ComputedColumn[] | undefined {
     columns.push(column);
   }
   return columns.length > 0 ? columns : undefined;
+}
+
+function parseFieldAliases(value: unknown): Record<string, string> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const aliases: Record<string, string> = {};
+  for (const [source, target] of Object.entries(value as Record<string, unknown>)) {
+    if (source === '' || typeof target !== 'string' || target === '') continue;
+    aliases[source] = target;
+  }
+  return Object.keys(aliases).length > 0 ? aliases : undefined;
 }
 
 function parseAggregations(value: unknown): ViewAggregation[] | undefined {
@@ -158,6 +176,7 @@ export function parseViewLayout(config: Record<string, unknown> | undefined): Vi
     conditions: parseCondition(config.conditions),
     computed: parseComputedColumns(config.computed),
     aggregations: parseAggregations(config.aggregations),
+    fieldAliases: parseFieldAliases(config.fieldAliases),
   };
 }
 
@@ -175,5 +194,6 @@ export function serializeViewLayout(layout: ViewLayout): Record<string, unknown>
     conditions: layout.conditions,
     computed: layout.computed,
     aggregations: layout.aggregations,
+    fieldAliases: layout.fieldAliases,
   };
 }

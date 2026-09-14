@@ -87,3 +87,21 @@ test('书架/工作台/设置通过 axe 棘轮审计', async () => {
     cleanupUserDataDir(userDataDir);
   }
 });
+
+/** 手机宽度（390×844）：底部导航与流式重排界面要求零 serious/critical。 */
+test('手机宽度的书架/工作台通过 axe 审计', async () => {
+  const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-a11y-mobile-'));
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const violations = [...summary('bookshelf-mobile', await blockingViolations(page))];
+
+    await createBook(page);
+    violations.push(...summary('workspace-mobile', await blockingViolations(page)));
+
+    expect(violations, '手机宽度书架/工作台出现 axe serious/critical 问题').toEqual([]);
+  } finally {
+    await app.close();
+    cleanupUserDataDir(userDataDir);
+  }
+});

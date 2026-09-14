@@ -29,11 +29,13 @@ import type { Project } from '../../shared/types';
 import { DEFAULT_EDITOR_FONT, DEFAULT_UI_FONT, resolveFontStack } from '../constants/fonts';
 import ApprovalHost from '../features/assistant/components/ApprovalHost';
 import AIHistoryViewer from '../features/writing/AIHistoryViewer';
+import { useViewportTier } from '../shared/hooks/useViewportTier';
 import { useViewPreference } from '../shared/hooks/useViewPreference';
 import { exportCover } from '../shared/services/coverService';
 import { dialogService } from '../shared/services/dialogService';
 import { eventToKeybinding, resolveKeybindings } from '../shared/services/keybindings';
 import { getStorageBackendStatus,repository } from '../shared/services/repository';
+import { resolveWorkspaceChrome } from '../shared/utils/layout';
 import { registerAssistantRuntime } from './app-shell/assistantRuntimeSetup';
 import { BookshelfScreen } from './app-shell/BookshelfScreen';
 import CommandPalette from './app-shell/CommandPalette';
@@ -91,7 +93,10 @@ const App: React.FC = () => {
   const [resetOpen, setResetOpen] = useState(false);
   const [assistantOpenPref, setAssistantOpenPref] = useViewPreference<'open' | 'closed'>('assistant.open', 'open');
   const [assistantWidthPref, setAssistantWidthPref] = useViewPreference<string>('assistant.width', '380');
-  const assistantOpen = assistantOpenPref !== 'closed';
+  // 窄视口（手机）助手改全屏覆盖层：不随桌面偏好自动铺开，本次进入显式打开才显示
+  const assistantOverlay = resolveWorkspaceChrome(useViewportTier()).assistantOverlay;
+  const [mobileAssistantOpen, setMobileAssistantOpen] = useState(false);
+  const assistantOpen = assistantOverlay ? mobileAssistantOpen : assistantOpenPref !== 'closed';
   const assistantWidth = Math.min(560, Math.max(300, Number.parseInt(assistantWidthPref, 10) || 380));
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -132,8 +137,16 @@ const App: React.FC = () => {
   }, [uiFont, editorFont, customFonts, uiFontSize, editorFontSize, editorLineHeight]);
 
   const toggleAssistant = useCallback(() => {
+    if (assistantOverlay) {
+      setMobileAssistantOpen((v) => !v);
+      return;
+    }
     setAssistantOpenPref(assistantOpen ? 'closed' : 'open');
-  }, [assistantOpen, setAssistantOpenPref]);
+  }, [assistantOpen, assistantOverlay, setAssistantOpenPref]);
+  const closeAssistant = useCallback(() => {
+    if (assistantOverlay) setMobileAssistantOpen(false);
+    else setAssistantOpenPref('closed');
+  }, [assistantOverlay, setAssistantOpenPref]);
 
   // IDE 式开关：默认 Ctrl/Cmd+J 随时显隐 AI 侧边栏（设置页可改键）
   const keybindingOverrides = useSettingsStore(s => s.keybindings);
@@ -273,7 +286,7 @@ const App: React.FC = () => {
         prompts={prompts}
         onUpdate={updateProject}
         width={assistantWidth}
-        onClose={() => setAssistantOpenPref('closed')}
+        onClose={closeAssistant}
         onWidthChange={(w) => setAssistantWidthPref(String(Math.min(560, Math.max(300, Math.round(w)))))}
       />
     </Suspense>
@@ -358,11 +371,15 @@ const App: React.FC = () => {
               />
             </div>
             {assistantNode && assistantOpen ? (
-              <div className="shrink-0 border-l border-border" style={{ width: assistantWidth }}>
-                {assistantNode}
-              </div>
+              assistantOverlay ? (
+                <div className="fixed inset-0 z-overlay bg-card">{assistantNode}</div>
+              ) : (
+                <div className="shrink-0 border-l border-border" style={{ width: assistantWidth }}>
+                  {assistantNode}
+                </div>
+              )
             ) : (
-              assistantNode && (
+              !assistantOverlay && assistantNode && (
                 <div className="flex w-10 shrink-0 items-start justify-center border-l border-border bg-card pt-3">
                   <Button
                     variant="ghost"

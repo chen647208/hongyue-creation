@@ -94,3 +94,23 @@ export function parseKeywords(body: string): KeywordParseResult {
   }
   return { declarations, references, wikiLinks };
 }
+
+/**
+ * 抽取全部 `# @键: 值` 行（不限已知关键字），键为关键字名、值为行内原文。
+ * 供视图投影把章节正文里的自定义字段（如分镜的 画面/景别）暴露为行字段；
+ * 同一关键字重复出现时后者覆盖前者。
+ */
+const ANY_KEYWORD_LINE = /^\s*#\s*@([^\s:：]+)\s*[:：]\s*(.+)$/;
+
+export function parseKeywordAttributes(body: string): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  for (const line of body.split('\n')) {
+    const m = line.match(ANY_KEYWORD_LINE);
+    if (!m) continue;
+    const keyword = (m[1] ?? '').trim();
+    const value = (m[2] ?? '').trim();
+    if (!keyword || value === '') continue;
+    attributes[keyword] = value;
+  }
+  return attributes;
+}

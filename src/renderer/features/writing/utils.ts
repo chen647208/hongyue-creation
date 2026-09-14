@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { buildDocxFiles, buildEpubFiles, buildOdtFiles, type BuildProfile,clampHeadingLevel, COMPILE_DEFAULTS,roundtripProfile, runBuild } from '@core/build';
+import { buildDocxFiles, buildEpubFiles, buildOdtFiles, type BuildProfile,clampHeadingLevel, COMPILE_DEFAULTS, referenceEntities,roundtripProfile, runBuild } from '@core/build';
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '@core/entities';
 import { Bot, Brain, Cpu, Feather, type LucideIcon,Server } from 'lucide-react';
 
@@ -114,7 +114,9 @@ export const getPreviousChapterSummaryIds = (chapters: Chapter[], currentChapter
     }
     return list;
   });
-  return { nodes, attrs, edges: [] };
+  // 来源条目投影为 meta.reference 节点：正文 [@key] 经编译管线解析为编号与文末表。
+  const sources = referenceEntities(project.references ?? [], project.id);
+  return { nodes: [...nodes, ...sources.nodes], attrs: [...attrs, ...sources.attrs], edges: [] };
 }
 
 const escapeHtml = (text: string) =>

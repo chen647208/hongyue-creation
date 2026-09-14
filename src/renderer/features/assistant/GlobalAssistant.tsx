@@ -496,7 +496,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="size-6 text-muted-foreground hover:text-foreground"
+              className="size-11 text-muted-foreground hover:text-foreground sm:size-6"
               title={t('window.closeSidebar')}
             >
               <X className="size-3.5" />
@@ -506,8 +506,8 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
       </div>
 
       <>
-        <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted/20 px-4 py-2 text-xs">
-          <div className="flex items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-4 py-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
             <Select
               className="h-7 w-auto max-w-[140px] text-xs"
               aria-label={t('chat.modelSelect')}
@@ -531,12 +531,12 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
               <option value="traditional">{t('output.traditional')}</option>
             </Select>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-1">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setEditPanelOpen(!editPanelOpen)}
-              className={cn('size-7 text-muted-foreground hover:text-foreground', editPanelOpen && 'bg-primary/10 text-primary')}
+              className={cn('size-11 text-muted-foreground hover:text-foreground sm:size-7', editPanelOpen && 'bg-primary/10 text-primary')}
               title={t('window.editDataTitle')}
             >
               <PenLine className="size-4" />
@@ -545,7 +545,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
               variant="ghost"
               size="icon"
               onClick={() => { setContextPanelOpen(!contextPanelOpen); setInjectionPanelOpen(false); }}
-              className={cn('size-7 text-muted-foreground hover:text-foreground', contextPanelOpen && 'bg-primary/10 text-primary')}
+              className={cn('size-11 text-muted-foreground hover:text-foreground sm:size-7', contextPanelOpen && 'bg-primary/10 text-primary')}
               title={t('window.contextTitle')}
             >
               <BookOpenText className="size-4" />
@@ -554,7 +554,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
               variant="ghost"
               size="icon"
               onClick={() => { setInjectionPanelOpen(!injectionPanelOpen); setContextPanelOpen(false); setEditPanelOpen(false); }}
-              className={cn('size-7 text-muted-foreground hover:text-foreground', injectionPanelOpen && 'bg-primary/10 text-primary')}
+              className={cn('size-11 text-muted-foreground hover:text-foreground sm:size-7', injectionPanelOpen && 'bg-primary/10 text-primary')}
               title={t('window.injectionTitle')}
             >
               <Layers className="size-4" />
@@ -564,7 +564,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
                 variant="ghost"
                 size="icon"
                 onClick={handleStopStreaming}
-                className="size-7 text-destructive hover:text-destructive"
+                className="size-11 text-destructive hover:text-destructive sm:size-7"
                 title={t('window.stopStreamTitle')}
               >
                 <CircleStop className="size-4" />
@@ -574,7 +574,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
               variant="ghost"
               size="icon"
               onClick={() => setPlanMode((v) => !v)}
-              className={cn('size-7 text-muted-foreground hover:text-foreground', planMode && 'bg-primary/10 text-primary')}
+              className={cn('size-11 text-muted-foreground hover:text-foreground sm:size-7', planMode && 'bg-primary/10 text-primary')}
               title={t('window.planModeTitle')}
             >
               <ListChecks className="size-4" />
@@ -584,7 +584,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
               size="icon"
               onClick={handleRetry}
               disabled={isLoading || !hasModel || !lastUserText.current.trim()}
-              className="size-7 text-muted-foreground hover:text-foreground disabled:opacity-40"
+              className="size-11 text-muted-foreground hover:text-foreground sm:size-7 disabled:opacity-40"
               title={t('chat.retryTitle')}
             >
               <RotateCcw className="size-4" />
@@ -593,7 +593,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
               variant="ghost"
               size="icon"
               onClick={handleClearChat}
-              className="size-7 text-muted-foreground hover:text-destructive"
+              className="size-11 text-muted-foreground hover:text-destructive sm:size-7"
               title={t('window.clearChatTitle')}
             >
               <Trash2 className="size-4" />

@@ -8,7 +8,7 @@
  */
 
 import { SkillCatalog } from '@core/ai';
-import { BuildProfileRegistry, EventBus } from '@core/plugin';
+import { BuildProfileRegistry, EventBus, FormulaRegistry } from '@core/plugin';
 import { afterEach,beforeEach, describe, expect, it, vi } from 'vitest';
 
 const files: Record<string, string> = {
@@ -76,7 +76,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
 
   it('发现→装载→自动激活：技能贡献进入目录；禁用后卸载', async () => {
     const catalog = new SkillCatalog();
-    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus() }, '2.0.0', []);
+    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() }, '2.0.0', []);
 
     const status = host.list().find((s) => s.id === 'com.example.golden3');
     // bootstrap 即激活（否则贡献点永不生效）
@@ -91,7 +91,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
 
   it('配置级禁用：装载即 disabled，技能不注册', async () => {
     const catalog = new SkillCatalog();
-    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus() }, '2.0.0', ['com.example.golden3']);
+    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() }, '2.0.0', ['com.example.golden3']);
     host.activate('com.example.golden3');
     expect(host.list()[0]!.state).toBe('disabled');
     expect(catalog.get('golden3-extra')).toBeUndefined();
@@ -100,7 +100,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
   it('无文件系统（预览环境）：静默跳过磁盘发现', async () => {
     vi.stubGlobal('window', { electronAPI: undefined });
     const catalog = new SkillCatalog();
-    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus() }, '2.0.0', []);
+    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() }, '2.0.0', []);
     expect(host.list()).toEqual([]);
   });
 
@@ -129,7 +129,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
       },
     });
     const catalog = new SkillCatalog();
-    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus() }, '2.0.0', []);
+    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() }, '2.0.0', []);
     const status = host.list().find((s) => s.id === 'com.bad.escape');
     expect(status?.state).toBe('failed');
     expect(status?.error?.cause.some((c) => String(c).includes('越界'))).toBe(true);
@@ -158,7 +158,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     });
     const catalog = new SkillCatalog();
     const host = await bootstrapPlugins(
-      { skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus() },
+      { skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
       '2.0.0',
       [],
     );
@@ -190,7 +190,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     });
     const catalog = new SkillCatalog();
     const host = await bootstrapPlugins(
-      { skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus() },
+      { skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
       '2.0.0',
       [],
     );
@@ -224,7 +224,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
       },
     });
     const host = await bootstrapPlugins(
-      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus() },
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
       '2.0.0',
       [],
     );
@@ -265,7 +265,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     });
     setTrustedPluginKeys(['test-key']);
     const host = await bootstrapPlugins(
-      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus() },
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
       '2.0.0',
       [],
     );
@@ -315,7 +315,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     });
     setTrustedPluginKeys(['test-key']);
     const host = await bootstrapPlugins(
-      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus() },
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
       '2.0.0',
       [],
     );
@@ -367,7 +367,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     });
     setTrustedPluginKeys(['test-key']);
     const host = await bootstrapPlugins(
-      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus() },
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
       '2.0.0',
       [],
     );
@@ -401,7 +401,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
       },
     });
     const host = await bootstrapPlugins(
-      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus() },
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
       '2.0.0',
       [],
     );

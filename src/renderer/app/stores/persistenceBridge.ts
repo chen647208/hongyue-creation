@@ -221,6 +221,13 @@ function bindFlushHandlers(): void {
   window.addEventListener('beforeunload', () => {
     void flushNow();
   });
+  // 移动端浏览器不以 beforeunload 保证退出：切后台/隐藏即刷盘，避免被系统回收丢稿。
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void flushNow();
+  });
+  window.addEventListener('pagehide', () => {
+    void flushNow();
+  });
 }
 
 /**

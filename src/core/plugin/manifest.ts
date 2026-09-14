@@ -66,6 +66,8 @@ export interface PluginContribution {
   /** 逻辑贡献目录（.js，导出具名函数；调用时进沙箱，design/22 §3）。 */
   logic?: string[];
   renderers?: string[];
+  /** 视图公式目录（.json，可序列化派生字段；纯函数沙箱求值，无代码执行）。 */
+  formulas?: string[];
 }
 
 export interface PluginManifest {
@@ -160,7 +162,7 @@ export function validateManifest(raw: unknown): ManifestValidateResult {
       }
       // 目录/文件清单贡献必须是字符串数组（字符串会被逐字符误读为多个路径）。
       const c = m.contributes as Record<string, unknown>;
-      for (const key of ['skills', 'types', 'buildProfiles', 'commands', 'ui', 'logic', 'renderers', 'editor'] as const) {
+      for (const key of ['skills', 'types', 'buildProfiles', 'commands', 'ui', 'logic', 'renderers', 'editor', 'formulas'] as const) {
         const value = c[key];
         if (value !== undefined && (!Array.isArray(value) || value.some((x) => !str(x)))) {
           fail(`contributes.${key}`, '必须是字符串数组');
@@ -222,6 +224,11 @@ export function commandId(pluginId: string, cmd: string): string {
 
 export function typeTemplateId(pluginId: string, type: string): string {
   return `${shortId(pluginId)}.${type}`;
+}
+
+/** 视图公式 id：`<插件短名>.formula.<声明 id>`，与类型模板同域隔离。 */
+export function formulaId(pluginId: string, id: string): string {
+  return `${shortId(pluginId)}.formula.${id}`;
 }
 
 export function eventDomain(pluginId: string, event: string): string {

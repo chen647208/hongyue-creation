@@ -7,6 +7,10 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import type { FormulaExpr } from '@shared/formulaScript';
+
+export type { FormulaExpr, FormulaFunction } from '@shared/formulaScript';
+
 /** 视图引擎的类型：同一份行数据可由表格/卡片/图/大纲/读者五种视图呈现。 */
 export type ViewKind = 'table' | 'card' | 'graph' | 'list' | 'reader';
 
@@ -66,11 +70,18 @@ export type FormulaOperator = 'add' | 'subtract' | 'multiply' | 'divide' | 'min'
 export interface ComputedColumn {
   key: string;
   label: string;
-  operator: FormulaOperator;
-  operands: string[];
+  /** 扁平操作符（无 expression 时使用）。 */
+  operator?: FormulaOperator;
+  /** 扁平操作数（无 expression 时使用）。 */
+  operands?: string[];
   /** 视图/用户参数（数值），操作数 `$名` 在此取值。 */
   params?: Record<string, number>;
   width?: number;
+  /**
+   * 公式脚本表达式：可序列化的纯函数树，存在时优先于 operator/operands。
+   * 只读行字段与 params，无网络/文件/代码执行；由 shared/formulaScript 沙箱求值。
+   */
+  expression?: FormulaExpr;
 }
 
 /** 聚合方式：计数、求和、均值、最长文本长度、最新日期。 */
@@ -95,6 +106,8 @@ export interface ViewQuery {
   conditions?: QueryCondition;
   computed?: ComputedColumn[];
   aggregations?: ViewAggregation[];
+  /** 字段别名：目标字段为空时用来源字段补值（如分镜 DSL 关键字 → 模板字段）。 */
+  aliases?: Record<string, string>;
 }
 
 /** 图中一条边：source/target 为行 id。 */
@@ -131,4 +144,6 @@ export interface ViewLayout {
   computed?: ComputedColumn[];
   /** 聚合定义（缺席=无聚合）。 */
   aggregations?: ViewAggregation[];
+  /** 字段别名：目标字段为空时用来源字段补值，映射方向为 来源 → 目标。 */
+  fieldAliases?: Record<string, string>;
 }

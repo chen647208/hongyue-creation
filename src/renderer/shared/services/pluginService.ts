@@ -21,10 +21,11 @@ import type {
   BuildProfileRegistry,
   ContributionInstaller,
   EventBus,
+  FormulaRegistry,
   PluginHostOptions,
   PluginStatus,
 } from '@core/plugin';
-import { installHooks, installTypeTemplates, PermissionDenied, PluginHost, typeTemplateId } from '@core/plugin';
+import { formulaId, installFormulas, installHooks, installTypeTemplates, PermissionDenied, PluginHost, typeTemplateId } from '@core/plugin';
 import { adjudicateHandlerResult, checkPluginFileName, checkPluginRelPath, type SandboxRunResult } from '@core/plugin';
 import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
@@ -207,7 +208,7 @@ export async function discoverAndLoad(host: PluginHost): Promise<void> {
       const contributes = (manifestJson as { contributes?: Record<string, string[]> }).contributes;
       // 路径门（§11.2）：词法两道门在渲染侧前置，realpath 包含由主进程 fs 代理（pluginReadFile/pluginListDirectory）强制
       let denied = false;
-      for (const dirKey of ['skills', 'types', 'buildProfiles', 'ui', 'editor', 'logic'] as const) {
+      for (const dirKey of ['skills', 'types', 'buildProfiles', 'formulas', 'ui', 'editor', 'logic'] as const) {
         // 未签名插件不加载可执行贡献（logic/editor）：资源型仍可用
         if ((dirKey === 'logic' || dirKey === 'editor') && !signed) {
           logger.warn(`未签名插件 ${pluginId}：跳过可执行贡献 ${dirKey}`);
@@ -250,6 +251,7 @@ export interface PluginDeps {
   skillCatalog: SkillCatalog;
   buildProfiles: BuildProfileRegistry;
   events: EventBus;
+  formulas: FormulaRegistry;
 }
 
 /** 贡献装配器：把资源型贡献注册进各注册表（经 sink 交回 Disposable 供 unwind）。 */
@@ -318,6 +320,20 @@ export function createContributionInstaller(deps: PluginDeps): ContributionInsta
           sink.add(deps.buildProfiles.register(profile));
         } catch {
           // 同上：损坏档案跳过
+        }
+      }
+    }
+
+    // 视图公式（可序列化派生字段）：JSON 数组，经白名单校验后注册
+    for (const rel of manifest.contributes?.formulas ?? []) {
+      const prefix = `${rel.replace(/^\.\//, '').replace(/\/+$/, '')}/`;
+      for (const [file, content] of Object.entries(plugin.files)) {
+        if (!file.startsWith(prefix) || !file.endsWith('.json')) continue;
+        try {
+          const formulas = JSON.parse(content) as unknown;
+          for (const d of installFormulas(manifest.id, formulas, deps.formulas, formulaId)) sink.add(d);
+        } catch {
+          // 单文件损坏跳过（状态面板可经 markFailed 观测装载期错误）
         }
       }
     }

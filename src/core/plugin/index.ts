@@ -40,7 +40,10 @@ export {
 export {
   buildProfileKey,
   BuildProfileRegistry,
+  type FormulaDefinition,
+  FormulaRegistry,
   type HookDeclaration,
+  installFormulas,
   installHooks,
   installTypeTemplates,
 } from './contributions.js';
@@ -57,6 +60,7 @@ export {
   commandId,
   type Disposable,
   eventDomain,
+  formulaId,
   type ManifestIssue,
   type ManifestValidateResult,
   PermissionDenied,

@@ -760,6 +760,36 @@ export type CharacterGenderId = 'male' | 'female' | 'other' | 'unknown';
 /** 时间线事件重要度：重大 / 次要（过滤用；impact 自由文本保留） */
 export type TimelineImpactId = 'major' | 'minor';
 
+// ========== 参考文献数据模型（非虚构/报告/论文，docs/design/41） ==========
+
+/** 来源类型：书 / 期刊论文 / 文集章节 / 学位论文 / 网页 / 其它。 */
+export type ReferenceType = 'book' | 'article' | 'chapter' | 'thesis' | 'web' | 'other';
+
+/** 一条结构化来源条目；正文以 citekey 用 [@key] 挂接。 */
+export interface Reference {
+  id: string;
+  /** 正文引用键，缺省用 id。 */
+  citekey: string;
+  title: string;
+  type: ReferenceType;
+  authors?: string;
+  year?: string;
+  /** 期刊/文集/网站名。 */
+  container?: string;
+  publisher?: string;
+  place?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  url?: string;
+  doi?: string;
+  isbn?: string;
+  accessed?: string;
+  note?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 // ========== 项目数据模型 ==========
 
 export interface Project {
@@ -802,6 +832,8 @@ export interface Project {
   plan?: PlanItem[];
   /** 泛用分组/卷（任意文体可用；缺席=[]，免迁移）。 */
   groups?: ContentGroup[];
+  /** 参考文献来源条目（非虚构/论文；缺席=[]，免迁移）。 */
+  references?: Reference[];
 }
 
 /** 写作计划阶段（对应创作工作流）。 */

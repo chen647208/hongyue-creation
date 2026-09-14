@@ -39,14 +39,16 @@
 ## 数据视图
 
 - 入口：世界分区「数据视图」开关卡，组件为 `src/renderer/features/views/MultiViewPanel.tsx`。
-- 数据来源：`buildEntityView.ts` 把角色、地点、势力、事件拍平为行与关系边，列固定为类型/名称/摘要/详情。
+- 数据来源：`buildEntityView.ts` 把任意域拍平为行与关系边——章节（含虚拟章节）、实体（角色/地点/势力/事件）、清单项（知识库/伏笔/计划/分组）、规则与世界观，以及 `Project.extensions` 中的扩展类型。章节正文的 `# @键: 值` 行（`parseKeywordAttributes`）与扩展条目的自有字段都成为行字段，列与公式取数不写死六实体。
 - 视图种类：表格（`ViewTable.tsx`，`@tanstack/react-table` 排序与列显隐）、卡片（`ViewCards.tsx`，`@tanstack/react-virtual` 按行虚拟化）、关系图（`ViewGraph.tsx`，按类型着色，边来自角色↔势力↔地点↔事件关联）、大纲（`ViewOutline.tsx`，编号列表）、读者预览（`ViewReader.tsx`，按桌面/平板/手机宽度正文排版）。
-- 拖拽分配：把字段拖入字段区显示该列，把类型拖入类型区按该类型筛选（原生 HTML5 拖放，无额外依赖）。
+- 拖拽分配：字段区列出所有域的字段，拖入字段区显示该列；类型区按当前数据的域动态生成，拖入即按该类型筛选（原生 HTML5 拖放，无额外依赖）。
 - 布局持久化：视图类型、列、隐藏列、排序、类型筛选、读者设备宽度、内容区高度写入 `views` 表的 `ViewDefinition.config`，经 `genericModelStore` 读写；上次选中视图按作品记在 `localStore` 的 `views.selected`。
 - 视图管理：具名视图以可拖拽标签排列，拖动即重排并写回 `orderIndex`；底部拖动条调整内容区高度。
 - 导出：任意视图的投影结果（含计算列）经 `viewExport.ts` 序列化为 Markdown / CSV / HTML 表格；列头、竖线与换行（Markdown）、逗号与引号（CSV）、HTML 实体分别转义。桌面端走主进程另存为对话框，浏览器回退下载（`shared/services/fileSave.ts`）。
-- 计算列：公式操作符为四则、极值、文本拼接与文本长度；操作数写 `$名` 时取 `ComputedColumn.params` 中的数值（视图参数），引擎内不内置业务常数。
-- 视图预设：`viewPresets.ts` 以数据资源提供 ViewLayout 模板，视图面板「插入预设」按预设新建视图。分镜表预设（对应 `storyboard.shot`）列出镜号/景别/画面/台词/音效/时长，口播时长为计算列 `台词字数 ÷ $speechRate`，语速为可在自定义区修改的视图参数。
+- 计算列：两种形态并存——扁平操作符（四则、极值、文本拼接与文本长度，操作数写 `$名` 取 `ComputedColumn.params` 的视图参数）与公式脚本表达式（`shared/formulaScript.ts`）。
+- 公式脚本：可序列化的纯函数树（字段、参数、字面量、白名单函数 if/coalesce/round/lower/upper 等），只读当前行字段与参数，无网络、无文件、无代码执行；未知节点或函数、超深度/节点/参数配额一律拒绝（deny-by-default），求值失败显示空串。插件经 `contributes.formulas` 贡献 JSON 公式，`installFormulas` 按命名空间注册，视图面板「插入公式」将其加入计算列。
+- 字段别名：`ViewLayout.fieldAliases` 在目标字段为空时用来源字段补值，用于把不同域字段名对齐到同一套列（分镜预设把章节 DSL 关键字补到模板字段）。
+- 视图预设：`viewPresets.ts` 以数据资源提供 ViewLayout 模板，视图面板「插入预设」按预设新建视图。分镜表预设（对应 `storyboard.shot`）列出镜号/景别/画面/台词/音效/时长，口播时长为计算列 `台词字数 ÷ $speechRate`，语速为可在自定义区修改的视图参数；同时声明字段别名，使章节型分镜（正文 `# @画面:` 等）也能填入同名列。
 
 ## 双轴时间线
 

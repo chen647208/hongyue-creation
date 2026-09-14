@@ -31,7 +31,40 @@
       "location": "地点",
       "faction": "势力",
       "knowledge": "知识",
-      "event": "事件"
+      "event": "事件",
+      "chapter": "章节",
+      "foreshadow": "伏笔",
+      "rule": "规则",
+      "world": "世界观",
+      "plan": "写作计划",
+      "group": "分组",
+      "reference": "引用"
+    },
+    "references": {
+      "title": "参考文献",
+      "empty": "暂无来源。添加书籍、论文或网页后在此管理。",
+      "citekey": "引用键",
+      "authors": "作者",
+      "year": "年份",
+      "type": "类型",
+      "citedBy": "被引用",
+      "broken": "失链引用",
+      "brokenHint": "正文引用了不存在的来源：{{keys}}",
+      "style": "引用样式",
+      "styleNumbered": "编号",
+      "styleAuthorDate": "作者-年份",
+      "copyKey": "复制引用键"
+    },
+    "branch": {
+      "title": "分支叙事",
+      "scene": "场景",
+      "choices": "选择项",
+      "ending": "结局",
+      "noExit": "无出口",
+      "orphan": "孤儿场景",
+      "undefinedVariable": "未定义变量",
+      "unreachable": "不可达",
+      "empty": "暂无场景。"
     },
     "col": {
       "kind": "类型",
@@ -67,6 +100,7 @@
       "title": "计算列",
       "empty": "暂无计算列，插入预设获取示例",
       "remove": "移除计算列",
+      "insertFormula": "插入公式",
       "param": {
         "speechRate": "语速（字/秒）"
       }

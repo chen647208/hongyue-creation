@@ -18,6 +18,8 @@ import { collectBlockTexts, resolveBlockRefs } from '../dsl/blockRef';
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '../entities';
 import type { BuildProfile, MaterialPolicy } from './profile.js';
 import { clampHeadingLevel, COMPILE_DEFAULTS,typeMatches } from './profile.js';
+import type { InlineReferences,ReferenceSource } from './references.js';
+import { collectReferenceSources, createInlineReferences, formatBibliography, resolveInlineReferences } from './references.js';
 
 export type { MaterialPolicy };
 
@@ -133,7 +135,9 @@ export type DocBlock =
   | { kind: 'volume'; text: string; level?: number }
   | { kind: 'toc'; title: string; level?: number; entries: TocEntry[] }
   | { kind: 'separator'; text: string }
-  | { kind: 'paragraph'; text: string };
+  | { kind: 'paragraph'; text: string }
+  | { kind: 'bibliography'; title: string; entries: string[] }
+  | { kind: 'footnotes'; title: string; entries: string[] };
 
 /** 变换器贡献点：插件可在渲染前插入结构改写（如 reverse-order）。 */
 export interface Transformer {
@@ -170,12 +174,15 @@ function paragraphsOf(
   titleById: Map<string, string>,
   blockTexts: Map<string, string>,
   content: BuildProfile['transform']['content'],
+  inline?: InlineReferences,
 ): string {
   // 块锚是编辑器元数据，不进成稿：编译/导出前先剥离。
   // 引用/嵌入统一展开为被引块文本；失链写标记，成环截断（口径见 @core/dsl/blockRef）。
   const source = stripBlockAnchors(node.body);
   const withNodeRefs = content.resolveRefs === 'displayName' ? resolveRefs(source, titleById) : source;
-  const body = resolveBlockRefs(withNodeRefs, blockTexts);
+  const withBlockRefs = resolveBlockRefs(withNodeRefs, blockTexts);
+  // 引文编号与脚注在块引用展开后解析，保证被引块内的引文同样编号。
+  const body = inline ? resolveInlineReferences(withBlockRefs, inline) : withBlockRefs;
   const paragraphs = body
     .split(/\n+/)
     .map((p) => p.trim())
@@ -194,13 +201,19 @@ function headingText(template: string, no: number | undefined, title: string): s
  * 变换：标题模板 + 重编号 + 隐藏层级 + 引用替换 + 目录/分卷/前后置页（compile）。
  * 默认档案（无 compile）输出与纯章节导出逐字一致。
  */
-export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBlock[] {
+export function transform(
+  profile: BuildProfile,
+  nodes: SelectedNode[],
+  sources: ReadonlyMap<string, ReferenceSource> = new Map(),
+): DocBlock[] {
   const { headings, content } = profile.transform;
   const compile = profile.compile;
   const level = clampHeadingLevel(headings.level);
   const titleById = new Map(nodes.map((n) => [n.id, n.title]));
   // 块引用/嵌入的展开源：全书被锚定块的可见文本（跨章引用也能解析）。
   const blockTexts = collectBlockTexts(nodes.map((n) => n.body));
+  // 引文编号与脚注在正文渲染时统一登记，保证跨章顺序一致。
+  const inline = createInlineReferences(sources, profile.references?.style ?? COMPILE_DEFAULTS.referenceStyle, profile.format);
 
   const volumeTypes = compile?.volumeTypes ?? [];
   const volumeIdSet = new Set(compile?.volumeIds ?? []);
@@ -244,7 +257,7 @@ export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBloc
       }
     }
 
-    blocks.push({ kind: 'paragraph', text: paragraphsOf(node, titleById, blockTexts, content) });
+    blocks.push({ kind: 'paragraph', text: paragraphsOf(node, titleById, blockTexts, content, inline) });
     if (headings.scene) blocks.push({ kind: 'separator', text: headings.scene });
   }
 
@@ -255,7 +268,7 @@ export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBloc
       const node = byId.get(id);
       if (!node) continue;
       out.push({ kind: 'chapter', text: node.title, level });
-      out.push({ kind: 'paragraph', text: paragraphsOf(node, titleById, blockTexts, content) });
+      out.push({ kind: 'paragraph', text: paragraphsOf(node, titleById, blockTexts, content, inline) });
     }
     return out;
   };
@@ -271,6 +284,23 @@ export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBloc
   }
 
   const assembled = [...matterBlocks(frontIds), ...tocBlocks, ...blocks, ...matterBlocks(backIds)];
+
+  // 脚注与参考文献表：按正文出现顺序编号后附于文末（docs/design/41 §1、§2）。
+  if (inline.footnotes.length > 0) {
+    assembled.push({
+      kind: 'footnotes',
+      title: profile.references?.footnotesTitle ?? COMPILE_DEFAULTS.footnotesTitle,
+      entries: inline.footnotes,
+    });
+  }
+  const bibliographyEnabled = profile.references?.enabled ?? true;
+  if (bibliographyEnabled && inline.order.length > 0) {
+    assembled.push({
+      kind: 'bibliography',
+      title: profile.references?.title ?? COMPILE_DEFAULTS.bibliographyTitle,
+      entries: formatBibliography(inline.order, sources, profile.references?.style ?? COMPILE_DEFAULTS.referenceStyle),
+    });
+  }
 
   // 尾部分隔符去掉
   for (let last = assembled.at(-1); last && last.kind === 'separator'; last = assembled.at(-1)) {
@@ -305,9 +335,17 @@ function tocPlain(b: Extract<DocBlock, { kind: 'toc' }>): string {
   return [b.title, ...b.entries.map((entry) => entry.text)].join('\n');
 }
 
+function numberedPlainSection(b: Extract<DocBlock, { kind: 'bibliography' | 'footnotes' }>): string {
+  return [b.title, ...b.entries.map((entry, index) => `${index + 1}. ${entry}`)].join('\n');
+}
+
 function renderTxt(blocks: DocBlock[]): string {
   return blocks
-    .map((b) => (b.kind === 'toc' ? tocPlain(b) : b.text))
+    .map((b) => {
+      if (b.kind === 'toc') return tocPlain(b);
+      if (b.kind === 'bibliography' || b.kind === 'footnotes') return numberedPlainSection(b);
+      return b.text;
+    })
     .join('\n\n');
 }
 
@@ -326,6 +364,15 @@ function renderMd(blocks: DocBlock[], profile: BuildProfile): string {
         const items = b.entries.map((entry) => `- ${entry.text}`).join('\n');
         return `${mdHeading(b.level ?? COMPILE_DEFAULTS.chapterLevel, b.title)}\n\n${items}`;
       }
+      if (b.kind === 'bibliography') {
+        const heading = mdHeading(COMPILE_DEFAULTS.chapterLevel, b.title);
+        return `${heading}\n\n${b.entries.map((entry) => `- ${entry}`).join('\n')}`;
+      }
+      if (b.kind === 'footnotes') {
+        const heading = mdHeading(COMPILE_DEFAULTS.chapterLevel, b.title);
+        return `${heading}\n\n${b.entries.map((entry, index) => `[^${index + 1}]: ${entry}`).join('\n')}`;
+      }
+      if (b.kind === 'separator') return b.text;
       return b.text;
     })
     .join('\n\n');
@@ -350,6 +397,13 @@ function renderHtml(blocks: DocBlock[], profile: BuildProfile): string {
         return `<nav class="toc"><h${h}>${escapeHtml(b.title)}</h${h}><ul>${items}</ul></nav>`;
       }
       if (b.kind === 'separator') return `<p class="scene">${escapeHtml(b.text)}</p>`;
+      if (b.kind === 'bibliography' || b.kind === 'footnotes') {
+        const h = clampHeadingLevel(COMPILE_DEFAULTS.chapterLevel);
+        const className = b.kind === 'bibliography' ? 'bibliography' : 'footnotes';
+        // 逐条为段落：DOCX/ODT 的 HTML 子集只识别 h/p/div，列表项会被丢弃。
+        const items = b.entries.map((entry) => `<p class="${className}-item">${escapeHtml(entry)}</p>`).join('');
+        return `<section class="${className}"><h${h}>${escapeHtml(b.title)}</h${h}>${items}</section>`;
+      }
       return b.text
         .split('\n\n')
         .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
@@ -394,6 +448,9 @@ function renderRtf(blocks: DocBlock[], profile: BuildProfile): string {
     } else if (b.kind === 'toc') {
       lines.push(`{\\b ${escapeRtf(b.title)}}\\par`);
       for (const entry of b.entries) lines.push(`${escapeRtf(entry.text)}\\par`);
+    } else if (b.kind === 'bibliography' || b.kind === 'footnotes') {
+      lines.push(`{\\b ${escapeRtf(b.title)}}\\par`);
+      b.entries.forEach((entry, index) => lines.push(`${escapeRtf(`${index + 1}. ${entry}`)}\\par`));
     } else if (b.kind === 'separator') {
       lines.push(`${escapeRtf(b.text)}\\par`);
     } else {
@@ -424,7 +481,9 @@ export function renderDoc(blocks: DocBlock[], profile: BuildProfile): string {
 /** 完整管线一步调用；同时返回成稿文本供字数统计共用（单一口径）。 */
 export function runBuild(profile: BuildProfile, entities: { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] }): { text: string; blocks: DocBlock[]; nodes: SelectedNode[] } {
   const nodes = select(profile, entities);
-  const blocks = transform(profile, nodes);
+  // 来源条目从全量实体收集（不受选段影响），引文编号按正文出现顺序统一分配。
+  const sources = collectReferenceSources(entities.nodes, entities.attrs);
+  const blocks = transform(profile, nodes, sources);
   const text = renderDoc(blocks, profile);
   return { text, blocks, nodes };
 }

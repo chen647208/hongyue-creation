@@ -9,6 +9,21 @@
 
 /** 构建管线出口（docs/design/07）：profile + select/transform/render。 */
 export {
+  type BranchChoice,
+  type BranchIssue,
+  type BranchIssueKind,
+  type BranchScene,
+  type BranchVariable,
+  buildJumpTable,
+  canReachEnding,
+  collectConditionVariables,
+  evalCondition,
+  firstReadThrough,
+  type JumpEntry,
+  reachableScenes,
+  validateBranching,
+} from './branching.js';
+export {
   buildCoverSvg,
   type CoverOptions,
   escapeXml,
@@ -43,6 +58,7 @@ export {
   type BuildHeadings,
   type BuildProfile,
   type BuildRange,
+  type BuildReferences,
   type BuildRender,
   type BuildSelection,
   type BuildToc,
@@ -59,3 +75,22 @@ export {
   typeMatches,
   validateProfile,
 } from './profile.js';
+export {
+  buildCitationUsage,
+  CITATION_STYLES,
+  type CitationOccurrence,
+  type CitationStyle,
+  type CitationUsage,
+  collectReferenceSources,
+  createInlineReferences,
+  formatBibliography,
+  getCitationStyle,
+  type InlineReferences,
+  REFERENCE_FIELDS,
+  referenceEntities,
+  type ReferenceField,
+  type ReferenceInput,
+  type ReferenceSource,
+  type ReferenceType,
+  resolveInlineReferences,
+} from './references.js';

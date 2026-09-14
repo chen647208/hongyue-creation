@@ -48,6 +48,17 @@ const STORYBOARD_PRESET: ViewPreset = {
     hidden: [],
     sortKey: 'shotNumber',
     sortDesc: false,
+    // 章节型分镜正文用中文 DSL 关键字（# @画面: …）。别名把关键字补到模板字段，
+    // 扩展类型 storyboard.shot 的条目字段键已对齐，别名只在目标为空时生效。
+    fieldAliases: {
+      title: 'shotNumber',
+      画面: 'image',
+      景别: 'framing',
+      镜头运动: 'cameraMove',
+      台词: 'dialogue',
+      音效: 'sound',
+      时长: 'duration',
+    },
     computed: [
       { key: 'computed:shotWordCount', label: 'views.preset.storyboard.col.wordCount', operator: 'length', operands: ['dialogue'], width: 96 },
       {

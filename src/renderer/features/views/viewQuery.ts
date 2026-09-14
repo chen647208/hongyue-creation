@@ -8,6 +8,8 @@
  */
 
 /** 视图查询的纯函数引擎：条件过滤、计算列与聚合，不触碰实体与存储。 */
+import { evaluateFormulaExpr, formatFormulaNumber, formulaDisplay } from '@shared/formulaScript';
+
 import type {
   AggregationKind,
   AggregationResult,
@@ -92,11 +94,6 @@ export function evaluateCondition(condition: QueryCondition | undefined, row: Vi
   return !condition.children.some((child) => evaluateCondition(child, row));
 }
 
-function formatNumber(value: number): string {
-  if (Number.isInteger(value)) return String(value);
-  return String(Math.round(value * 100) / 100);
-}
-
 /**
  * 读出一个操作数：`$名` 取 params 中的数值，其余按字段读取。
  */
@@ -105,15 +102,24 @@ function readOperand(row: ViewRow, operand: string, params: Record<string, numbe
   return params?.[operand.slice(1)];
 }
 
-/** 对一行按计算列求值，返回显示文本；操作数不足、参数缺失或除零返回空串。 */
+/** 对一行按计算列求值，返回显示文本；操作数不足、参数缺失或除零返回空串。
+ *  带 expression 的计算列走公式脚本沙箱（纯函数、白名单函数、深度/节点配额）。 */
 export function evaluateFormula(column: ComputedColumn, row: ViewRow): string {
-  const invalidParam = column.operands.some((operand) => {
+  if (column.expression) {
+    const result = evaluateFormulaExpr(column.expression, {
+      field: (key) => readField(row, key),
+      param: (name) => column.params?.[name],
+    });
+    return result.ok ? result.value : '';
+  }
+  const flatOperands = column.operands ?? [];
+  const invalidParam = flatOperands.some((operand) => {
     if (!operand.startsWith('$')) return false;
     const value = column.params?.[operand.slice(1)];
     return typeof value !== 'number' || !Number.isFinite(value);
   });
-  if (invalidParam) return '';
-  const operands = column.operands.map((operand) => readOperand(row, operand, column.params));
+  if (invalidParam || flatOperands.length === 0) return '';
+  const operands = flatOperands.map((operand) => readOperand(row, operand, column.params));
   if (column.operator === 'concat') {
     return operands.map((value) => toText(value)).filter((text) => text !== '').join(' ');
   }
@@ -124,21 +130,21 @@ export function evaluateFormula(column: ComputedColumn, row: ViewRow): string {
   if (numbers.length === 0) return '';
   switch (column.operator) {
     case 'add':
-      return formatNumber(numbers.reduce((sum, value) => sum + value, 0));
+      return formatFormulaNumber(numbers.reduce((sum, value) => sum + value, 0));
     case 'subtract':
-      return formatNumber(numbers.reduce((diff, value) => diff - value));
+      return formatFormulaNumber(numbers.reduce((diff, value) => diff - value));
     case 'multiply':
-      return formatNumber(numbers.reduce((product, value) => product * value, 1));
+      return formatFormulaNumber(numbers.reduce((product, value) => product * value, 1));
     case 'divide': {
       const head = numbers[0];
       const divisor = numbers.slice(1).reduce((product, value) => product * value, 1);
       if (head === undefined || divisor === 0) return '';
-      return formatNumber(head / divisor);
+      return formatFormulaNumber(head / divisor);
     }
     case 'min':
-      return formatNumber(Math.min(...numbers));
+      return formatFormulaNumber(Math.min(...numbers));
     case 'max':
-      return formatNumber(Math.max(...numbers));
+      return formatFormulaNumber(Math.max(...numbers));
     default:
       return '';
   }
@@ -205,10 +211,34 @@ export function aggregateRows(rows: ViewRow[], aggregations: ViewAggregation[] |
   return aggregations.map((aggregation) => aggregateField(rows, aggregation));
 }
 
-/** 纯函数投影：过滤行、追加计算列、裁剪关系边；不修改入参。 */
+/**
+ * 字段别名：目标字段为空时用来源字段补值（来源 → 目标）。
+ * 用于把不同域的字段名对齐到同一套列（如章节 DSL 关键字补到分镜模板字段）。
+ */
+export function applyFieldAliases(data: EntityViewData, aliases: Record<string, string> | undefined): EntityViewData {
+  const entries = Object.entries(aliases ?? {});
+  if (entries.length === 0) return data;
+  const rows = data.rows.map((row) => {
+    const values = { ...(row.values ?? {}) };
+    const cells = { ...row.cells };
+    for (const [source, target] of entries) {
+      if (!source || !target || source === target) continue;
+      if (!isEmptyValue(values[target]) || !isEmptyValue(cells[target])) continue;
+      const value = Object.prototype.hasOwnProperty.call(values, source) ? values[source] : row.cells[source];
+      if (value === undefined || value === null) continue;
+      values[target] = value;
+      cells[target] = row.cells[source] ?? formulaDisplay(value);
+    }
+    return { ...row, values, cells };
+  });
+  return { ...data, rows };
+}
+
+/** 纯函数投影：对齐字段别名、过滤行、追加计算列、裁剪关系边；不修改入参。 */
 export function applyViewQuery(data: EntityViewData, query: ViewQuery | undefined): EntityViewData {
+  const aliased = applyFieldAliases(data, query?.aliases);
   const computed = query?.computed ?? [];
-  const rows = data.rows
+  const rows = aliased.rows
     .filter((row) => evaluateCondition(query?.conditions, row))
     .map((row) => {
       if (computed.length === 0) return row;
@@ -222,9 +252,9 @@ export function applyViewQuery(data: EntityViewData, query: ViewQuery | undefine
     });
   const columns =
     computed.length === 0
-      ? data.columns
-      : [...data.columns, ...computed.map((column) => ({ key: column.key, label: column.label, width: column.width ?? 140 }))];
+      ? aliased.columns
+      : [...aliased.columns, ...computed.map((column) => ({ key: column.key, label: column.label, width: column.width ?? 140 }))];
   const kept = new Set(rows.map((row) => row.id));
-  const links = data.links.filter((link) => kept.has(link.source) && kept.has(link.target));
+  const links = aliased.links.filter((link) => kept.has(link.source) && kept.has(link.target));
   return { columns, rows, links };
 }

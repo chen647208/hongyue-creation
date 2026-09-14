@@ -31,7 +31,40 @@
       "location": "Location",
       "faction": "Faction",
       "knowledge": "Knowledge",
-      "event": "Event"
+      "event": "Event",
+      "chapter": "Chapter",
+      "foreshadow": "Foreshadow",
+      "rule": "Rule",
+      "world": "World",
+      "plan": "Plan",
+      "group": "Group",
+      "reference": "Reference"
+    },
+    "references": {
+      "title": "References",
+      "empty": "No sources yet. Add books, papers or web pages to manage them here.",
+      "citekey": "Cite key",
+      "authors": "Authors",
+      "year": "Year",
+      "type": "Type",
+      "citedBy": "Cited by",
+      "broken": "Broken citations",
+      "brokenHint": "The text cites sources that do not exist: {{keys}}",
+      "style": "Citation style",
+      "styleNumbered": "Numbered",
+      "styleAuthorDate": "Author-date",
+      "copyKey": "Copy cite key"
+    },
+    "branch": {
+      "title": "Branching narrative",
+      "scene": "Scene",
+      "choices": "Choices",
+      "ending": "Ending",
+      "noExit": "No exit",
+      "orphan": "Orphan scene",
+      "undefinedVariable": "Undefined variable",
+      "unreachable": "Unreachable",
+      "empty": "No scenes."
     },
     "col": {
       "kind": "Type",
@@ -67,6 +100,7 @@
       "title": "Computed columns",
       "empty": "No computed columns. Insert a preset for an example.",
       "remove": "Remove computed column",
+      "insertFormula": "Insert formula",
       "param": {
         "speechRate": "Speech rate (chars/s)"
       }

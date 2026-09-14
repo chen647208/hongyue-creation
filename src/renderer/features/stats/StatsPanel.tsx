@@ -56,7 +56,7 @@ const StatsPanel: React.FC = () => {
             <p className="text-xs text-muted-foreground">
               {t('stats.today', { today: todayWords, target: project.wordTarget ?? 0 })}
             </p>
-            <div className="grid grid-flow-col grid-rows-7 gap-1" style={{ gridAutoColumns: '12px' }}>
+            <div className="grid w-full grid-flow-col grid-rows-7 gap-1" style={{ gridAutoColumns: 'minmax(6px, 1fr)' }}>
               {calendar.map((entry) => {
                 const intensity = maxWords > 0 ? entry.words / maxWords : 0;
                 return (
@@ -130,8 +130,8 @@ const StatsPanel: React.FC = () => {
                 </svg>
                 <ul className="mt-2 space-y-1 text-xs">
                   {clues.map((clue) => (
-                    <li key={clue.id} className="flex items-center gap-2">
-                      <span className="font-medium">{clue.title}</span>
+                    <li key={clue.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="min-w-0 truncate font-medium">{clue.title}</span>
                       <span className="text-muted-foreground">{t(CLUE_STATUS_KEYS[clue.status])}</span>
                       <span className="text-muted-foreground">{clue.span === null ? t('stats.clueUnset') : t('stats.clueSpan', { span: clue.span })}</span>
                     </li>

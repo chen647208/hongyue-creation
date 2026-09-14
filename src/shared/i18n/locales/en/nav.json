@@ -10,6 +10,7 @@
   },
   "bookshelf": "Bookshelf",
   "settings": "Settings",
+  "workspaceSections": "Workspace sections",
   "structureTabs": {
     "outline": "Outline",
     "chapters": "Chapters",

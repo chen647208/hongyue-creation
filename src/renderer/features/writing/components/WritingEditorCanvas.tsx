@@ -50,7 +50,7 @@ const WritingEditorCanvas: React.FC<WritingEditorCanvasProps> = ({
   onDiscardStoppedPartial,
 }) => {
   return (
-    <div className={cn(' flex flex-1 justify-center overflow-y-auto p-10 transition-colors', isFocusMode ? 'bg-background' : 'bg-muted/30')}>
+    <div className={cn(' flex flex-1 justify-center overflow-y-auto p-3 transition-colors sm:p-10', isFocusMode ? 'bg-background' : 'bg-muted/30')}>
       <TipTapCanvas
         ref={editorRef}
         activeChapterId={activeChapterId}

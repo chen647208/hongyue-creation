@@ -13,6 +13,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { templateDisplayName } from '@/i18n';
+import { createDeleteGuard } from '@/shared/services/deleteGuard';
 import { speechLocale } from '@/shared/services/speechService';
 import { Button } from '@/shared/ui/Button';
 import { MarkdownView } from '@/shared/ui/Markdown';
@@ -115,6 +116,11 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const copyTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 删除消息二次确认：确认期间吞掉重复触发（触控双击只删一次）
+  const deleteGuard = React.useMemo(() => createDeleteGuard(), []);
+  const requestDeleteMessage = React.useCallback((id: string) => {
+    void deleteGuard(() => onDeleteMessage(id), { message: t('chat.deleteConfirm'), danger: true });
+  }, [deleteGuard, onDeleteMessage, t]);
   React.useEffect(() => () => {
     if (copyTimer.current) clearTimeout(copyTimer.current);
   }, []);
@@ -195,7 +201,7 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
                   {msg.isStreaming && <span className="ml-1 inline-block h-4 w-2 animate-pulse bg-primary align-middle"></span>}
                 </div>
                 {msg.role !== 'user' && msg.citations && msg.citations.length > 0 && (
-                  <aside className="w-40 shrink-0 border-l border-border pl-2">
+                  <aside className="w-28 shrink-0 border-l border-border pl-2 sm:w-40">
                     <div className="mb-1 text-2xs uppercase tracking-wider text-muted-foreground">{t('chat.citationTitle')}</div>
                     <ul className="space-y-1.5">
                       {msg.citations.map((citation) => (
@@ -225,7 +231,7 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-6 text-muted-foreground hover:text-foreground"
+                  className="size-11 text-muted-foreground hover:text-foreground sm:size-6"
                   title={t('chat.copyTitle')}
                   onClick={() => void copyMessage(msg.id, msg.content)}
                 >
@@ -236,7 +242,7 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-6 text-muted-foreground hover:text-foreground"
+                    className="size-11 text-muted-foreground hover:text-foreground sm:size-6"
                     title={t('chat.editResendTitle')}
                     onClick={() => setInput(msg.content)}
                   >
@@ -246,9 +252,9 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-6 text-muted-foreground hover:text-destructive"
+                  className="size-11 text-muted-foreground hover:text-destructive sm:size-6"
                   title={t('chat.deleteTitle')}
-                  onClick={() => onDeleteMessage(msg.id)}
+                  onClick={() => requestDeleteMessage(msg.id)}
                 >
                   <Trash2 className="size-3.5" />
                 </Button>
@@ -393,7 +399,7 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
           )}
 
           <div className="flex items-end gap-2">
-            <label className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+            <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:size-9">
               <Paperclip className="size-5" />
               <input type="file" multiple className="hidden" onChange={handleFileUpload} accept=".txt,.md,.json,.js,.ts,.csv,.pdf,.png,.jpg,.jpeg,.webp" />
             </label>
@@ -440,7 +446,7 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
               onClick={handleSendMessage}
               disabled={!hasModel || (!input.trim() && pendingFiles.length === 0 && pendingImages.length === 0)}
               title={!hasModel ? t('dialog.noModel') : t('chat.sendTitle')}
-              className="shrink-0"
+              className="shrink-0 size-11 sm:size-9"
             >
               <Send className="size-4" />
             </Button>

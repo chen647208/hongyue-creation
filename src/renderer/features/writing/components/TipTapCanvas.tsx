@@ -436,7 +436,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
   return (
     <div
       className={cn(
-        'relative h-full w-full min-h-[1200px] min-w-[320px] rounded-lg border border-border bg-card p-16 font-serif text-lg leading-relaxed text-foreground shadow-sm',
+        'relative h-full w-full min-h-[1200px] min-w-0 rounded-lg border border-border bg-card p-4 font-serif text-lg leading-relaxed text-foreground shadow-sm sm:p-16 sm:min-w-[320px]',
         'selection:bg-primary/15',
         isFocusMode ? 'max-w-3xl text-xl leading-loose' : 'max-w-4xl',
       )}
@@ -446,7 +446,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
       onMouseMove={onMouseMove}
     >
       {isEmpty && activeChapterId ? (
-        <div className="pointer-events-none absolute inset-0 p-16 text-muted-foreground/50">
+        <div className="pointer-events-none absolute inset-0 p-4 text-muted-foreground/50 sm:p-16">
           {t('canvas.placeholderReady')}
         </div>
       ) : null}

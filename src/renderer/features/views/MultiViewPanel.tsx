@@ -19,6 +19,7 @@ import { dt } from '@/i18n/dynamic';
 import { dialogService } from '@/shared/services/dialogService';
 import { saveTextFile } from '@/shared/services/fileSave';
 import { localStore } from '@/shared/services/localStore';
+import { formulaRegistry } from '@/shared/services/viewFormulas';
 import { Button } from '@/shared/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/shared/ui/DropdownMenu';
@@ -155,6 +156,20 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
         return t('views.kind.knowledge');
       case 'event':
         return t('views.kind.event');
+      case 'chapter':
+        return t('views.kind.chapter');
+      case 'foreshadow':
+        return t('views.kind.foreshadow');
+      case 'rule':
+        return t('views.kind.rule');
+      case 'world':
+        return t('views.kind.world');
+      case 'plan':
+        return t('views.kind.plan');
+      case 'group':
+        return t('views.kind.group');
+      case 'reference':
+        return t('views.kind.reference');
       default:
         return kind;
     }
@@ -194,6 +209,12 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     day: t('views.query.fields.day'),
   };
   const queryFieldLabel = (field: string): string => queryFieldLabels[field] ?? field;
+  // 字段标签：内置/查询字段走映射，预设 i18n 键走 world 命名空间，扩展字段回落原始键。
+  const fieldLabel = (key: string): string => {
+    const known = columnLabels[key] ?? queryFieldLabels[key];
+    if (known) return known;
+    return key.startsWith('views.') ? dt(`world:${key}`) : key;
+  };
   const conditionOperatorLabels: Record<ConditionOperator, string> = {
     eq: t('views.query.op.eq'),
     neq: t('views.query.op.neq'),
@@ -219,8 +240,9 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
         conditions: layout.conditions,
         computed: layout.computed,
         aggregations: layout.aggregations,
+        aliases: layout.fieldAliases,
       }),
-    [data, layout.conditions, layout.computed, layout.aggregations],
+    [data, layout.conditions, layout.computed, layout.aggregations, layout.fieldAliases],
   );
   const displayColumns = projection.columns.map((column) => ({ ...column, label: columnLabel(column) }));
 
@@ -272,6 +294,19 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     setLayout({ computed: next.length > 0 ? next : undefined });
   };
 
+  // 插件贡献的公式（可序列化派生字段）：注册表在启动期填充，此处按需读取。
+  const pluginFormulas = formulaRegistry.list();
+
+  const addFormula = (formulaId: string) => {
+    const formula = pluginFormulas.find((item) => item.id === formulaId);
+    if (!formula) return;
+    const key = `computed:${formula.id}`;
+    if (computedColumns.some((column) => column.key === key)) return;
+    setLayout({
+      computed: [...computedColumns, { key, label: formula.label, expression: formula.expression, width: 140 }],
+    });
+  };
+
   const insertPreset = async (preset: ViewPreset) => {
     const id = `view:${project.id}:${crypto.randomUUID()}`;
     await useGenericModelStore.getState().saveView({
@@ -310,15 +345,20 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   };
 
   const showColumn = (key: string) => {
-    const column = projection.columns.find((item) => item.key === key);
-    if (!column) return;
+    const existing = projection.columns.find((item) => item.key === key) ?? layout.columns.find((item) => item.key === key);
+    const column = existing ?? { key, label: fieldLabel(key), width: 140 };
     setLayout({
       hidden: layout.hidden.filter((hiddenKey) => hiddenKey !== key),
       columns: [...layout.columns.filter((item) => item.key !== key), column],
     });
   };
 
-  const kindOrder = ['character', 'location', 'faction', 'knowledge', 'event'];
+  // 任一域都可能是行来源：类型筛选按当前数据的 kind 动态生成，已知类型优先排序。
+  const kindOrder = useMemo(() => {
+    const preferred = ['character', 'location', 'faction', 'event', 'chapter', 'knowledge', 'foreshadow', 'rule', 'world', 'plan', 'group'];
+    const present = [...new Set(data.rows.map((row) => row.kind))];
+    return [...preferred.filter((kind) => present.includes(kind)), ...present.filter((kind) => !preferred.includes(kind)).sort()];
+  }, [data]);
 
   const options = [
     { value: 'table' as const, icon: Table2, title: t('views.kind.table') },
@@ -445,15 +485,15 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                 if (key.startsWith('col:')) showColumn(key.slice(4));
               }}
             >
-            {projection.columns.map((column) => (
+            {availableFields.map((key) => (
               <span
-                key={column.key}
+                key={key}
                 draggable
                 title={t('views.dragColumn')}
-                onDragStart={(event) => event.dataTransfer.setData('text/plain', `col:${column.key}`)}
+                onDragStart={(event) => event.dataTransfer.setData('text/plain', `col:${key}`)}
                 className="cursor-grab rounded border border-border px-1.5 py-0.5"
               >
-                {displayColumns.find((item) => item.key === column.key)?.label ?? column.key}
+                {fieldLabel(key)}
               </span>
             ))}
             <span className="rounded border border-dashed border-border px-1.5 py-0.5 text-muted-foreground">{t('views.dropColumn')}</span>
@@ -575,6 +615,25 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                   </button>
                 </span>
               ))}
+              {pluginFormulas.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-7" title={t('views.computed.insertFormula')}>
+                      <Plus className="size-3" />
+                      {t('views.computed.insertFormula')}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>{t('views.computed.insertFormula')}</DropdownMenuLabel>
+                    {pluginFormulas.map((formula) => (
+                      <DropdownMenuItem key={formula.id} onSelect={() => addFormula(formula.id)}>
+                        <span>{formula.label}</span>
+                        {formula.description && <span className="truncate text-2xs text-muted-foreground">{formula.description}</span>}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </details>

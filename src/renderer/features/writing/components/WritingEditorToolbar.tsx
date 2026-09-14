@@ -22,6 +22,9 @@ import type { WritingEditorToolbarProps } from '../types';
 
 const iconBtn = 'size-8 text-muted-foreground';
 const textBtn = 'h-8 gap-1.5 px-2 text-xs text-muted-foreground';
+// 窄视口只保留核心编辑动作（撤销/重做/查找/拼写/工具/侧栏），其余收进桌面宽度
+const iconBtnSecondary = cn(iconBtn, 'hidden md:inline-flex');
+const textBtnSecondary = cn(textBtn, 'hidden md:inline-flex');
 
 const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
   activeChapterId,
@@ -144,7 +147,7 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
               <Button variant="ghost" size="icon" className={iconBtn} onClick={onRedo} disabled={!canRedo} title={t('toolbar.redoTitle')}>
                 <Redo2 className="size-4" />
               </Button>
-              <Button variant="ghost" size="icon" className={iconBtn} onClick={onRetryAI} disabled={!canRetryAI} title={t('toolbar.retryTitle')}>
+              <Button variant="ghost" size="icon" className={iconBtnSecondary} onClick={onRetryAI} disabled={!canRetryAI} title={t('toolbar.retryTitle')}>
                 <RotateCcw className="size-4" />
               </Button>
               <Button
@@ -162,7 +165,7 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className={cn(iconBtn, chapterFinal && 'bg-accent text-foreground')}
+                className={cn(iconBtnSecondary, chapterFinal && 'bg-accent text-foreground')}
                 onClick={onToggleFinal}
                 disabled={!activeChapterId}
                 title={chapterFinal ? t('toolbar.unfinalTitle') : t('toolbar.finalTitle')}
@@ -172,26 +175,26 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
               <Button variant="ghost" size="icon" className={iconBtn} onClick={onOpenTools} title={t('toolbar.toolsTitle')}>
                 <Wrench className="size-4" />
               </Button>
-              <Button variant="ghost" size="icon" className={iconBtn} onClick={onSplitChapter} disabled={!canSplitChapter} title={t('toolbar.splitChapterTitle')}>
+              <Button variant="ghost" size="icon" className={iconBtnSecondary} onClick={onSplitChapter} disabled={!canSplitChapter} title={t('toolbar.splitChapterTitle')}>
                 <Scissors className="size-4" />
               </Button>
-              <Button variant="ghost" size="icon" className={iconBtn} onClick={onMergeChapter} disabled={!canMergeChapter} title={t('toolbar.mergeChapterTitle')}>
+              <Button variant="ghost" size="icon" className={iconBtnSecondary} onClick={onMergeChapter} disabled={!canMergeChapter} title={t('toolbar.mergeChapterTitle')}>
                 <Merge className="size-4" />
               </Button>
               {activeChapterId && (
-                <Button variant="ghost" size="sm" className={textBtn} onClick={onManualSnapshot} title={t('toolbar.snapshotTitle', { count: snapshotCount })}>
+                <Button variant="ghost" size="sm" className={textBtnSecondary} onClick={onManualSnapshot} title={t('toolbar.snapshotTitle', { count: snapshotCount })}>
                   <Camera className="size-4" /> <span className="hidden @3xl:inline">{t('toolbar.snapshot')}</span>
                 </Button>
               )}
               {hasProjectChapters && (
-                <Button variant="ghost" size="sm" className={textBtn} onClick={onOpenExport} title={t('toolbar.exportTitle')}>
+                <Button variant="ghost" size="sm" className={textBtnSecondary} onClick={onOpenExport} title={t('toolbar.exportTitle')}>
                   <FileOutput className="size-4" /> <span className="hidden @3xl:inline">{t('toolbar.export')}</span>
                 </Button>
               )}
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn(textBtn, overdueForeshadowCount > 0 ? 'text-destructive hover:text-destructive' : 'hover:text-foreground')}
+                className={cn(textBtnSecondary, overdueForeshadowCount > 0 ? 'text-destructive hover:text-destructive' : 'hover:text-foreground')}
                 onClick={onOpenForeshadow}
                 title={overdueForeshadowCount > 0 ? t('toolbar.foreshadowTitleOverdue', { open: openForeshadowCount, overdue: overdueForeshadowCount }) : t('toolbar.foreshadowTitle', { open: openForeshadowCount })}
               >
@@ -208,21 +211,21 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
                 )}
               </Button>
               {activeChapterId && (
-                <Button variant="ghost" size="icon" className={cn(iconBtn, 'hover:text-destructive')} onClick={onClearContent} title={t('toolbar.clearTitle')}>
+                <Button variant="ghost" size="icon" className={cn(iconBtnSecondary, 'hover:text-destructive')} onClick={onClearContent} title={t('toolbar.clearTitle')}>
                   <Eraser className="size-4" />
                 </Button>
               )}
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn(textBtn, isGlobalHistorySidebarOpen && 'bg-accent text-foreground')}
+                className={cn(textBtnSecondary, isGlobalHistorySidebarOpen && 'bg-accent text-foreground')}
                 onClick={onToggleGlobalHistory}
                 title={t('toolbar.globalHistoryTitle')}
               >
                 <History className="size-4" /> <span className="hidden @3xl:inline">{t('toolbar.globalHistory')}</span>
               </Button>
               {activeChapterId && hasActiveChapterHistory && (
-                <Button variant="ghost" size="icon" className={iconBtn} onClick={onOpenChapterHistory} title={t('toolbar.chapterHistoryTitle')}>
+                <Button variant="ghost" size="icon" className={iconBtnSecondary} onClick={onOpenChapterHistory} title={t('toolbar.chapterHistoryTitle')}>
                   <FileText className="size-4" />
                 </Button>
               )}
@@ -240,13 +243,13 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
           >
             {isFocusMode ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
           </Button>
-          <Button variant="ghost" size="icon" className={iconBtn} onClick={toggleFullscreen} title={t('toolbar.fullscreen')}>
+          <Button variant="ghost" size="icon" className={iconBtnSecondary} onClick={toggleFullscreen} title={t('toolbar.fullscreen')}>
             <Expand className="size-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className={cn(iconBtn, typewriter && 'bg-accent text-foreground')}
+            className={cn(iconBtnSecondary, typewriter && 'bg-accent text-foreground')}
             onClick={onToggleTypewriter}
             title={typewriter ? t('toolbar.typewriterOff') : t('toolbar.typewriterOn')}
           >

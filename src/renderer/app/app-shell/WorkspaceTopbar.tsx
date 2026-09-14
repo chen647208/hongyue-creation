@@ -149,7 +149,7 @@ const WorkspaceTopbar: React.FC<WorkspaceTopbarProps> = ({
           </Button>
         )}
         {showHint && suggested && (
-          <div className="ml-2 flex shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/5 py-0.5 pl-2 pr-0.5 text-xs">
+          <div className="ml-2 hidden shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/5 py-0.5 pl-2 pr-0.5 text-xs md:flex">
             <Compass className="size-3 text-primary" />
             <Button
               variant="link"
@@ -185,8 +185,8 @@ const WorkspaceTopbar: React.FC<WorkspaceTopbarProps> = ({
         )}
       </div>
 
-      {/* 右侧工具区 */}
-      <div className="flex shrink-0 items-center gap-2">
+      {/* 右侧工具区：窄视口只保留助手/主题/设置，其余次要入口收进设置面板 */}
+      <div className="flex min-w-0 shrink-0 items-center gap-2">
         {assistantEnabled && onToggleAssistant && (
           <IconButton
             tone="muted"
@@ -197,9 +197,15 @@ const WorkspaceTopbar: React.FC<WorkspaceTopbarProps> = ({
             <PanelRight className="size-4" />
           </IconButton>
         )}
-        <AssistantTasksIndicator />
-        <SyncDialog project={project} />
-        <ProtectedSessionDialog />
+        <div className="hidden items-center md:flex">
+          <AssistantTasksIndicator />
+        </div>
+        <div className="hidden items-center md:flex">
+          <SyncDialog project={project} />
+        </div>
+        <div className="hidden items-center md:flex">
+          <ProtectedSessionDialog />
+        </div>
 
         <IconButton
           tone="muted"
@@ -209,7 +215,7 @@ const WorkspaceTopbar: React.FC<WorkspaceTopbarProps> = ({
           {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </IconButton>
 
-        <div className="flex items-center gap-1">
+        <div className="hidden items-center gap-1 md:flex">
           <Slot id="topbar.actions" />
           <IconButton
             tone="muted"
@@ -222,7 +228,7 @@ const WorkspaceTopbar: React.FC<WorkspaceTopbarProps> = ({
         </div>
 
         {hasHistory && (
-          <Button variant="outline" size="sm" onClick={onOpenHistory} title={t('app:topbar.viewHistoryTip')}>
+          <Button variant="outline" size="sm" onClick={onOpenHistory} title={t('app:topbar.viewHistoryTip')} className="hidden md:inline-flex">
             <History className="size-3.5" />
             {t('app:topbar.history')}
           </Button>
@@ -236,7 +242,7 @@ const WorkspaceTopbar: React.FC<WorkspaceTopbarProps> = ({
           className={!isModelUsable(activeModel) ? 'border-warning/40 text-warning hover:text-warning' : undefined}
         >
           <Cpu className="size-3.5" />
-          <span className="max-w-32 truncate">{isModelUsable(activeModel) ? activeModel.name : t('app:model.noneSelected')}</span>
+          <span className="hidden max-w-32 truncate sm:inline">{isModelUsable(activeModel) ? activeModel.name : t('app:model.noneSelected')}</span>
         </Button>
       </div>
     </header>

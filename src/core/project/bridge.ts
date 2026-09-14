@@ -55,6 +55,7 @@ const COLLECTIONS: readonly CollectionSpec[] = [
   { key: 'ruleSystems', type: 'world.rule-system', role: 'world', titleField: 'name' },
   { key: 'knowledge', type: 'meta.knowledge', role: 'knowledge', titleField: 'name', bodyField: 'content' },
   { key: 'foreshadows', type: 'meta.foreshadow', role: 'meta', titleField: 'title' },
+  { key: 'references', type: 'meta.reference', role: 'reference', titleField: 'title' },
 ];
 
 /** 投影时从对象中剔除的键（已映射到实体列；createdAt/updatedAt 是领域数据字段，保留为属性） */

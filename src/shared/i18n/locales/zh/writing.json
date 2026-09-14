@@ -432,6 +432,7 @@
   },
   "sidebar": {
     "title": "创作参考面板",
+    "close": "收起参考面板",
     "charactersTitle": "关键角色设定",
     "noCharacters": "暂无角色信息",
     "goCharacters": "去角色页建卡",

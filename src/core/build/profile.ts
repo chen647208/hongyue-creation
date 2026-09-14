@@ -85,6 +85,18 @@ export interface BuildToc {
   maxDepth?: number;
 }
 
+/** 参考文献与脚注（docs/design/41）：样式、文末表标题。 */
+export interface BuildReferences {
+  /** 是否在文末生成参考文献表；缺席按 true（有引文即生成）。 */
+  enabled?: boolean;
+  /** 引用样式 id（core/build/references 的 CITATION_STYLES）；缺省 numbered。 */
+  style?: string;
+  /** 文末参考文献表标题；缺省「参考文献」。 */
+  title?: string;
+  /** 脚注列表标题（纯文本/ODT 等回落为文末注时使用）；缺省「注释」。 */
+  footnotesTitle?: string;
+}
+
 /** 编译编排：分卷、前后置页、目录。标题层级见 transform.headings.level。 */
 export interface BuildCompile {
   toc?: BuildToc;
@@ -113,6 +125,8 @@ export interface BuildProfile {
   render: BuildRender;
   /** 编译编排（docs/design/39）；缺席即纯正文导出。 */
   compile?: BuildCompile;
+  /** 参考文献与脚注（docs/design/41）；缺席按默认样式与默认标题。 */
+  references?: BuildReferences;
 }
 
 /** 编译默认值：profile 缺省字段回落到此，保证默认档案等价纯正文导出。 */
@@ -121,6 +135,9 @@ export const COMPILE_DEFAULTS = {
   volumeHeading: '第%N卷 %T',
   tocTitle: '目录',
   tocMaxDepth: 1,
+  referenceStyle: 'numbered',
+  bibliographyTitle: '参考文献',
+  footnotesTitle: '注释',
 } as const;
 
 export const DEFAULT_BUILD_PROFILE: BuildProfile = {
@@ -271,6 +288,18 @@ export function validateProfile(profile: BuildProfile | null | undefined): strin
   }
   if (profile.compile?.volumeHeading !== undefined && typeof profile.compile.volumeHeading !== 'string') {
     errors.push('compile.volumeHeading 必须是字符串');
+  }
+
+  const references = profile.references;
+  if (references !== undefined) {
+    if (references.enabled !== undefined && typeof references.enabled !== 'boolean') {
+      errors.push('references.enabled 必须是布尔值');
+    }
+    for (const key of ['style', 'title', 'footnotesTitle'] as const) {
+      if (references[key] !== undefined && typeof references[key] !== 'string') {
+        errors.push(`references.${key} 必须是字符串`);
+      }
+    }
   }
 
   return errors;

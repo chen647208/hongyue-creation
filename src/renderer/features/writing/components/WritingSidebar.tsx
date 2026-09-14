@@ -52,7 +52,7 @@ const WritingSidebar: React.FC<WritingSidebarProps> = ({
         <h3 className="text-sm font-medium">{t('sidebar.title')}</h3>
         <div className="flex items-center gap-1">
           <Slot id="sidebar.actions" />
-          <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={onClose}>
+          <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={onClose} aria-label={t('sidebar.close')}>
             <ChevronsLeft className="size-4" />
           </Button>
         </div>

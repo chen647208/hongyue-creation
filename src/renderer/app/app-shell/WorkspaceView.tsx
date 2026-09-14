@@ -17,10 +17,13 @@ import { BookHeart, Plug } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useViewportTier } from '@/shared/hooks/useViewportTier';
 import { Button } from '@/shared/ui/Button';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import Slot from '@/shared/ui/Slot';
 import { Spinner } from '@/shared/ui/Spinner';
+import { cn } from '@/shared/utils/cn';
+import { resolveWorkspaceChrome } from '@/shared/utils/layout';
 
 import { type AppTheme, type ModelConfig, type Project, type PromptTemplate } from '../../../shared/types';
 import { ErrorBoundary } from '../../shared/components/ErrorBoundary';
@@ -197,6 +200,9 @@ const WorkspaceView: React.FC<WorkspaceViewProps> = (props) => {
     onDeleteProject, onOpenHistory, onOpenVersionCheck,
     onThemeChange, onRenameBook,
   } = props;
+  const chrome = resolveWorkspaceChrome(useViewportTier());
+  // 写作分区为全屏沉浸（无底部导航），其余分区在手机档留出底栏高度
+  const reserveBottomNav = chrome.bottomNav && section !== 'writing';
 
   return (
     <>
@@ -211,7 +217,7 @@ const WorkspaceView: React.FC<WorkspaceViewProps> = (props) => {
         />
       )}
 
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main className={cn('flex min-w-0 flex-1 flex-col', reserveBottomNav && 'pb-16')}>
         {section !== 'writing' && (
           <WorkspaceTopbar
             project={activeProject}

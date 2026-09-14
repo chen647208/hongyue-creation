@@ -19,6 +19,7 @@ import { setAiGate } from '@/shared/services/ai/aiGate';
 import { isOverHourlyLimit } from '@/shared/services/ai/usageTracker';
 import { buildProfileRegistry } from '@/shared/services/buildProfiles';
 import { localStore } from '@/shared/services/localStore';
+import { formulaRegistry } from '@/shared/services/viewFormulas';
 import { APP_VERSION } from '@/shared/version';
 
 import { AiSessionManager } from './aiSessionManager';
@@ -69,5 +70,5 @@ export function saveDisabledList(ids: string[]): void {
 
 /** 启动期插件装载（预览环境无文件系统时空宿主）。状态面板复用同一 Promise。 */
 export const pluginHostPromise = import('@/shared/services/pluginService').then((m) =>
-  m.bootstrapPlugins({ skillCatalog, buildProfiles: buildProfileRegistry, events: eventBus }, APP_VERSION, readDisabledList()),
+  m.bootstrapPlugins({ skillCatalog, buildProfiles: buildProfileRegistry, events: eventBus, formulas: formulaRegistry }, APP_VERSION, readDisabledList()),
 );

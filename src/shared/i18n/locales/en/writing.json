@@ -432,6 +432,7 @@
   },
   "sidebar": {
     "title": "Writing Reference Panel",
+    "close": "Close reference panel",
     "charactersTitle": "Key Characters",
     "noCharacters": "No characters yet",
     "goCharacters": "Open Characters",

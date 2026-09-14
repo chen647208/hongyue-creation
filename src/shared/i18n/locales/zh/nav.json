@@ -10,6 +10,7 @@
   },
   "bookshelf": "书籍库",
   "settings": "设置",
+  "workspaceSections": "工作台分区",
   "structureTabs": {
     "outline": "大纲",
     "chapters": "细纲",
