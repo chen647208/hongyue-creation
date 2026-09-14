@@ -55,6 +55,8 @@ function toBase64(text: string): string {
 let trustedPluginKeys: readonly string[] = [];
 /** 允许的插件来源标识（manifest.source）；空清单 = 不限制来源，仅校验签名。 */
 let allowedPluginSources: readonly string[] = [];
+/** 最近一次装配的宿主：生产数据边界（逻辑执行）据此做权限代理。 */
+let activeHost: PluginHost | null = null;
 
 /** 逻辑贡献源码：`<pluginId>:<file>` → 代码（调用时才进沙箱）。 */
 const logicHandlers = new Map<string, string>();
@@ -67,6 +69,13 @@ function logicKey(pluginId: string, file: string): string {
 export async function runPluginLogic(pluginId: string, fn: string, input: unknown): Promise<SandboxRunResult> {
   if (!/^[A-Za-z_$][\w$]*$/.test(fn)) {
     return { ok: false, error: { kind: 'runtime', message: `非法函数名：${fn}` } };
+  }
+  // 权限边界：逻辑贡献在 ai 接缝执行，须声明 write:ai；未声明即拒、不进沙箱。
+  try {
+    activeHost?.assertCan(pluginId, 'write', 'ai');
+  } catch (error) {
+    logger.warn(`插件 ${pluginId} 逻辑执行被拒：未声明 write:ai 权限`);
+    return { ok: false, error: { kind: 'permission', message: error instanceof Error ? error.message : String(error) } };
   }
   // 合并该插件全部逻辑文件：具名函数可能定义在任一文件中，避免只取首个文件而遮蔽。
   const sources = [...logicHandlers.entries()]
@@ -360,8 +369,8 @@ export function createContributionInstaller(deps: PluginDeps): ContributionInsta
           const parsed = JSON.parse(raw) as { hooks?: unknown } | unknown[];
           const list = Array.isArray(parsed) ? parsed : ((parsed.hooks ?? []) as unknown[]);
           for (const d of installHooks(list as never[], deps.events, manifest.id, manifest)) sink.add(d);
-        } catch {
-          // hooks 声明损坏跳过
+        } catch (error) {
+          logger.warn(`插件 ${manifest.id} hooks 声明未生效：${error instanceof Error ? error.message : String(error)}`);
         }
       }
     }
@@ -371,6 +380,7 @@ export function createContributionInstaller(deps: PluginDeps): ContributionInsta
 /** 创建宿主并完成一次完整发现-装载-激活循环（预览环境无文件系统时跳过磁盘发现）。 */
 export async function bootstrapPlugins(deps: PluginDeps, hostVersion: string, disabled: string[]): Promise<PluginHost> {
   const host = new PluginHost({ hostVersion, disabled }, createContributionInstaller(deps));
+  activeHost = host;
   try {
     const storedKeys = readTrustedPluginKeys();
     if (storedKeys) setTrustedPluginKeys(storedKeys);

@@ -24,6 +24,7 @@ export const CORE_BUNDLE_MANIFEST: PluginManifest = {
   dependencies: {},
   activation: 'onStartup',
   contributes: { buildProfiles: ['./builds/'] },
+  permissions: { read: ['project', 'fs'], write: ['project', 'editor', 'index', 'fs'] },
 };
 
 export const WORLD_BUNDLE_MANIFEST: PluginManifest = {
@@ -35,6 +36,7 @@ export const WORLD_BUNDLE_MANIFEST: PluginManifest = {
   description: '世界与角色：世界构建/角色势力/时间线/知识库',
   dependencies: { 'com.hongyue.bundle.core': '^2.0.0' },
   activation: 'onStartup',
+  permissions: { read: ['project'], write: ['project', 'index'] },
 };
 
 export const AI_BUNDLE_MANIFEST: PluginManifest = {
@@ -46,6 +48,7 @@ export const AI_BUNDLE_MANIFEST: PluginManifest = {
   description: 'AI 创作套件：助手/卡片/一致性/伏笔（依赖 AI 网关与索引）',
   dependencies: { 'com.hongyue.bundle.core': '^2.0.0', 'com.hongyue.bundle.world': '^2.0.0' },
   activation: 'onDemand',
+  permissions: { read: ['project', 'index'], write: ['ai'] },
 };
 
 export const BUILTIN_BUNDLE_MANIFESTS: readonly PluginManifest[] = [

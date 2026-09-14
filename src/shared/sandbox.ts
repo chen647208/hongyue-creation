@@ -27,7 +27,7 @@ export const DEFAULT_SANDBOX_LIMITS: SandboxLimits = {
   maxOutputBytes: 256 * 1024,
 };
 
-export type SandboxErrorKind = 'timeout' | 'memory' | 'runtime' | 'limit' | 'capability';
+export type SandboxErrorKind = 'timeout' | 'memory' | 'runtime' | 'limit' | 'capability' | 'permission';
 
 /** WASM 宿主函数种类（受控实现，见 wasmRunner）。 */
 export type WasmHostKind = 'now' | 'log' | 'hash';
