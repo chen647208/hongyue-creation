@@ -182,6 +182,8 @@ export const SQL = {
 
   // ── nodes ──
   'nodes.selectAll': `SELECT * FROM nodes`,
+  'nodes.selectAllLite': `SELECT id, book_id, type, title, path, created_at, updated_at, erased, hash FROM nodes`,
+  'nodes.selectByBook': `SELECT * FROM nodes WHERE book_id = ?`,
   'nodes.selectDistinctBooks': `SELECT DISTINCT book_id FROM nodes`,
   'nodes.selectHashesByBook': `SELECT id, hash, body FROM nodes WHERE book_id = ?`,
   'nodes.deleteById': `DELETE FROM nodes WHERE id = ?`,

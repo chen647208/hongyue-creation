@@ -323,6 +323,21 @@ export class SqliteRepository implements StorageRepository {
     }));
   }
 
+  /** 惰性载入：读取某本书完整正文并投影为 Project（含 hydrated 标记）。 */
+  async loadBookContent(bookId: string): Promise<Project | null> {
+    await this.ready;
+    const nodeRows = await this.driver.all<NodeRow>('nodes.selectByBook', [bookId]);
+    if (nodeRows.length === 0) return null;
+    const edgeRows = await this.driver.all<EdgeRow>('edges.selectAll');
+    const attrRows = await this.driver.all<AttrRow & { book_id: string }>('attrs.selectAllWithBook');
+    const group: BookEntities = {
+      nodes: nodeRows.map((row) => rowToNode(row)),
+      edges: edgeRows.filter((row) => row.book_id === bookId).map((row) => rowToEdge(row)),
+      attrs: attrRows.filter((row) => row.book_id === bookId).map((row) => rowToAttr(row)),
+    };
+    return { ...entitiesToProject(group), hydrated: true };
+  }
+
   /** 读取某本书的修订统计（码字日历用） */
   async loadRevisionStats(bookId: string): Promise<RevisionStat[]> {
     await this.ready;
@@ -722,7 +737,7 @@ export class SqliteRepository implements StorageRepository {
    */
   private async syncBookTx(tx: SqlDriver, project: Project, opts?: CommitOptions): Promise<BookEntities> {
     const bookId = project.id;
-    const entities = projectToEntities(project);
+    let entities = projectToEntities(project);
     const agentId = opts?.agentId ?? 'user';
     const cause = opts?.cause ?? null;
 
@@ -741,6 +756,17 @@ export class SqliteRepository implements StorageRepository {
     }
     for (const r of oldEdges) oldHash.set(`edges:${r.id}`, r.hash);
     for (const r of oldAttrs) oldHash.set(`attrs:${r.id}`, r.hash);
+
+    // 惰性载入守卫：未 hydrate 的书只写元数据，正文沿用库中已有内容，绝不把空正文覆盖回去。
+    if (project.hydrated === false) {
+      entities = {
+        ...entities,
+        nodes: entities.nodes.map((node) => {
+          const existing = oldBody.get(node.id);
+          return existing === undefined ? node : { ...node, body: existing };
+        }),
+      };
+    }
 
     // 各节点当前最大修订序号（删除前查询，供新修订续号）
     const seqRows = await tx.all<{ node_id: string; max: number }>(

@@ -197,7 +197,11 @@ export interface StorageRepository {
   loadAllSync(): AppState | null;
   /** 整体写入全量状态 */
   saveAll(state: AppState): Promise<void>;
-  /** 清空全部数据 */
+  /**
+   * 惰性载入：读取某本书的完整正文并投影为 Project。
+   * 后端不支持时返回 null（调用方按已载入处理）。
+   */
+  loadBookContent?(bookId: string): Promise<Project | null>;  /** 清空全部数据 */
   clear(): Promise<void>;
 
   /** 快速完整性检查；后端不提供时返回 null。 */

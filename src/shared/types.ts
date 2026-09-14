@@ -749,6 +749,8 @@ export interface Project {
   extensions?: Record<string, unknown[]>;
   /** 双轴时间线标记（节拍/伏笔定位；缺席=[]，免迁移）。 */
   timelineMarkers?: TimelineMarker[];
+  /** 正文是否已载入（惰性载入标记；false = 仅骨架，写库前须守卫）。 */
+  hydrated?: boolean;
   /** 时间线轨道（缺席=单条主轨，免迁移）。 */
   timelineTracks?: TimelineTrackDef[];
   /** 写作计划/待办（选题→大纲→章节→修订→校验；缺席=[]，免迁移）。 */
