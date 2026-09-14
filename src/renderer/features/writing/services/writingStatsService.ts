@@ -11,6 +11,7 @@
  * 写作统计（纯函数）：字数、段落、句子、阅读时长、全书进度。
  */
 import { DEFAULT_BUILD_PROFILE, runBuild } from '@core/build';
+import { stripBlockAnchors } from '@core/dsl/anchor';
 
 import { i18n } from '@/i18n';
 
@@ -28,7 +29,8 @@ export function countableChapters(chapters: Chapter[]): Chapter[] {
 }
 
 export function computeChapterStats(content: string): ChapterStats {
-  const text = content ?? '';
+  // 块锚是编辑器元数据，不计入正文字数/段落口径。
+  const text = stripBlockAnchors(content ?? '');
   const charCount = text.replace(/\s+/g, '').length;
   const paragraphs = text.split(/\n+/).filter((p) => p.trim().length > 0).length;
   const sentences = text.split(/[。！？!?.;；]+/).filter((s) => s.trim().length > 0).length;

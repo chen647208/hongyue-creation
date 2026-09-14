@@ -17,6 +17,7 @@ import { IPC } from '../channels.js';
 import { closeMcpClients,registerMcpClientIpc } from '../mcp/clientIpc.js';
 import { registerProxyIpc } from '../net/proxyIpc.js';
 import { closeSqlite,registerSqliteIpc } from '../sqlite-ipc.js';
+import { registerSyncIpc } from '../sync/transportIpc.js';
 import { registerUpdaterIpc } from '../updater.js';
 import { registerVectorIpc } from '../vector-ipc.js';
 import type { Provider, ProviderContext } from './container.js';
@@ -379,6 +380,14 @@ export const netProvider: Provider = {
   name: 'net',
   boot() {
     registerProxyIpc();
+  },
+};
+
+/** 同步传输 Provider：本地目录 / WebDAV / S3 的连通测试与对象收发。 */
+export const syncProvider: Provider = {
+  name: 'sync',
+  boot() {
+    registerSyncIpc();
   },
 };
 

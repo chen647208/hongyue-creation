@@ -23,8 +23,16 @@
  *   [[tag]] / [[tag|显示]] → chapterRef（硬链接）
  *   {name} / {name|kind}   → placeholder（占位符）
  *
+ * 块锚（docs/design/45 §3）：已有 `blockId` 的块在正文前写一行 `^<id>`，解析时还原为
+ * `blockId` 属性并从可见文本剥离；无标识的块不写锚。语法与避让规则见 @core/dsl/anchor。
+ *
  * 富文本 marks（em/strong/typography）为编辑器态，不落 DSL（正文禁 Markdown 符号）。
  */
+
+import { formatBlockAnchor, isBlockAnchorId, isBlockAnchorLine, parseBlockAnchor } from '@core/dsl/anchor';
+
+/** 块级节点承载稳定标识的属性名；与 blockId.ts / blockIndex.ts 同源。 */
+export const BLOCK_ID_ATTRIBUTE = 'blockId';
 
 export interface PmNode {
   type: string;
@@ -40,9 +48,21 @@ const SCENE_BREAK = /^\s*\*\*\*\s*$/;
 const WIKI_INLINE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 const PLACEHOLDER_INLINE = /\{([^{}|]+)(?:\|([^{}]+))?\}/g;
 
-/** 该行若原样落入 DSL 会被重新解析为块级语法（标题/关键字/场景分隔）。 */
+/** 该行若原样落入 DSL 会被重新解析为块级语法（标题/关键字/场景分隔/块锚）。 */
 function isBlockCollision(line: string): boolean {
-  return HEADING.test(line) || KEYWORD_LINE.test(line) || SCENE_BREAK.test(line);
+  return HEADING.test(line) || KEYWORD_LINE.test(line) || SCENE_BREAK.test(line) || isBlockAnchorLine(line);
+}
+
+/** 读取块节点的稳定标识；缺失或非法（无法写成锚）时为 null。 */
+function blockAnchorOf(node: PmNode): string | null {
+  const id = node.attrs?.[BLOCK_ID_ATTRIBUTE];
+  return typeof id === 'string' && isBlockAnchorId(id) ? id : null;
+}
+
+/** 若块有标识，写入 `blockId` 属性。 */
+function withBlockId(node: PmNode, blockId: string | null): PmNode {
+  if (blockId === null) return node;
+  return { ...node, attrs: { ...(node.attrs ?? {}), [BLOCK_ID_ATTRIBUTE]: blockId } };
 }
 
 function textNode(t: string): PmNode {
@@ -100,10 +120,13 @@ export function dslToPmDoc(body: string): PmNode {
   const lines = body.replace(/\r\n/g, '\n').split('\n');
   const blocks: PmNode[] = [];
   let paraBuf: string[] = [];
+  // 待归属的块锚：锚行先于其块出现，遇下一个块时写入该块属性。
+  let pendingBlockId: string | null = null;
 
   const flushPara = () => {
     if (paraBuf.length > 0) {
-      blocks.push(paragraphFromLines(paraBuf));
+      blocks.push(withBlockId(paragraphFromLines(paraBuf), pendingBlockId));
+      pendingBlockId = null;
       paraBuf = [];
     }
   };
@@ -114,32 +137,40 @@ export function dslToPmDoc(body: string): PmNode {
       paraBuf.push(line.slice(1));
       continue;
     }
+    const anchor = parseBlockAnchor(line);
+    if (anchor !== null) {
+      pendingBlockId = anchor;
+      continue;
+    }
     if (line.trim() === '') {
       flushPara();
       continue;
     }
     if (SCENE_BREAK.test(line)) {
       flushPara();
-      blocks.push({ type: 'sceneBreak' });
+      blocks.push(withBlockId({ type: 'sceneBreak' }, pendingBlockId));
+      pendingBlockId = null;
       continue;
     }
     const kw = line.match(KEYWORD_LINE);
     if (kw) {
       flushPara();
-      blocks.push({ type: 'keywordLine', attrs: { keyword: kw[1] ?? '', value: (kw[2] ?? '').trim() } });
+      blocks.push(withBlockId({ type: 'keywordLine', attrs: { keyword: kw[1] ?? '', value: (kw[2] ?? '').trim() } }, pendingBlockId));
+      pendingBlockId = null;
       continue;
     }
     const head = line.match(HEADING);
     if (head) {
       flushPara();
-      blocks.push({ type: 'heading', attrs: { level: (head[1] ?? '#').length }, content: parseInline((head[2] ?? '').trim()) });
+      blocks.push(withBlockId({ type: 'heading', attrs: { level: (head[1] ?? '#').length }, content: parseInline((head[2] ?? '').trim()) }, pendingBlockId));
+      pendingBlockId = null;
       continue;
     }
     paraBuf.push(line);
   }
   flushPara();
 
-  if (blocks.length === 0) blocks.push({ type: 'paragraph' });
+  if (blocks.length === 0) blocks.push(withBlockId({ type: 'paragraph' }, pendingBlockId));
   return { type: 'doc', content: blocks };
 }
 
@@ -170,6 +201,14 @@ function escapeParagraphText(text: string): string {
     .join('\n');
 }
 
+/** 写入块锚（若有）+ 块文本 + 段后空行。 */
+function pushBlock(lines: string[], node: PmNode, text: string): void {
+  const id = blockAnchorOf(node);
+  if (id !== null) lines.push(formatBlockAnchor(id));
+  lines.push(text);
+  lines.push('');
+}
+
 /** PM doc JSON → DSL 正文文本（块间以空行分隔，与 dslToPmDoc 往返稳定） */
 export function pmDocToDsl(doc: PmNode): string {
   const blocks = doc.content ?? [];
@@ -177,29 +216,22 @@ export function pmDocToDsl(doc: PmNode): string {
   for (const b of blocks) {
     switch (b.type) {
       case 'paragraph':
-        lines.push(escapeParagraphText(renderInline(b.content)));
-        lines.push('');
+        pushBlock(lines, b, escapeParagraphText(renderInline(b.content)));
         break;
       case 'heading': {
         const level = Number(b.attrs?.level ?? 1);
-        lines.push('#'.repeat(Math.min(3, Math.max(1, level))) + ' ' + renderInline(b.content));
-        lines.push('');
+        pushBlock(lines, b, '#'.repeat(Math.min(3, Math.max(1, level))) + ' ' + renderInline(b.content));
         break;
       }
       case 'sceneBreak':
-        lines.push('***');
-        lines.push('');
+        pushBlock(lines, b, '***');
         break;
       case 'keywordLine':
-        lines.push(`# @${b.attrs?.keyword ?? ''}: ${b.attrs?.value ?? ''}`.trimEnd());
-        lines.push('');
+        pushBlock(lines, b, `# @${b.attrs?.keyword ?? ''}: ${b.attrs?.value ?? ''}`.trimEnd());
         break;
       default:
         // 未知块：尽力渲染其内联内容
-        if (b.content) {
-          lines.push(renderInline(b.content));
-          lines.push('');
-        }
+        if (b.content) pushBlock(lines, b, renderInline(b.content));
     }
   }
   // 去掉尾部多余空行；不追加尾随换行（编辑器受控内容与源正文对齐，避免尾差抖动）

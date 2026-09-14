@@ -18,7 +18,7 @@ vi.mock('@core/entities', async (importOriginal) => {
   return { ...actual, getInstanceId: () => 'inst-test', hashEntity: vi.fn(async () => 'hash-x') };
 });
 
-import { exportSyncBundle, importSyncBundle } from '../syncService';
+import { downloadSyncBundle, exportSyncBundle, importSyncBundle, syncObjectKey, uploadSyncBundle } from '../syncService';
 
 const SQL_ID = /^[a-z]+\.[A-Za-z]+$/;
 
@@ -79,6 +79,13 @@ function stubApi(options: { rows?: Record<string, unknown[]>; fileContent?: { va
     fileContent.value = content;
     return true;
   });
+  const sync = {
+    testTransport: vi.fn(async () => ({ ok: true, message: 'ok' })),
+    put: vi.fn(async (_config: unknown, _key: string, _data: string) => ({ ok: true })),
+    get: vi.fn(async (_config: unknown, _key: string): Promise<string | null> => fileContent.value),
+    list: vi.fn(async () => []),
+    remove: vi.fn(async (_config: unknown, _key: string) => ({ ok: true })),
+  };
   vi.stubGlobal('window', {
     electronAPI: {
       db: { all: dbAll, run: dbRun },
@@ -86,9 +93,10 @@ function stubApi(options: { rows?: Record<string, unknown[]>; fileContent?: { va
       openFileDialog: async () => ({ canceled: false, filePaths: ['/tmp/sync.json'] }),
       writeFile,
       readFile: vi.fn(async () => fileContent.value),
+      sync,
     },
   });
-  return { dbAll, dbRun, writeFile, fileContent, writes };
+  return { dbAll, dbRun, writeFile, fileContent, writes, sync };
 }
 
 afterEach(() => {
@@ -221,5 +229,76 @@ describe('importSyncBundle', () => {
     expect(writes).toHaveLength(0);
     expect(report.applied).toBe(0);
     expect(report.manual).toBe(1);
+  });
+});
+
+describe('uploadSyncBundle', () => {
+  it('导出并上传到传输后端，默认键按书 id', async () => {
+    const { sync, writeFile } = stubApi({
+      rows: {
+        'nodes.selectByBook': [nodeRow],
+        'attrs.selectByBook': [attrRow],
+        'edges.selectByBook': [edgeRow],
+      },
+    });
+
+    const result = await uploadSyncBundle('b1', { kind: 'local', directory: '/x' }, { maxAttempts: 1 });
+
+    expect(result).toEqual({ key: 'hongyue-sync/b1.json', changeCount: 3 });
+    expect(syncObjectKey('b1')).toBe('hongyue-sync/b1.json');
+    expect(writeFile).not.toHaveBeenCalled();
+    const [config, key, data] = sync.put.mock.calls[0]!;
+    expect(config).toEqual({ kind: 'local', directory: '/x' });
+    expect(key).toBe('hongyue-sync/b1.json');
+    expect((JSON.parse(data) as { bookId: string }).bookId).toBe('b1');
+  });
+});
+
+describe('downloadSyncBundle', () => {
+  it('下载远端同步包并合并落库', async () => {
+    const remoteNode = {
+      id: 'n2', bookId: 'b1', type: 'novel.chapter', title: '第二章', body: '远端正文',
+      path: undefined, createdAt: 3, updatedAt: 4, erased: false,
+    };
+    const bundle = {
+      version: 1, bookId: 'b1', instanceId: 'remote', generatedAt: 1,
+      changes: [{ changeId: 1, entityName: 'nodes', entityId: 'n2', hash: 'deadbeef', isErased: false, agentId: 'sync', utcDateChanged: 1 }],
+      entities: { nodes: [remoteNode], edges: [], attrs: [] },
+    };
+    const { sync, writes } = stubApi({
+      rows: { 'nodes.selectByBook': [nodeRow], 'attrs.selectByBook': [], 'edges.selectByBook': [] },
+      fileContent: { value: JSON.stringify(bundle) },
+    });
+
+    const report = await downloadSyncBundle({ kind: 'local', directory: '/x' }, 'hongyue-sync/b1.json', { maxAttempts: 1 });
+
+    expect(report.applied).toBe(1);
+    expect(writes.map((w) => w.id)).toEqual(['nodes.upsert']);
+    expect(sync.get).toHaveBeenCalledWith({ kind: 'local', directory: '/x' }, 'hongyue-sync/b1.json');
+  });
+
+  it('远端对象缺失时抛可读错误', async () => {
+    const { sync } = stubApi();
+    sync.get.mockResolvedValueOnce(null);
+
+    await expect(
+      downloadSyncBundle({ kind: 'local', directory: '/x' }, 'missing.json', { maxAttempts: 1 }),
+    ).rejects.toThrow('远端不存在同步包');
+  });
+
+  it('瞬时失败按重试次数重试后成功', async () => {
+    const bundle = edgeBundle(
+      [edgeEntity('e:n2>n3:contain:', 'n2', 'n3')],
+      [nodeEntity('n2', '第二章'), nodeEntity('n3', '第三章')],
+    );
+    const { sync } = stubApi({
+      rows: { 'nodes.selectByBook': [nodeRow], 'attrs.selectByBook': [], 'edges.selectByBook': [] },
+    });
+    sync.get.mockRejectedValueOnce(new Error('网络抖动')).mockResolvedValueOnce(JSON.stringify(bundle));
+
+    const report = await downloadSyncBundle({ kind: 'local', directory: '/x' }, 'k.json', { maxAttempts: 2, delayMs: 0 });
+
+    expect(sync.get).toHaveBeenCalledTimes(2);
+    expect(report.applied).toBe(3);
   });
 });

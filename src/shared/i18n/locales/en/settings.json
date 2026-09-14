@@ -43,7 +43,8 @@
     "storage": "Data Storage",
     "embedding": "Embedding Models",
     "general": "General",
-    "plugins": "Plugins"
+    "plugins": "Plugins",
+    "sync": "Sync Transport"
   },
   "general": {
     "title": "General Settings",
@@ -560,5 +561,42 @@
     "online": "{{count}} online",
     "serverLabel": "Relay URL (cross-device, optional)",
     "serverHint": "Leave empty for same-machine windows; set ws:// or wss:// when all peers connect to the same relay for cross-device sync."
+  },
+  "syncTransfer": {
+    "title": "Sync transport",
+    "subtitle": "Send sync bundles to a local folder, WebDAV, or S3-compatible storage. Passwords and keys go to the system keychain; config keeps only references.",
+    "backendLabel": "Transport",
+    "backend": {
+      "local": "Local folder",
+      "webdav": "WebDAV",
+      "s3": "S3-compatible"
+    },
+    "directory": "Target folder",
+    "directoryPlaceholder": "e.g. D:\\Backup\\hongyue-sync",
+    "pickDirectory": "Choose folder",
+    "baseUrl": "Server URL",
+    "remoteDir": "Remote folder",
+    "authType": "Authentication",
+    "authBasic": "Username & password",
+    "authBearer": "Token (Bearer)",
+    "authNone": "None",
+    "username": "Username",
+    "credentialLabel": "Password / token",
+    "credentialReady": "Credential saved",
+    "credentialSaved": "Credential stored in the system keychain",
+    "credentialFailed": "Failed to save credential: {{error}}",
+    "endpoint": "Endpoint",
+    "region": "Region",
+    "bucket": "Bucket",
+    "prefix": "Object prefix",
+    "accessKeyId": "Access Key ID",
+    "secretLabel": "Secret Access Key",
+    "pathStyle": "Use path-style addressing (MinIO, etc.)",
+    "saveCredential": "Save credential",
+    "test": "Test connection",
+    "testing": "Testing…",
+    "testOk": "Connection succeeded",
+    "testFail": "Connection failed: {{error}}",
+    "desktopOnly": "Sync transport is available on desktop only."
   }
 }

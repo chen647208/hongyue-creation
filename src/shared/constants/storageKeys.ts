@@ -29,6 +29,7 @@ export const STORAGE_KEYS = {
   viewsSelected: 'views.selected',
   collabEnabled: 'collab.enabled',
   collabServerUrl: 'collab.serverUrl',
+  syncTransport: 'sync.transport',
   pluginsDisabled: 'plugins.disabled',
   trustedPluginKeys: 'plugins.trustedKeys',
   allowedPluginSources: 'plugins.allowedSources',

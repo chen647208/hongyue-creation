@@ -11,14 +11,13 @@
  * 块索引：从 ProseMirror 文档 JSON 提取块级标识与纯文本摘要。
  *
  * 纯函数、不依赖编辑器实例，供引用面板与单测使用。文档（PM-JSON）中块节点的
- * `blockId` 属性由 blockId.ts 的编辑器扩展维护；从 DSL 文本重新解析的文档
- * 不携带该属性，此时 id 为 null（见 blockIndex.ts 头部「丢链边界」）。
+ * `blockId` 属性由 blockId.ts 的编辑器扩展维护；DSL 文本经 serialization.ts 的
+ * 块锚（`^<id>`）读写该属性，缺失标识的块 id 为 null。
  */
 
-import { dslToPmDoc, type PmNode } from './serialization';
+import { BLOCK_ID_ATTRIBUTE, dslToPmDoc, type PmNode } from './serialization';
 
-/** 块级节点承载稳定标识的属性名（blockId.ts 的编辑器扩展写入）。 */
-export const BLOCK_ID_ATTRIBUTE = 'blockId';
+export { BLOCK_ID_ATTRIBUTE };
 
 /** 摘要最大字符数，超出截断并追加省略号。 */
 export const BLOCK_SUMMARY_MAX_LENGTH = 120;
@@ -111,8 +110,7 @@ export function collectBlockIds(doc: PmNode): string[] {
 /**
  * 章节 body（DSL 文本）→ 顶层块记录。
  *
- * DSL 文本不携带 blockId，因此 id 恒为 null；这是 markdown 存储下的已知丢链边界。
- * 需要带 id 的块记录时，改用编辑器当前文档的 `getJSON()` 结果调用 listBlocks。
+ * 带块锚的块经 serialization.ts 还原出 blockId；无锚的块 id 为 null。
  */
 export function listBlocksFromBody(body: string): BlockRecord[] {
   return listBlocks(dslToPmDoc(body));

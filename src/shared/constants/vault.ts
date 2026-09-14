@@ -13,7 +13,7 @@
  */
 export const VAULT_REF_PREFIX = 'vault:';
 
-export function isVaultRef(value: string | undefined): boolean {
+export function isVaultRef(value: string | undefined): value is string {
   return typeof value === 'string' && value.startsWith(VAULT_REF_PREFIX) && value.length > VAULT_REF_PREFIX.length;
 }
 

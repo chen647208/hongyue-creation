@@ -176,7 +176,16 @@
     "reportApplied": "应用变更：{{count}} 条",
     "reportSkipped": "已同步跳过：{{count}} 条",
     "reportManual": "需人工处理：{{count}} 条",
-    "conflictCopies": "冲突副本（本地已保留，远端以副本落库）"
+    "conflictCopies": "冲突副本（本地已保留，远端以副本落库）",
+    "upload": "上传到传输",
+    "download": "从传输下载并合并",
+    "uploadDone": "同步包已上传",
+    "uploadDoneMessage": "共 {{count}} 条变更记录。\n远端对象：{{key}}",
+    "uploadFailed": "上传失败",
+    "downloadFailed": "下载失败",
+    "transportHint": "当前传输：{{backend}}",
+    "transportMissing": "请先在 设置 → 同步传输 中配置并保存传输方式。",
+    "transportDesktopOnly": "同步传输仅在桌面端可用。"
   },
   "protected": {
     "title": "受保护会话",

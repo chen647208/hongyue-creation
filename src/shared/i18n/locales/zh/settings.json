@@ -43,7 +43,8 @@
     "storage": "数据存储",
     "embedding": "向量模型",
     "general": "通用",
-    "plugins": "插件"
+    "plugins": "插件",
+    "sync": "同步传输"
   },
   "general": {
     "title": "通用设置",
@@ -560,5 +561,42 @@
     "online": "在线 {{count}} 人",
     "serverLabel": "中转地址（跨设备，可留空）",
     "serverHint": "留空仅同机多窗口同步；填写 ws:// 或 wss:// 且各端连同一服务时跨设备同步。"
+  },
+  "syncTransfer": {
+    "title": "同步传输",
+    "subtitle": "把同步包送到本地目录、WebDAV 或 S3 兼容存储。密码与密钥存入系统钥匙串，配置只保留引用。",
+    "backendLabel": "传输方式",
+    "backend": {
+      "local": "本地目录",
+      "webdav": "WebDAV",
+      "s3": "S3 兼容"
+    },
+    "directory": "目标目录",
+    "directoryPlaceholder": "如 D:\\备份\\红月同步",
+    "pickDirectory": "选择目录",
+    "baseUrl": "服务地址",
+    "remoteDir": "远端目录",
+    "authType": "认证方式",
+    "authBasic": "用户名密码",
+    "authBearer": "令牌（Bearer）",
+    "authNone": "无认证",
+    "username": "用户名",
+    "credentialLabel": "密码 / 令牌",
+    "credentialReady": "凭据已保存",
+    "credentialSaved": "凭据已存入系统钥匙串",
+    "credentialFailed": "凭据保存失败：{{error}}",
+    "endpoint": "端点地址",
+    "region": "区域",
+    "bucket": "存储桶",
+    "prefix": "对象前缀",
+    "accessKeyId": "Access Key ID",
+    "secretLabel": "Secret Access Key",
+    "pathStyle": "使用路径寻址（MinIO 等）",
+    "saveCredential": "保存凭据",
+    "test": "测试连通",
+    "testing": "测试中…",
+    "testOk": "连接成功",
+    "testFail": "连接失败：{{error}}",
+    "desktopOnly": "同步传输仅在桌面端可用。"
   }
 }

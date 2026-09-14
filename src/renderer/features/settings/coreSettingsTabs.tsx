@@ -8,9 +8,10 @@
  */
 
 /** 内置设置页签贡献：与插件页签走同一注册表。 */
-import { Puzzle } from 'lucide-react';
+import { Cloud, Puzzle } from 'lucide-react';
 
 import PluginSettingsPanel from './components/PluginSettingsPanel';
+import SyncTransportPanel from './components/SyncTransportPanel';
 import { settingsTabRegistry } from './services/settingsTabs';
 
 export function registerCoreSettingsTabs(): void {
@@ -21,5 +22,14 @@ export function registerCoreSettingsTabs(): void {
     groupLabelKey: 'tabGroup.system',
     order: 0,
     render: () => <PluginSettingsPanel />,
+  });
+
+  settingsTabRegistry.register({
+    id: 'sync',
+    icon: Cloud,
+    labelKey: 'tab.sync',
+    groupLabelKey: 'tabGroup.system',
+    order: 1,
+    render: () => <SyncTransportPanel />,
   });
 }

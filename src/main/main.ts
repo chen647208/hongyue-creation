@@ -22,6 +22,7 @@ import {
   netProvider,
   shellProvider,
   sqliteProvider,
+  syncProvider,
   updaterProvider,
   vectorProvider,
   windowProvider,
@@ -46,6 +47,7 @@ const container = new AppContainer()
   .register(mcpClientProvider)
   .register(netProvider)
   .register(collabProvider)
+  .register(syncProvider)
   .register(shellProvider)
   .register(updaterProvider)
   .register(windowProvider);

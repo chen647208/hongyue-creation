@@ -13,6 +13,7 @@
  * 纯函数、无 IO：渲染端/测试环境共用；字数统计（写作统计）与导出
  * 共用同一段文本来源，保证「成稿字数」单一口径（验收 4）。
  */
+import { stripBlockAnchors } from '../dsl/anchor';
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '../entities';
 import type { BuildProfile } from './profile.js';
 import { typeMatches } from './profile.js';
@@ -163,7 +164,9 @@ export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBloc
       blocks.push({ kind: 'chapter', text: `【${node.title}】` });
     }
 
-    const body = content.resolveRefs === 'displayName' ? resolveRefs(node.body, titleById) : node.body;
+    // 块锚是编辑器元数据，不进成稿：编译/导出前先剥离。
+    const source = stripBlockAnchors(node.body);
+    const body = content.resolveRefs === 'displayName' ? resolveRefs(source, titleById) : source;
     const paragraphs = body
       .split(/\n+/)
       .map((p) => p.trim())

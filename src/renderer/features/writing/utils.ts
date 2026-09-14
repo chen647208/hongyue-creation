@@ -93,7 +93,7 @@ export const getPreviousChapterSummaryIds = (chapters: Chapter[], currentChapter
     const list: AttributeEntity[] = [{
       id: `attr-order-${c.id}`,
       nodeId: c.id,
-      type: 'label' as never,
+      type: 'label',
       name: 'order',
       value: String(c.order),
       inheritable: false,
@@ -104,7 +104,7 @@ export const getPreviousChapterSummaryIds = (chapters: Chapter[], currentChapter
       list.push({
         id: `attr-material-${c.id}`,
         nodeId: c.id,
-        type: 'label' as never,
+        type: 'label',
         name: 'material',
         value: 'true',
         inheritable: false,

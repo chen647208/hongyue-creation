@@ -129,4 +129,13 @@ export const IPC = {
     close: 'collab:close',
     message: 'collab:message',
   },
+
+  // 同步传输（本地目录 / WebDAV / S3 兼容；凭据经 vault 解引用，日志不落明文）
+  sync: {
+    transportTest: 'sync:transport:test',
+    transportPut: 'sync:transport:put',
+    transportGet: 'sync:transport:get',
+    transportList: 'sync:transport:list',
+    transportRemove: 'sync:transport:remove',
+  },
 } as const;

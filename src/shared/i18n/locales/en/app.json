@@ -176,7 +176,16 @@
     "reportApplied": "Applied: {{count}}",
     "reportSkipped": "Skipped (up to date): {{count}}",
     "reportManual": "Needs manual review: {{count}}",
-    "conflictCopies": "Conflict copies (local kept, remote saved as copies)"
+    "conflictCopies": "Conflict copies (local kept, remote saved as copies)",
+    "upload": "Upload to transport",
+    "download": "Download & merge",
+    "uploadDone": "Bundle uploaded",
+    "uploadDoneMessage": "{{count}} changes.\nRemote object: {{key}}",
+    "uploadFailed": "Upload failed",
+    "downloadFailed": "Download failed",
+    "transportHint": "Transport: {{backend}}",
+    "transportMissing": "Configure and save a transport under Settings → Sync transport first.",
+    "transportDesktopOnly": "Sync transport is available on desktop only."
   },
   "protected": {
     "title": "Protected Session",

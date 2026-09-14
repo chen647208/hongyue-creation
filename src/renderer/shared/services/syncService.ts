@@ -17,7 +17,9 @@
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '@core/entities';
 import { getInstanceId,hashEntity } from '@core/entities';
 import { buildBundle, canonicalHash, type EntitySnapshot, localState, mergeBundle, type SyncBundle } from '@core/sync';
-import type { FileDialogOptions, SaveDialogOptions } from '@shared/types';
+import type { FileDialogOptions, SaveDialogOptions, SyncTransportConfig } from '@shared/types';
+
+import { getSyncObject, putSyncObject, type RetryOptions } from './syncTransportService';
 
 function db(): NonNullable<Window['electronAPI']>['db'] {
   if (!window.electronAPI) throw new Error('同步需要桌面环境（文件系统/SQLite）');
@@ -47,8 +49,8 @@ async function readEntities(bookId: string): Promise<EntitySnapshot> {
 
 export interface SyncBundleExport { path: string; changeCount: number }
 
-/** 导出某本书的同步包（JSON），写入用户选择的路径。 */
-export async function exportSyncBundle(bookId: string, bookTitle: string): Promise<SyncBundleExport> {
+/** 合成某本书的同步包（导出与上传共用）。 */
+async function buildSyncBundle(bookId: string): Promise<{ bundle: SyncBundle; changeCount: number }> {
   const entities = await readEntities(bookId);
   let seq = 0;
   const changes = [
@@ -57,6 +59,17 @@ export async function exportSyncBundle(bookId: string, bookTitle: string): Promi
     ...entities.attrs.map((a) => ({ changeId: ++seq, entityName: 'attrs' as const, entityId: a.id, hash: canonicalOf(a), isErased: a.erased, agentId: 'sync', utcDateChanged: 0 })),
   ];
   const bundle = buildBundle({ bookId, instanceId: getInstanceId(), changes, entities });
+  return { bundle, changeCount: changes.length };
+}
+
+/** 同步对象在传输后端上的默认键；多书共用一个传输目录。 */
+export function syncObjectKey(bookId: string): string {
+  return `hongyue-sync/${bookId}.json`;
+}
+
+/** 导出某本书的同步包（JSON），写入用户选择的路径。 */
+export async function exportSyncBundle(bookId: string, bookTitle: string): Promise<SyncBundleExport> {
+  const { bundle, changeCount } = await buildSyncBundle(bookId);
 
   const saveOptions: SaveDialogOptions = {
     title: '导出同步包',
@@ -68,7 +81,23 @@ export async function exportSyncBundle(bookId: string, bookTitle: string): Promi
   const save = await api.saveFileDialog(saveOptions);
   if (save.canceled || !save.filePath) throw new Error('已取消导出');
   await api.writeFile(save.filePath, JSON.stringify(bundle, null, 2));
-  return { path: save.filePath, changeCount: changes.length };
+  return { path: save.filePath, changeCount };
+}
+
+export interface SyncUploadResult { key: string; changeCount: number }
+
+/**
+ * 导出并上传同步包到传输后端。失败按 retry 选项重试（默认 3 次）。
+ */
+export async function uploadSyncBundle(
+  bookId: string,
+  config: SyncTransportConfig,
+  options: { key?: string } & RetryOptions = {},
+): Promise<SyncUploadResult> {
+  const { bundle, changeCount } = await buildSyncBundle(bookId);
+  const key = options.key?.trim() || syncObjectKey(bookId);
+  await putSyncObject(config, key, JSON.stringify(bundle, null, 2), options);
+  return { key, changeCount };
 }
 
 function canonicalOf(entity: unknown): string {
@@ -82,15 +111,8 @@ export interface SyncApplyReport {
   manual: number;
 }
 
-/** 导入同步包：选择文件 → 合并 → 应用插入集 → 返回报告。 */
-export async function importSyncBundle(): Promise<SyncApplyReport> {
-  const api = window.electronAPI;
-  if (!api) throw new Error('同步需要桌面环境');
-  const picked = await api.openFileDialog({ title: '导入同步包', filters: [{ name: 'AI Novel Sync', extensions: ['json'] }], properties: ['openFile'] } satisfies FileDialogOptions);
-  if (picked.canceled || !picked.filePaths[0]) throw new Error('已取消导入');
-  const raw = await api.readFile(picked.filePaths[0]);
-  const bundle = JSON.parse(raw) as SyncBundle;
-
+/** 合并同步包并应用插入集（导入与下载共用）。 */
+async function applyBundle(bundle: SyncBundle): Promise<SyncApplyReport> {
   const local = localState(await readEntities(bundle.bookId));
   const report = mergeBundle(bundle, local);
 
@@ -113,4 +135,28 @@ export async function importSyncBundle(): Promise<SyncApplyReport> {
     skipped: report.skipped.length,
     manual: report.manual.length,
   };
+}
+
+/** 导入同步包：选择文件 → 合并 → 应用插入集 → 返回报告。 */
+export async function importSyncBundle(): Promise<SyncApplyReport> {
+  const api = window.electronAPI;
+  if (!api) throw new Error('同步需要桌面环境');
+  const picked = await api.openFileDialog({ title: '导入同步包', filters: [{ name: 'AI Novel Sync', extensions: ['json'] }], properties: ['openFile'] } satisfies FileDialogOptions);
+  if (picked.canceled || !picked.filePaths[0]) throw new Error('已取消导入');
+  const raw = await api.readFile(picked.filePaths[0]);
+  return applyBundle(JSON.parse(raw) as SyncBundle);
+}
+
+/**
+ * 从传输后端下载同步包并导入合并。远端对象不存在时抛出可读错误；
+ * 下载失败按 retry 选项重试（默认 3 次）。
+ */
+export async function downloadSyncBundle(
+  config: SyncTransportConfig,
+  key: string,
+  options: RetryOptions = {},
+): Promise<SyncApplyReport> {
+  const raw = await getSyncObject(config, key, options);
+  if (raw === null || raw === undefined) throw new Error(`远端不存在同步包：${key}`);
+  return applyBundle(JSON.parse(raw) as SyncBundle);
 }

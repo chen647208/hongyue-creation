@@ -824,6 +824,59 @@ export interface ProxyConfig {
   url: string;
 }
 
+/**
+ * 同步传输后端配置（docs/design/36）。三种后端共用 test/put/get/list/remove 契约。
+ * 密钥一律只存 `vault:<id>` 引用，配置本身不落明文。
+ */
+export interface SyncLocalTransportConfig {
+  kind: 'local';
+  /** 目标目录绝对路径。 */
+  directory: string;
+}
+
+export interface SyncWebDavTransportConfig {
+  kind: 'webdav';
+  /** 服务基地址，例如 https://host/remote.php/dav/files/user。 */
+  baseUrl: string;
+  /** 相对基地址的目录前缀；留空即基地址根。 */
+  remoteDir?: string;
+  authType: 'basic' | 'bearer' | 'none';
+  /** Basic 认证用户名（Bearer/无认证时忽略）。 */
+  username?: string;
+  /** 密码或令牌的保险库引用（vault:<id>）。 */
+  credentialRef?: string;
+}
+
+export interface SyncS3TransportConfig {
+  kind: 's3';
+  /** 端点，例如 https://s3.us-east-1.amazonaws.com 或 http://127.0.0.1:9000。 */
+  endpoint: string;
+  region: string;
+  bucket: string;
+  /** 对象键前缀，可留空。 */
+  prefix?: string;
+  accessKeyId: string;
+  /** Secret Access Key 的保险库引用（vault:<id>）。 */
+  secretRef?: string;
+  /** 路径寻址（MinIO 等）；虚拟主机寻址用于标准云对象存储。 */
+  pathStyle: boolean;
+}
+
+export type SyncTransportConfig = SyncLocalTransportConfig | SyncWebDavTransportConfig | SyncS3TransportConfig;
+
+/** 连通测试结果：message 为可直接展示的可读原因，不含凭据。 */
+export interface SyncTransportTestResult {
+  ok: boolean;
+  message: string;
+}
+
+/** 传输对象条目（list 结果）。 */
+export interface SyncTransportObject {
+  key: string;
+  size: number;
+  modifiedAt?: number;
+}
+
 export interface AppState {
   /** 状态结构版本：导入时高于当前即拒绝（旧版可读，新版不可降级读）。 */
   schemaVersion: number;
@@ -1291,6 +1344,14 @@ export interface ElectronAPI {
   net: {
     setProxy: (url: string) => Promise<{ ok: boolean }>;
     testProxy: (url: string) => Promise<{ ok: boolean; status?: number; error?: string }>;
+  };
+  /** 同步传输（本地目录 / WebDAV / S3；主进程执行，凭据从保险库解引用）。 */
+  sync: {
+    testTransport: (config: SyncTransportConfig) => Promise<SyncTransportTestResult>;
+    put: (config: SyncTransportConfig, key: string, data: string) => Promise<{ ok: boolean }>;
+    get: (config: SyncTransportConfig, key: string) => Promise<string | null>;
+    list: (config: SyncTransportConfig, prefix?: string) => Promise<SyncTransportObject[]>;
+    remove: (config: SyncTransportConfig, key: string) => Promise<{ ok: boolean }>;
   };
   /** 自动更新（仅打包版存在；开发/网页预览无此字段）。 */
   updater?: {

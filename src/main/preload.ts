@@ -148,6 +148,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setProxy: (url: string) => ipcRenderer.invoke(IPC.net.setProxy, url),
     testProxy: (url: string) => ipcRenderer.invoke(IPC.net.testProxy, url),
   },
+  // 同步传输（本地目录 / WebDAV / S3；主进程执行并解引用保险库凭据）
+  sync: {
+    testTransport: (config: unknown) => ipcRenderer.invoke(IPC.sync.transportTest, config),
+    put: (config: unknown, key: string, data: string) => ipcRenderer.invoke(IPC.sync.transportPut, config, key, data),
+    get: (config: unknown, key: string) => ipcRenderer.invoke(IPC.sync.transportGet, config, key),
+    list: (config: unknown, prefix?: string) => ipcRenderer.invoke(IPC.sync.transportList, config, prefix),
+    remove: (config: unknown, key: string) => ipcRenderer.invoke(IPC.sync.transportRemove, config, key),
+  },
   // 自动更新（打包版原生链路；开发版无 updater 字段，渲染层退回 GitHub 查询）
   updater: {
     check: () => ipcRenderer.invoke(IPC.updater.check),

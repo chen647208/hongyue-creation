@@ -7,6 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import { stripBlockAnchors } from '../dsl/anchor';
 import { parseKeywords } from '../dsl/keywords';
 import type { AttributeEntity, BookEntities, NodeEntity } from '../entities/types';
 import { countWords } from './words';
@@ -148,7 +149,8 @@ export function buildIndex(entities: BookEntities): IndexSnapshot {
     if (node.type.startsWith('card.') || node.type === 'meta.timeline-event') {
       addTag(node.title, { nodeId: node.id, displayName: node.title, aliases: [], kind: 'implicit' });
     }
-    wordCounts.set(node.id, isMaterial(node.id) ? 0 : countWords(node.body));
+    // 块锚不计入字数口径：统计前剥离。
+    wordCounts.set(node.id, isMaterial(node.id) ? 0 : countWords(stripBlockAnchors(node.body)));
   }
 
   const resolveTag = (target: string): TagEntry | undefined => {
