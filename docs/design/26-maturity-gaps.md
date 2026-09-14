@@ -11,16 +11,16 @@
 | 严重度 | 位置 | 问题 | 收尾需要做什么 |
 |---|---|---|---|
 | H | `src/renderer/app/App.tsx` | 订阅整个 `projects` 数组，任意编辑令工作台重渲染 | 细粒度选择器 + 重子树 memo |
-| H | `src/renderer/shared/services/repository/sqliteRepository.ts` | 启动 `SELECT * FROM nodes` 全表含正文 | 按活动书惰性查询（与「全部书常驻内存」模型冲突，需连同模型改造） |
-| H | `src/renderer/shared/services/repository/index.ts` | OPFS 失效静默退 localStorage | 双向迁移 + 哨兵 + UI 提示 |
+| H | `src/renderer/shared/services/repository/sqliteRepository.ts` | 启动 `SELECT * FROM nodes` 全表含正文 | 按活动书惰性查询（设计见 `docs/design/30-lazy-node-loading.md`） |
+| H | `src/renderer/shared/services/repository/index.ts` | OPFS 失效静默退 localStorage | 双向迁移 + 哨兵 + UI 提示（设计见 `docs/design/31-storage-backend-migration.md`） |
 | H | `src/main/app/providers.ts` | `pluginVerifySignature` 公钥由渲染层传入 | 主进程内置信任键集并在 handler 内校验 |
 | H | `modelListService` / `embeddingModelService` | 密钥明文解密在渲染层 | 拉表/嵌入改走主进程网关 |
 | M | `sqliteRepository.ts` | 冷启动对每本书 `rebuild` 索引 | 仅活动书重建或延迟重建 |
 | M | 驱动契约测试 | json/wasm 驱动无共享契约套件 | 抽三后端共享契约套件 |
 | M | `e2e/extended.spec.ts` | 缺加密/设置/损坏恢复 E2E | 补流程用例 |
 | M | `repository/__tests__/sqliteRepository.test.ts` | 无旧 schema fixture 升级/回滚用例 | 补 fixture |
-| M | `core/ai/agentLoop.ts` | proposal 无 diff，内置写工具不落库 | 产出 exec/diff 提案并批准后落 Revision |
-| M | `core/plugin/runtime.ts` 权限代理 | `assertCan` 仅测试调用 | 生产数据边界接入权限校验 |
+| M | `core/ai/agentLoop.ts` | proposal 无 diff，内置写工具不落库 | 产出 exec/diff 提案并批准后落 Revision（设计见 `docs/design/32-ai-write-governance.md`） |
+| M | `core/plugin/runtime.ts` 权限代理 | `assertCan` 仅测试调用 | 生产数据边界接入权限校验（同 `32`） |
 
 ## 已完成（从本表移除）
 
