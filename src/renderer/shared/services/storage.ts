@@ -24,6 +24,11 @@ const STORAGE_CONFIG_FILE = 'storage-config.json';
 // 自动备份服务实例
 const autoBackupService = AutoBackupService.getInstance();
 
+/** 迁移到 SQLite 后清理 localStorage 回退数据（浏览器无文件系统场景）。 */
+export function removeLocalStateFallback(): void {
+  localStore.removeItem(STORAGE_FILE_NAME);
+}
+
 // 默认存储配置（备份默认开启：每 30 秒一次，保留最近 5 份）
 const DEFAULT_STORAGE_CONFIG: StorageConfig = {
   dataPath: '',

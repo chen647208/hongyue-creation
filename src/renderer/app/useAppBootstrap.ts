@@ -21,7 +21,7 @@ import { bootCustomFonts } from '../features/settings/services/customFontService
 import { changeLanguage } from '../i18n';
 import { dt } from '../i18n';
 import { dialogService } from '../shared/services/dialogService';
-import { repository } from '../shared/services/repository';
+import { offerLocalToOpfsMigration,repository } from '../shared/services/repository';
 import { applyTheme, watchSystemTheme } from '../shared/services/themeService';
 import { logger } from '../shared/utils/logger';
 import { INITIAL_APP_STATE } from './initialState';
@@ -84,6 +84,8 @@ export function useAppBootstrap(): void {
           hydrateStoresFromState(loaded);
           if (loaded.language) changeLanguage(loaded.language);
           applyTheme(loaded.theme);
+          // 上次用 localStorage、本次 OPFS 可用时提议一次性迁移（失败保留原数据）
+          void offerLocalToOpfsMigration();
         } else {
           logger.debug('没有找到保存的状态，使用初始状态');
         }

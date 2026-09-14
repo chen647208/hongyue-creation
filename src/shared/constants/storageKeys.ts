@@ -25,6 +25,7 @@ export const STORAGE_KEYS = {
   editorSensitiveWords: 'editor.sensitiveWords',
   editorPaper: 'editor.paper',
   storageBackend: 'storage.backend',
+  storageLegacyBackup: 'storage.legacyBackup',
   viewsSelected: 'views.selected',
   collabEnabled: 'collab.enabled',
   collabServerUrl: 'collab.serverUrl',

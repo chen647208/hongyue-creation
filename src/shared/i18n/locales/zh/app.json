@@ -1,5 +1,8 @@
 {
   "storageBackendMismatch": "检测到上次使用浏览器数据库（OPFS），但当前环境不支持；已用回退存储打开，书库可能显示为空。请改用支持 OPFS 的浏览器，或从备份导入数据。",
+  "storageBackendBlockTitle": "无法打开本地书库",
+  "storageBackendBlockBody": "上次使用浏览器数据库（OPFS），但当前环境不支持。数据仍保存在原存储中，未丢失；请重试或改用支持 OPFS 的浏览器打开。",
+  "storageBackendRetry": "重试",
   "bookshelf": {
     "title": "书籍库",
     "subtitle": "你的全部小说项目，点击卡片继续创作。",

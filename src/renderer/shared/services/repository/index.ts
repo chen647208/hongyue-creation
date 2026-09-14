@@ -10,9 +10,12 @@
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 
 import { logger } from '../../utils/logger';
+import { dialogService } from '../dialogService';
 import { localStore } from '../localStore';
+import { removeLocalStateFallback } from '../storage';
 import { IpcSqlDriver } from './ipcDriver';
 import { jsonRepository } from './jsonRepository';
+import { migrateLocalToSqlite, type MigrationPlan,planStorageMigration } from './migration';
 import { SqliteRepository } from './sqliteRepository';
 import type { StorageRepository } from './types';
 import { WasmSqliteDriver } from './wasmDriver';
@@ -31,7 +34,7 @@ export interface StorageBackendStatus {
 export function decideStorageBackend(input: { hasIpc: boolean; hasOpfs: boolean; sentinel: string | null }): { kind: StorageBackendKind; mismatch: boolean } {
   if (input.hasIpc) return { kind: 'ipc', mismatch: false };
   if (input.hasOpfs) return { kind: 'opfs', mismatch: false };
-  return { kind: 'local', mismatch: input.sentinel === 'opfs' };
+  return { kind: 'local', mismatch: input.sentinel === 'sqlite-opfs' };
 }
 
 function readSentinel(): string | null {
@@ -39,7 +42,8 @@ function readSentinel(): string | null {
 }
 
 function writeSentinel(kind: StorageBackendKind): void {
-  localStore.setItem(STORAGE_KEYS.storageBackend, kind === 'opfs' ? 'opfs' : kind);
+  const value = kind === 'opfs' ? 'sqlite-opfs' : kind === 'ipc' ? 'sqlite-ipc' : 'json-local';
+  localStore.setItem(STORAGE_KEYS.storageBackend, value);
 }
 
 /**
@@ -89,4 +93,45 @@ export function getStorageBackendStatus(): StorageBackendStatus {
 
 export const repository: StorageRepository = selectRepository();
 
+/**
+ * 启动迁移提议（design/31）：OPFS 可用、localStorage 有数据且 OPFS 为空时，
+ * 经用户确认后一次性迁移；失败保留原数据与哨兵。
+ */
+export async function offerLocalToOpfsMigration(): Promise<boolean> {
+  const status = getStorageBackendStatus();
+  if (status.kind !== 'opfs') return false;
+  const local = await jsonRepository.loadAll().catch(() => null);
+  const localHasData = (local?.projects?.length ?? 0) > 0;
+  if (!localHasData) return false;
+  const current = await repository.loadAll().catch(() => null);
+  const plan: MigrationPlan = planStorageMigration({
+    hasIpc: false,
+    hasOpfs: true,
+    sentinel: status.expected,
+    localHasData,
+    opfsEmpty: (current?.projects?.length ?? 0) === 0,
+  });
+  if (plan !== 'offer-local-to-opfs') return false;
+  const agreed = await dialogService.confirm({
+    title: '迁移本地数据到 SQLite 存储',
+    message: '检测到本地存储中有书籍数据。是否迁移到 SQLite(OPFS)？迁移前会保留一份 .legacy 副本。',
+    confirmText: '迁移',
+    cancelText: '暂不',
+  });
+  if (!agreed) return false;
+  const result = await migrateLocalToSqlite({
+    loadLocal: () => jsonRepository.loadAll(),
+    initTarget: async () => repository,
+    keepLegacy: (json) => localStore.setItem(STORAGE_KEYS.storageLegacyBackup, json),
+    markMigrated: () => writeSentinel('opfs'),
+    clearLocal: () => removeLocalStateFallback(),
+  });
+  if (!result.ok) {
+    logger.error(`[repository] 存储迁移失败：${result.reason ?? 'unknown'}`);
+    void dialogService.alert('迁移未完成，原数据已保留。可稍后重试。');
+  }
+  return result.ok;
+}
+
+export type { MigrationPlan } from './migration';
 export type { OperationLogEntry, RevisionStat, SqlDriver, SqlRunResult,SqlValue, StorageRepository } from './types';

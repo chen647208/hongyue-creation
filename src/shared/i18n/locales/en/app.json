@@ -1,5 +1,8 @@
 {
   "storageBackendMismatch": "The browser database (OPFS) was used last time but is unavailable now; the app opened with the fallback store, so the bookshelf may look empty. Use a browser that supports OPFS, or import from a backup.",
+  "storageBackendBlockTitle": "Can’t open the local library",
+  "storageBackendBlockBody": "The browser database (OPFS) was used last time but is unavailable now. Your data is still in the original store and is not lost; retry or open with a browser that supports OPFS.",
+  "storageBackendRetry": "Retry",
   "bookshelf": {
     "title": "Bookshelf",
     "subtitle": "All your novel projects. Click a card to continue writing.",

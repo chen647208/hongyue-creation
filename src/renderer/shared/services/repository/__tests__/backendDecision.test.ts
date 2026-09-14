@@ -21,7 +21,7 @@ describe('decideStorageBackend', () => {
   });
 
   it('期望 OPFS 但不可用时标记 mismatch（不静默当空库）', () => {
-    expect(decideStorageBackend({ hasIpc: false, hasOpfs: false, sentinel: 'opfs' })).toEqual({ kind: 'local', mismatch: true });
+    expect(decideStorageBackend({ hasIpc: false, hasOpfs: false, sentinel: 'sqlite-opfs' })).toEqual({ kind: 'local', mismatch: true });
   });
 
   it('无记录且不可用仅回退不告警', () => {

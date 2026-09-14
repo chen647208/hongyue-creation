@@ -278,18 +278,23 @@ const App: React.FC = () => {
     </Suspense>
   ) : null;
 
+  if (getStorageBackendStatus().mismatch) {
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center">
+        <DialogHost />
+        <h1 className="text-lg font-semibold text-foreground">{t('storageBackendBlockTitle')}</h1>
+        <p role="alert" className="max-w-md text-sm text-muted-foreground">{t('storageBackendBlockBody')}</p>
+        <Button onClick={() => window.location.reload()}>{t('storageBackendRetry')}</Button>
+      </div>
+    );
+  }
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className="relative flex h-screen w-screen overflow-hidden bg-background">
         <DialogHost />
         <ToastHost />
         <ApprovalHost />
-
-        {getStorageBackendStatus().mismatch && (
-          <div role="alert" className="absolute inset-x-0 top-0 z-50 border-b border-warning/40 bg-warning/10 px-4 py-2 text-center text-xs text-warning">
-            {t('storageBackendMismatch')}
-          </div>
-        )}
 
         <ResetAlertDialog open={resetOpen} type="factory_reset" onClose={() => setResetOpen(false)} />
 
