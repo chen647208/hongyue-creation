@@ -47,27 +47,33 @@ function isNonEmptyString(value: unknown): value is string {
 /** 解析签名信封；算法未知或缺必要字段返回 undefined。 */
 export function parseSignatureEnvelope(raw: string): PluginSignatureEnvelope | undefined {
   try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    switch (parsed.algorithm) {
-      case 'ed25519':
-        if (!isNonEmptyString(parsed.signature) || !isNonEmptyString(parsed.publicKey)) return undefined;
-        return { algorithm: 'ed25519', signature: parsed.signature, publicKey: parsed.publicKey };
-      case 'sha256':
-        if (!isNonEmptyString(parsed.digest)) return undefined;
-        return { algorithm: 'sha256', digest: parsed.digest };
-      case 'cosign':
-        if (!isNonEmptyString(parsed.bundle)) return undefined;
-        return {
-          algorithm: 'cosign',
-          bundle: parsed.bundle,
-          publicKey: isNonEmptyString(parsed.publicKey) ? parsed.publicKey : undefined,
-          certificateIdentity: isNonEmptyString(parsed.certificateIdentity) ? parsed.certificateIdentity : undefined,
-          certificateOidcIssuer: isNonEmptyString(parsed.certificateOidcIssuer) ? parsed.certificateOidcIssuer : undefined,
-        };
-      default:
-        return undefined;
-    }
+    return validateSignatureEnvelope(JSON.parse(raw));
   } catch {
     return undefined;
+  }
+}
+
+/** 校验一个已解析的签名信封对象；算法未知或缺必要字段返回 undefined。 */
+export function validateSignatureEnvelope(value: unknown): PluginSignatureEnvelope | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const parsed = value as Record<string, unknown>;
+  switch (parsed.algorithm) {
+    case 'ed25519':
+      if (!isNonEmptyString(parsed.signature) || !isNonEmptyString(parsed.publicKey)) return undefined;
+      return { algorithm: 'ed25519', signature: parsed.signature, publicKey: parsed.publicKey };
+    case 'sha256':
+      if (!isNonEmptyString(parsed.digest)) return undefined;
+      return { algorithm: 'sha256', digest: parsed.digest };
+    case 'cosign':
+      if (!isNonEmptyString(parsed.bundle)) return undefined;
+      return {
+        algorithm: 'cosign',
+        bundle: parsed.bundle,
+        publicKey: isNonEmptyString(parsed.publicKey) ? parsed.publicKey : undefined,
+        certificateIdentity: isNonEmptyString(parsed.certificateIdentity) ? parsed.certificateIdentity : undefined,
+        certificateOidcIssuer: isNonEmptyString(parsed.certificateOidcIssuer) ? parsed.certificateOidcIssuer : undefined,
+      };
+    default:
+      return undefined;
   }
 }

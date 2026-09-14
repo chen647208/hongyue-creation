@@ -8,7 +8,7 @@
  */
 
 /** 助手运行时注册（特性契约，app 层接线）：把助手能力暴露给设置等消费方。 */
-import { pluginHostPromise, saveDisabledList } from '@/features/assistant/services/aiRuntime';
+import { pluginHostPromise, reloadPlugins, saveDisabledList } from '@/features/assistant/services/aiRuntime';
 import {
   deleteUserSkill,
   importUserSkill,
@@ -20,6 +20,7 @@ import { setAssistantRuntime } from '@/shared/services/assistantRuntime';
 export function registerAssistantRuntime(): void {
   setAssistantRuntime({
     pluginHostPromise,
+    reloadPlugins,
     saveDisabledList,
     listUserSkills,
     listBuiltinSkills,

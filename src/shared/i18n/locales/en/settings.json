@@ -512,7 +512,40 @@
     "panel": {
       "title": "Plugin UI"
     },
-    "settingsCorrupt": "Plugin settings were corrupt and reset to defaults; the original value is backed up at plugin.<id>.settings.corrupt"
+    "settingsCorrupt": "Plugin settings were corrupt and reset to defaults; the original value is backed up at plugin.<id>.settings.corrupt",
+    "uninstall": "Uninstall",
+    "install": {
+      "title": "Install plugin",
+      "hint": "Install from a local folder or a catalog index (catalog.json). Signature and source are verified before install; executable contributions require a trusted signature, and failures never leave partial files.",
+      "fromFolder": "Install from folder",
+      "fromCatalog": "Install from catalog",
+      "action": "Install",
+      "done": "{{action}} {{id}} ({{version}})",
+      "failed": "Install failed: {{reason}}",
+      "catalogInvalid": "Catalog index is invalid.",
+      "unavailable": "Plugin install is unavailable (no filesystem).",
+      "pickFolder": "Choose plugin folder",
+      "pickCatalog": "Choose catalog index file"
+    },
+    "net": {
+      "title": "Plugin network allowlist",
+      "hint": "Plugins such as web search/translation can only reach hosts on this list (exact or wildcard subdomain *.example.com). An empty list denies every plugin network request.",
+      "save": "Save allowlist",
+      "saved": "Saved"
+    },
+    "local": {
+      "title": "Local inference",
+      "hint": "Connect a self-provided local runtime (OpenAI-compatible or Ollama endpoint); the runtime is not bundled. When disabled or unreachable, calls fall back to the remote gateway.",
+      "enabled": "Enabled",
+      "endpoint": "Local endpoint",
+      "probe": "Probe",
+      "start": "Start runtime",
+      "stop": "Stop runtime",
+      "reachable": "Reachable: {{endpoint}}, {{count}} model(s).",
+      "unreachable": "Unreachable: {{error}}",
+      "routeLocal": "Routing: local inference.",
+      "routeRemote": "Routing: remote gateway ({{reason}})."
+    }
   },
   "usage": {
     "title": "Usage & cost",

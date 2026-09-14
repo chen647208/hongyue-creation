@@ -18,7 +18,8 @@ import { Button } from '@/shared/ui/Button';
 import { Input } from '@/shared/ui/Input';
 import { LoadingState } from '@/shared/ui/LoadingState';
 
-import { listSessionArchives, type SessionArchiveEntry,summarizeSessionUsage } from '../services/sessionArchive';
+import { filterSessionEntries, listSessionArchives, type SessionArchiveEntry,summarizeSessionUsage } from '../services/sessionArchive';
+import { renameSession, setSessionArchived } from '../services/sessionIndexService';
 
 function eventLine(e: AiEvent, t: TFunction<'assistant'>): { label: string; tone: 'ok' | 'err' | 'muted' } {
   switch (e.t) {
@@ -84,12 +85,18 @@ const SessionEventBrowser: React.FC<{ bookId: string }> = ({ bookId }) => {
   const [sessions, setSessions] = useState<SessionArchiveEntry[] | null>(null);
   const [selected, setSelected] = useState<SessionArchiveEntry | null>(null);
   const [query, setQuery] = useState('');
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [nameDraft, setNameDraft] = useState('');
 
   useEffect(() => {
     let alive = true;
     listSessionArchives(bookId)
       .then((entries) => {
-        if (alive) setSessions(entries);
+        if (!alive) return;
+        setSessions(entries);
+        // 元数据变更后刷新选中项，避免按钮/名称显示陈旧
+        setSelected((prev) => (prev ? entries.find((e) => e.sessionId === prev.sessionId) ?? prev : prev));
       })
       .catch(() => {
         if (alive) setSessions([]);
@@ -97,7 +104,9 @@ const SessionEventBrowser: React.FC<{ bookId: string }> = ({ bookId }) => {
     return () => {
       alive = false;
     };
-  }, [bookId]);
+  }, [bookId, reloadKey]);
+
+  const reload = () => setReloadKey((k) => k + 1);
 
   if (sessions === null) {
     return <LoadingState className="py-16" />;
@@ -107,10 +116,19 @@ const SessionEventBrowser: React.FC<{ bookId: string }> = ({ bookId }) => {
     return <div className="py-16 text-center text-sm text-muted-foreground">{t('approval.eventNoSessions')}</div>;
   }
 
-  const q = query.trim().toLowerCase();
-  const visible = q
-    ? sessions.filter((s) => (s.task ?? '').toLowerCase().includes(q))
-    : sessions;
+  const visible = filterSessionEntries(sessions, query, includeArchived);
+
+  const commitRename = () => {
+    if (!selected) return;
+    renameSession(bookId, selected.sessionId, nameDraft);
+    reload();
+  };
+
+  const toggleArchive = () => {
+    if (!selected) return;
+    setSessionArchived(bookId, selected.sessionId, !selected.archived);
+    reload();
+  };
 
   const exportMarkdown = () => {
     if (!selected) return;
@@ -138,15 +156,25 @@ const SessionEventBrowser: React.FC<{ bookId: string }> = ({ bookId }) => {
         placeholder={t('approval.eventSearchPlaceholder')}
         className="h-8 text-xs"
       />
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={includeArchived}
+          onChange={(e) => setIncludeArchived(e.target.checked)}
+          className="size-3.5 accent-primary"
+        />
+        {t('approval.eventShowArchived')}
+      </label>
       <div className="flex flex-wrap gap-2">
         {visible.map((s) => (
           <Button
             key={s.sessionId}
             size="sm"
             variant={selected?.sessionId === s.sessionId ? 'default' : 'outline'}
-            onClick={() => setSelected(s)}
+            onClick={() => { setSelected(s); setNameDraft(s.name ?? ''); }}
           >
-            {new Date(s.startedAt ?? 0).toLocaleString()} · {(s.task ?? '').slice(0, 18)}
+            {new Date(s.startedAt ?? 0).toLocaleString()} · {(s.name ?? s.task ?? '').slice(0, 18)}
+            {s.archived ? ` · ${t('approval.eventArchived')}` : ''}
           </Button>
         ))}
       </div>
@@ -160,6 +188,21 @@ const SessionEventBrowser: React.FC<{ bookId: string }> = ({ bookId }) => {
             <span className="text-xs text-muted-foreground">{selected.events.length} events</span>
             <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs text-muted-foreground" onClick={exportMarkdown}>
               {t('approval.eventExportMd')}
+            </Button>
+          </div>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <Input
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              placeholder={t('approval.eventRenamePlaceholder')}
+              className="h-7 flex-1 text-xs"
+              aria-label={t('approval.eventRenamePlaceholder')}
+            />
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={commitRename}>
+              {t('approval.eventRename')}
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={toggleArchive}>
+              {selected.archived ? t('approval.eventRestore') : t('approval.eventArchive')}
             </Button>
           </div>
           <SessionUsageBar events={selected.events} />

@@ -18,8 +18,10 @@ import { requestRendererFlush } from './app/flushHandshake.js';
 import {
   dialogProvider,
   fileProvider,
+  localInferenceProvider,
   mcpClientProvider,
   netProvider,
+  pluginStoreProvider,
   shellProvider,
   sqliteProvider,
   syncProvider,
@@ -45,6 +47,8 @@ const container = new AppContainer()
   .register(dialogProvider)
   .register(secureStoreProvider)
   .register(aiGatewayProvider)
+  .register(localInferenceProvider)
+  .register(pluginStoreProvider)
   .register(mcpClientProvider)
   .register(netProvider)
   .register(collabProvider)

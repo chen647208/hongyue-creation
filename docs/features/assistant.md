@@ -12,9 +12,10 @@
 - `components/AssistantContextPanel.tsx`：上下文分析与项目快照面板
 - `components/AssistantEditPanel.tsx`：项目数据编辑面板
 - `components/ApprovalHost.tsx`：审批对话框 + 待审箱角标（write 档操作经用户批准）
-- `components/SessionEventBrowser.tsx`：会话事件流回放（AI 历史的事件浏览器形态）
+- `components/SessionEventBrowser.tsx`：会话事件流回放（AI 历史的事件浏览器形态），含会话命名、归档/恢复与搜索
 - `services/aiRuntime.ts`：应用级 AI 运行时单例（assembler/registry/catalog/broker/sessionManager）
-- `services/aiSessionManager.ts`：会话管理器——jsonl 落盘、技能渐进注入、工具编排
+- `services/aiSessionManager.ts`：会话管理器——jsonl 落盘、技能渐进注入、工具编排；每个会话独立事件流与注入上下文（按会话 id 隔离）
+- `services/sessionIndexService.ts`：会话元数据（名称/归档标记，`localStore` 持久化；事件流仍是唯一真源）
 - `services/builtinTools.ts`：内置工具（卡片生成/命令解析/一致性扫描/推荐/索引查询/章节目录与正文/大纲/人物清单/知识读写/全文与语义检索/续写/重写/大纲/章节细纲）
 - `services/skillCatalogSetup.ts`：内置 5 写法技能装载（黄金三章/雪片法/POV/伏笔回收/AI 味消除；SKILL.md 以 `?raw` 打包进渲染端，离线可用；触发词命中会话内自动激活全文，会话结束即卸载）
 - `services/smartRecommendationService.ts` / `aiSemanticCheckService.ts`：推荐与语义检查（经工具注册表暴露）
@@ -54,8 +55,10 @@
 
 ## 后台任务与附件库
 
-- 会话运行交给应用级任务服务（`services/assistantTaskService.ts`）：同一时刻串行执行一个会话，
+- 会话运行交给应用级任务服务（`services/assistantTaskService.ts`）：最多两个助手会话并行，其余排队；
   面板关闭或切换分区都不中止。顶栏指示器显示排队/运行/已完成任务，可逐条中止与清理。
+- 并行隔离：会话管理器按会话 id 存事件流与注入上下文，技能激活按会话作用域（`SkillCatalog` 的 scope）
+  隔离——一个会话激活写法技能不污染另一个会话的上下文。
 - 文档附件按书持久化：发送的参考文件存入 `attachments`/`blobs`（仅 SQLite 后端），
   输入区附件按钮旁的附件库可再次引用（PDF 重新解析、文本按 UTF-8 解码），也可删除。
 
@@ -64,6 +67,11 @@
 - 设置 → 插件 → 外部 MCP 服务：stdio 命令增删、启用开关、连通测试。
 - 连通 server 的工具以 `mcp.*` 并入工具箱，默认走审批提案；
   同步失败记会话事件，不进聊天打断。
+- 资源面：MCP server 宣告 `books://index` 与 `book://{bookId}/toc|entities|chapter/{chapterId}|stats`，
+  外部客户端与内置助手读到同一份数据（目录/设定实体/单章正文/类型与字数统计）。
+- 自举：内置助手经进程内直连同一个 MCP server（不 spawn 子进程），读工具与外部同源；
+  server 的 `propose_*` 提案工具带 `_meta['hongyue/proposal']` 标记，调用只写入统一待审箱
+  `pending-proposals.jsonl`（同一提案不二次弹批），用户批准后由同一执行器落库。
 
 斜杠建卡（`/角色` 等）不走对话循环：解析成功后同样经审批弹框，
 批准才落库，拒绝/超时进待审箱——与工具写提案同标准。
@@ -72,7 +80,8 @@
 
 每轮全程事件化（turn/llm/tool/approval）落
 `userData/ai-sessions/<bookId>/<sessionId>.jsonl`；
-「AI 历史 → 会话事件流」页签可回放。审批待审箱：超时或手动搁置的
+「AI 历史 → 会话事件流」页签可回放，支持会话命名、归档/恢复与搜索
+（元数据存渲染端偏好，事件流仍是唯一真源）。审批待审箱：超时或手动搁置的
 write 请求挂起，顶栏待审箱角标可逐条决定，绝不静默应用。
 
 ## 无可用模型时的行为

@@ -5,7 +5,8 @@
   "strategy": {
     "title": "AI Core Strategy",
     "subtitle": "Shaping souls from your worldbuilding",
-    "templateLabel": "Parsing Template"
+    "templateLabel": "Parsing Template",
+    "settingsTitle": "Open settings"
   },
   "generating": "Mining character profiles...",
   "generateBtn": "Generate World Cast",
@@ -183,6 +184,7 @@
     "hasIntersection": "Connected",
     "backToOverview": "Back to Overview",
     "hintDragging": "Drag nodes to reposition, release to place",
-    "hintIdle": "Click a node for details, drag to reposition"
+    "hintIdle": "Click a node for details, drag to reposition",
+    "close": "Close map"
   }
 }

@@ -11,7 +11,7 @@
  * 助手聊天编排（从 GlobalAssistant 抽出）：消息流、输入、发送/重试/停止、
  * 会话记忆、卡片模板选择。卡片落库经 addCardToProject 回调交回组件（保持归因与审批语义）。
  */
-import type { AgentTurnResult, Citation, ContextInjectionResult } from '@core/ai';
+import type { Citation, ContextInjectionResult } from '@core/ai';
 import { inferContextTarget } from '@core/ai';
 import { indexService } from '@core/index';
 import type { TFunction } from 'i18next';
@@ -33,6 +33,7 @@ import {
   type Project,
 } from '../../../../shared/types';
 import { approvalBroker, sessionManager } from '../services/aiRuntime';
+import type { SessionRunResult } from '../services/aiSessionManager';
 import { assistantTaskService } from '../services/assistantTaskService';
 import { type ChatMessage } from '../types';
 import { useAssistantHistory } from './useAssistantHistory';
@@ -273,17 +274,19 @@ export function useAssistantChat({
     const outcome = await taskHandle.result;
     streamAbortRef.current = null;
     setStreamingMessageId(null);
-    const result = outcome.value as AgentTurnResult | undefined;
+    const result = outcome.value as SessionRunResult | undefined;
     if (!result) {
       // 中止（排队中移除或运行中被取消）：不追加答复
       setIsLoading(false);
       return;
     }
+    // 按本会话 id 读取事件（并行任务各读各的，不串到最近一次会话）
+    const sessionEvents = sessionManager.getEvents(result.sessionId);
     // 本轮工具链快照：callId 关联调用与结果，供聊天区折叠展示
     try {
       const names = new Map<string, string>();
       const results = new Map<string, boolean>();
-      for (const e of sessionManager.getEvents()) {
+      for (const e of sessionEvents) {
         if (e.t === 'tool.call' && typeof e.callId === 'string' && typeof e.toolId === 'string') {
           names.set(e.callId, e.toolId);
           if (!results.has(e.callId)) results.set(e.callId, true);
@@ -295,8 +298,8 @@ export function useAssistantChat({
     } catch {
       // 事件读取失败不影响主流程
     }
-    const citations = collectCitations(sessionManager.getEvents());
-    setLastInjection(sessionManager.getLastInjection());
+    const citations = collectCitations(sessionEvents);
+    setLastInjection(sessionManager.getLastInjection(result.sessionId));
     setMessages(prev => [...prev, {
       id: (Date.now() + 1).toString(),
       role: 'assistant' as const,

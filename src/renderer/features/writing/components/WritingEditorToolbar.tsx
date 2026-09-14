@@ -109,7 +109,7 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
               placeholder={t('toolbar.titlePlaceholder')}
             />
           ) : (
-            <span className="font-serif text-lg font-medium text-muted-foreground/50">{t('toolbar.selectChapter')}</span>
+            <span className="font-serif text-lg font-medium text-muted-foreground">{t('toolbar.selectChapter')}</span>
           )}
         </>
       }

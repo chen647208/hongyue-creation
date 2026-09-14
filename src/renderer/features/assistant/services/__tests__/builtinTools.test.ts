@@ -50,15 +50,16 @@ function ctxOf(project: Project | null, services: Record<string, unknown> = {}):
 }
 
 describe('按需上下文工具', () => {
-  it('注册表包含 17 个工具且无重复', () => {
+  it('注册表包含全部内置工具且无重复', () => {
     const registry = createToolRegistry();
     for (const id of [
       'core.chapter.list', 'core.chapter.read', 'core.outline.read', 'core.character.list',
       'core.knowledge.read', 'core.text.search', 'core.text.semanticSearch', 'core.skill.load', 'core.skill.run', 'core.plugin.run',
+      'core.net.fetch',
     ]) {
       expect(registry.has(id), id).toBe(true);
     }
-    expect(registry.list()).toHaveLength(19);
+    expect(registry.list()).toHaveLength(20);
   });
 
   it('chapter.list 按 order 排序并标注正文状态', async () => {
@@ -178,5 +179,12 @@ describe('按需上下文工具', () => {
     const out = await registry.execute('core.chapter.list', {}, ctxOf(null));
     expect(out.ok).toBe(false);
     expect(out.error).toContain('没有打开的书籍');
+  });
+
+  it('core.net.fetch：未激活插件一律拒绝（网络门权限前置）', async () => {
+    const registry = createToolRegistry();
+    const out = await registry.execute('core.net.fetch', { pluginId: 'com.example.search', url: 'https://example.com/' }, ctxOf(stubProject()));
+    expect(out.ok).toBe(false);
+    expect(out.error).toContain('未激活');
   });
 });

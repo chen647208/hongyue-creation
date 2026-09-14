@@ -27,6 +27,8 @@ export interface BuiltinSkillInfo {
 
 export interface AssistantRuntimeContract {
   pluginHostPromise: Promise<PluginHost>;
+  /** 安装/卸载后重建插件宿主（释放旧贡献 + 重新发现）。 */
+  reloadPlugins: () => Promise<PluginHost>;
   saveDisabledList: (ids: string[]) => void;
   listUserSkills: () => Promise<UserSkillInfo[]>;
   listBuiltinSkills: () => BuiltinSkillInfo[];

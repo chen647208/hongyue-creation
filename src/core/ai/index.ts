@@ -68,6 +68,20 @@ export {
   toCitation,
 } from './grounding.js';
 export {
+  type InferenceDecisionInput,
+  type InferenceTarget,
+  inferLocalFlavor,
+  type LocalModelInfo,
+  localModelsUrl,
+  type LocalProbeResult,
+  type LocalRuntimeConfig,
+  type LocalRuntimeFlavor,
+  normalizeLocalEndpoint,
+  parseLocalModels,
+  probeLocalEndpoint,
+  resolveInferenceTarget,
+} from './localInference.js';
+export {
   type AssembleResult,
   PromptAssembler,
   type PromptContext,
@@ -101,3 +115,13 @@ export {
   ToolRegistry,
   type ToolSpec,
 } from './tools.js';
+export {
+  DEFAULT_UNTRUSTED_LIMIT,
+  fenceUntrusted,
+  isFenced,
+  sanitizeUntrusted,
+  stripFence,
+  UNTRUSTED_BEGIN,
+  UNTRUSTED_END,
+  type UntrustedMeta,
+} from './untrusted.js';

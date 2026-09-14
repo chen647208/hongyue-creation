@@ -10,6 +10,8 @@
 /** 会话归档读取：userData/ai-sessions/<bookId>/*.jsonl → 事件列表（事件浏览器消费）。 */
 import { type AiEvent,parseEventLine } from '@core/ai';
 
+import { readSessionMeta,type SessionMetaMap } from './sessionIndexService';
+
 export interface SessionArchiveEntry {
   sessionId: string;
   fileName: string;
@@ -17,6 +19,36 @@ export interface SessionArchiveEntry {
   startedAt?: number;
   task?: string;
   ok?: boolean;
+  /** 用户自定义名称（元数据，缺席时界面回落 task）。 */
+  name?: string;
+  /** 归档标记（元数据）；归档会话默认不出现在列表。 */
+  archived?: boolean;
+}
+
+/** 把命名/归档元数据合并进归档列表；不改动事件（事件仍是唯一真源）。 */
+export function applySessionMeta(entries: SessionArchiveEntry[], meta: SessionMetaMap): SessionArchiveEntry[] {
+  return entries.map((entry) => {
+    const m = meta[entry.sessionId];
+    if (!m) return entry;
+    return { ...entry, name: m.name, archived: m.archived };
+  });
+}
+
+/** 关键词检索：命中自定义名称或任务文本（大小写不敏感）。 */
+export function matchesSessionQuery(entry: SessionArchiveEntry, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const name = (entry.name ?? entry.task ?? '').toLowerCase();
+  return name.includes(q) || entry.sessionId.toLowerCase().includes(q);
+}
+
+/** 列表过滤：默认隐藏已归档；传 includeArchived 时一并展示。 */
+export function filterSessionEntries(
+  entries: SessionArchiveEntry[],
+  query: string,
+  includeArchived: boolean,
+): SessionArchiveEntry[] {
+  return entries.filter((entry) => (includeArchived || !entry.archived) && matchesSessionQuery(entry, query));
 }
 
 function electron(): NonNullable<Window['electronAPI']> {
@@ -57,7 +89,8 @@ export async function listSessionArchives(bookId: string): Promise<SessionArchiv
     }
   }
 
-  return entries.sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+  const withMeta = applySessionMeta(entries, readSessionMeta(bookId));
+  return withMeta.sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
 }
 
 /** 单会话用量汇总（事件浏览器消费；缺字段事件按 0 计）。 */

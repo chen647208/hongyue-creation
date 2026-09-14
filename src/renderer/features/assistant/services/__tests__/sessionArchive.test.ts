@@ -10,9 +10,55 @@
 import type { AiEvent } from '@core/ai';
 import { describe, expect,it } from 'vitest';
 
-import { summarizeSessionUsage } from '../sessionArchive';
+import {
+  applySessionMeta,
+  filterSessionEntries,
+  matchesSessionQuery,
+  type SessionArchiveEntry,
+  summarizeSessionUsage,
+} from '../sessionArchive';
+import { parseMetaIndex, upsertMeta } from '../sessionIndexService';
 
 const at = 1;
+
+function entry(sessionId: string, task: string): SessionArchiveEntry {
+  return { sessionId, fileName: `${sessionId}.jsonl`, task, events: [] };
+}
+
+describe('会话归档元数据与过滤', () => {
+  it('applySessionMeta 合并名称与归档标记，不改事件', () => {
+    const entries = [entry('s1', '旧任务'), entry('s2', '另一任务')];
+    const meta = { s1: { name: '第一章草稿', archived: true, updatedAt: 9 } };
+    const merged = applySessionMeta(entries, meta);
+    expect(merged[0]).toMatchObject({ sessionId: 's1', name: '第一章草稿', archived: true });
+    expect(merged[1]!.name).toBeUndefined();
+    expect(merged[1]!.events).toBe(entries[1]!.events);
+  });
+
+  it('搜索命中名称或任务，默认隐藏已归档', () => {
+    const entries = [
+      { ...entry('s1', '普通任务'), archived: true },
+      { ...entry('s2', '角色设定') },
+    ];
+    expect(filterSessionEntries(entries, '', false).map((e) => e.sessionId)).toEqual(['s2']);
+    expect(filterSessionEntries(entries, '', true).map((e) => e.sessionId)).toEqual(['s1', 's2']);
+    expect(filterSessionEntries(entries, '角色', false).map((e) => e.sessionId)).toEqual(['s2']);
+    expect(matchesSessionQuery(entries[1]!, 'S2')).toBe(true);
+    expect(matchesSessionQuery(entries[1]!, '不存在')).toBe(false);
+  });
+});
+
+describe('parseMetaIndex / upsertMeta', () => {
+  it('损坏输入回退空索引，upsert 按书分桶合并', () => {
+    expect(parseMetaIndex(null)).toEqual({});
+    expect(parseMetaIndex('{oops')).toEqual({});
+    const idx = upsertMeta(upsertMeta({}, 'book1', 's1', { name: '甲' }), 'book1', 's1', { archived: true });
+    expect(idx.book1!.s1).toMatchObject({ name: '甲', archived: true });
+    const idx2 = upsertMeta(idx, 'book2', 's2', { name: '乙' });
+    expect(idx2.book2!.s2!.name).toBe('乙');
+    expect(idx2.book1!.s1!.name).toBe('甲');
+  });
+});
 
 describe('summarizeSessionUsage', () => {
   it('累计轮次/调用/用量与缓存命中', () => {

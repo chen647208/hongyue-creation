@@ -21,6 +21,8 @@ export interface McpToolDef {
   inputSchema?: unknown;
   /** MCP annotations：readOnlyHint 为真即只读（宿主据此直通，不走审批）。 */
   annotations?: { readOnlyHint?: boolean };
+  /** MCP 扩展元数据（`_meta`）；提案工具标记 `hongyue/proposal`。 */
+  _meta?: Record<string, unknown>;
 }
 
 interface PendingCall {

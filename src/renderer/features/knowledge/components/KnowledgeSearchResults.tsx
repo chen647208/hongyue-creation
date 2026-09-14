@@ -41,7 +41,12 @@ export const KnowledgeSearchResults: React.FC<KnowledgeSearchResultsProps> = ({ 
           {t('center.searchResultsTitle', { count: results.length })}
           <span className="ml-2 text-xs font-normal text-muted-foreground">{modeLabel}</span>
         </h3>
-        <button onClick={onClose} className="text-muted-foreground transition-colors hover:text-foreground">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('center.closeSearchResults')}
+          className="text-muted-foreground transition-colors hover:text-foreground"
+        >
           <X className="size-4" />
         </button>
       </div>
@@ -49,8 +54,16 @@ export const KnowledgeSearchResults: React.FC<KnowledgeSearchResultsProps> = ({ 
         {results.map((result) => (
           <div
             key={result.document.id}
-            className="cursor-pointer border-b border-border p-4 transition-colors last:border-0 hover:bg-accent/40"
+            role="button"
+            tabIndex={0}
+            className="cursor-pointer border-b border-border p-4 transition-colors last:border-0 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             onClick={() => onOpen(result.document.knowledgeItemId)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onOpen(result.document.knowledgeItemId);
+              }
+            }}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">

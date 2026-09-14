@@ -30,6 +30,7 @@ import { adjudicateHandlerResult, checkPluginFileName, checkPluginRelPath, type 
 import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import { parseSignatureEnvelope } from '@shared/pluginSignature';
+import type { PluginInstallRequest, PluginInstallResult, PluginUninstallResult } from '@shared/types';
 import * as React from 'react';
 
 import { PluginEditorFrame } from '@/shared/ui/PluginEditorFrame';
@@ -425,6 +426,88 @@ export async function bootstrapPlugins(deps: PluginDeps, hostVersion: string, di
     // 无 electronAPI：运行时仍可用于内置流程
   }
   return host;
+}
+
+/** 清理插件的本地配置键（`plugin.<id>.settings[.corrupt]`），卸载时无残留。 */
+export function clearPluginSettings(pluginId: string): void {
+  localStore.removeItem(`plugin.${pluginId}.settings`);
+  localStore.removeItem(`plugin.${pluginId}.settings.corrupt`);
+}
+
+/** 从已授权目录安装/更新插件（签名与来源由主进程校验）。 */
+export async function installPluginFromDirectory(
+  request: PluginInstallRequest,
+): Promise<PluginInstallResult> {
+  const api = typeof window === 'undefined' ? undefined : window.electronAPI;
+  if (!api?.pluginStore) {
+    return { ok: false, reason: '当前环境不支持插件安装（缺少文件系统）' };
+  }
+  return api.pluginStore.install(request);
+}
+
+/**
+ * 卸载插件：删落盘文件 + 清本地配置 + 逆序释放贡献（无残留）。
+ * 返回更新后的宿主信息由调用方刷新。
+ */
+export async function uninstallPlugin(
+  host: PluginHost,
+  pluginId: string,
+): Promise<PluginUninstallResult> {
+  clearPluginSettings(pluginId);
+  // 先释放宿主内已装配贡献，避免残留注册（技能/类型/公式/事件）
+  host.uninstall(pluginId);
+  const api = typeof window === 'undefined' ? undefined : window.electronAPI;
+  if (!api?.pluginStore) {
+    return { ok: true, pluginId };
+  }
+  const result = await api.pluginStore.uninstall(pluginId);
+  if (result.ok) {
+    const remaining = (readStringArraySetting(STORAGE_KEYS.pluginsDisabled) ?? []).filter((id) => id !== pluginId);
+    localStore.setItem(STORAGE_KEYS.pluginsDisabled, JSON.stringify(remaining));
+  }
+  return result;
+}
+
+/** 重建插件宿主：先逆序释放旧宿主全部贡献，再完整发现-装配一遍（安装/更新后刷新）。 */
+export async function reloadPluginHost(
+  deps: PluginDeps,
+  hostVersion: string,
+  previous?: PluginHost | null,
+): Promise<PluginHost> {
+  if (previous) {
+    for (const status of previous.list()) previous.uninstall(status.id);
+  }
+  return bootstrapPlugins(deps, hostVersion, readStringArraySetting(STORAGE_KEYS.pluginsDisabled) ?? []);
+}
+
+/** 受控网络请求：仅在插件已激活且 manifest 声明 network 权限时放行。 */
+export async function fetchAsPlugin(
+  pluginId: string,
+  request: { url: string; method?: string; headers?: Record<string, string>; body?: string },
+): Promise<{ ok: boolean; status?: number; text?: string; error?: string }> {
+  const host = activeHost;
+  if (!host || !host.isActive(pluginId)) {
+    return { ok: false, error: `插件 ${pluginId} 未激活，拒绝网络请求` };
+  }
+  if (host.manifest(pluginId)?.permissions?.network !== true) {
+    return { ok: false, error: `插件 ${pluginId} 未声明 network 权限，拒绝网络请求` };
+  }
+  const api = typeof window === 'undefined' ? undefined : window.electronAPI;
+  if (!api?.pluginNet) return { ok: false, error: '当前环境不支持受控网络门' };
+  return api.pluginNet.fetch(request);
+}
+
+/** 保存受控网络门白名单并即时生效（主进程执行）。 */
+export async function savePluginNetworkHosts(hosts: readonly string[]): Promise<void> {
+  const api = typeof window === 'undefined' ? undefined : window.electronAPI;
+  await api?.pluginNet?.setPolicy({ allowedHosts: [...hosts] });
+}
+
+/** 读取受控网络门白名单。 */
+export async function loadPluginNetworkHosts(): Promise<string[]> {
+  const api = typeof window === 'undefined' ? undefined : window.electronAPI;
+  const policy = await api?.pluginNet?.getPolicy();
+  return policy?.allowedHosts ?? [];
 }
 
 export type { PluginHostOptions,PluginStatus };

@@ -515,7 +515,7 @@ const ChapterWorldRelationEditor: React.FC<ChapterWorldRelationEditorProps> = ({
             <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="size-3.5" />
               {t('steps:chapters.storyTime')}
-              {timeline && <span className="font-normal text-muted-foreground/70">({timeline.config.calendarSystem})</span>}
+              {timeline && <span className="font-normal text-foreground/70">({timeline.config.calendarSystem})</span>}
             </Label>
 
             {timeline ? (

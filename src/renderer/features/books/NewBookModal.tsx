@@ -99,10 +99,11 @@ const NewBookModal: React.FC<NewBookModalProps> = ({
     >
       <form id="new-book-form" onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <Label>
+          <Label htmlFor="new-book-title">
             {t('books:newBook.titleLabel')} <span className="text-destructive">*</span>
           </Label>
           <Input
+            id="new-book-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder={t('books:newBook.titlePlaceholder')}
@@ -111,8 +112,9 @@ const NewBookModal: React.FC<NewBookModalProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <Label>{t('books:newBook.descLabel')}</Label>
+          <Label htmlFor="new-book-description">{t('books:newBook.descLabel')}</Label>
           <Textarea
+            id="new-book-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder={t('books:newBook.descPlaceholder')}
@@ -121,8 +123,8 @@ const NewBookModal: React.FC<NewBookModalProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <Label>{t('books:newBook.methodLabel')}</Label>
-          <div className="space-y-2">
+          <Label id="new-book-method-label">{t('books:newBook.methodLabel')}</Label>
+          <div role="radiogroup" aria-labelledby="new-book-method-label" className="space-y-2">
             {methods.map(({ value, label, desc }) => (
               <label
                 key={value}
@@ -146,6 +148,7 @@ const NewBookModal: React.FC<NewBookModalProps> = ({
                     <Select
                       value={selectedBookToDuplicate}
                       onChange={(e) => setSelectedBookToDuplicate(e.target.value)}
+                      aria-label={t('books:newBook.selectToDuplicate')}
                       className="mt-2 h-8 text-sm"
                     >
                       <option value="">{t('books:newBook.selectToDuplicate')}</option>

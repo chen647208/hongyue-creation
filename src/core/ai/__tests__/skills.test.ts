@@ -76,4 +76,18 @@ describe('SkillCatalog 渐进注入', () => {
     c.unregister('pov-switch');
     expect(c.getActive()).toBeNull();
   });
+
+  it('按 scope 隔离：会话 A 激活不影响会话 B', () => {
+    const c = new SkillCatalog();
+    c.registerParsed([{ md: SAMPLE, source: 'builtin' }]);
+    c.activate('pov-switch', 'sess-a');
+    expect(c.getActive('sess-a')?.name).toBe('pov-switch');
+    expect(c.getActive('sess-b')).toBeNull();
+    c.deactivate('sess-a');
+    expect(c.getActive('sess-a')).toBeNull();
+    // 另一 scope 的激活不受影响
+    c.activate('pov-switch', 'sess-b');
+    c.deactivate('sess-a');
+    expect(c.getActive('sess-b')?.name).toBe('pov-switch');
+  });
 });

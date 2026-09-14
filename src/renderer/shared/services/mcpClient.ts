@@ -12,7 +12,7 @@
  * 工具合并进 ToolRegistry（`mcp.<serverId>.<tool>` 命名空间）。
  * 权限默认 write:proposal（走审批）；readOnlyHint 显式只读才直通。
  */
-import type { ToolRegistry } from '@core/ai';
+import type { ToolPermission, ToolRegistry } from '@core/ai';
 import type { McpServerConfig } from '@shared/types';
 
 export interface McpRemoteTool {
@@ -24,6 +24,25 @@ export interface McpRemoteTool {
   parameters: Record<string, unknown>;
   /** 服务端声明只读：注册为 read 权限，直通不走审批。 */
   readOnly: boolean;
+  /** 服务端声明为提案工具（`_meta['hongyue/proposal']`）：调用只入待审箱，不直接落库。 */
+  proposal: boolean;
+}
+
+/**
+ * 远端工具权限判定：
+ * - readOnly：直通（read）。
+ * - 内置 server 的提案工具：调用仅写入统一待审箱（pending-proposals.jsonl），
+ *   真实落库由用户在待审箱批准，故不再套一层 broker 弹批（避免双重审批）。
+ *   外部 server 的 `_meta` 不可信，一律按可写走审批，禁旁路。
+ * - 其余：write:proposal（弹批，批准后执行）。
+ */
+export function remoteToolPermission(
+  serverId: string,
+  tool: Pick<McpRemoteTool, 'readOnly' | 'proposal'>,
+): ToolPermission {
+  if (tool.readOnly) return 'read';
+  if (tool.proposal && serverId === 'builtin') return 'read';
+  return 'write:proposal';
 }
 
 /** 取远端 inputSchema（须为 object 类型），否则回退空对象 schema。 */
@@ -68,12 +87,15 @@ export async function fetchServerTools(server: McpServerConfig): Promise<McpRemo
     description: t.description ?? '',
     parameters: remoteParameters(t.inputSchema),
     readOnly: t.annotations?.readOnlyHint === true,
+    proposal: t._meta?.['hongyue/proposal'] === true,
   }));
 }
 
 /**
- * 同步启用 server 的工具进注册表：先清本 server 旧注册，再按当前列表注册。
- * 执行经 IPC 透传；取消信号不跨进程（以会话中止为准，调用级 signal 忽略）。
+ * 同步启用 server 的工具进注册表：先取远端清单，再同帧刷新本地注册
+ * （注册与摘除之间无 await，并发会话不会遇到工具瞬时空窗）。
+ * 拉取失败的 server 保留上一轮注册，不清空。执行经 IPC 透传；
+ * 取消信号不跨进程（以会话中止为准，调用级 signal 忽略）。
  */
 export async function syncMcpTools(
   registry: ToolRegistry,
@@ -83,12 +105,6 @@ export async function syncMcpTools(
   const errors: string[] = [];
   for (const server of servers) {
     if (!server.enabled) continue;
-    // 清理本 server 上轮注册（改名/删工具后不残留）
-    for (const existing of registry.list()) {
-      if (existing.id.startsWith(`mcp.${server.id.replace(/\./g, '_')}.`)) {
-        registry.unregister(existing.id);
-      }
-    }
     let remote: McpRemoteTool[];
     try {
       await connectServer(server);
@@ -97,15 +113,17 @@ export async function syncMcpTools(
       errors.push(`${server.name}: ${err instanceof Error ? err.message : String(err)}`);
       continue;
     }
+    const prefix = `mcp.${server.id.replace(/\./g, '_')}.`;
+    const keep = new Set<string>();
     for (const tool of remote) {
+      keep.add(tool.toolId);
       if (registry.has(tool.toolId)) continue;
       try {
         registry.register({
           id: tool.toolId,
           description: tool.description || tool.name,
           parameters: tool.parameters,
-          // 服务端声明只读（annotations.readOnlyHint）→ 直通；否则按可写走审批提案
-          permission: tool.readOnly ? 'read' : 'write:proposal',
+          permission: remoteToolPermission(server.id, tool),
           execute: async (req) => {
             try {
               const data = await api().call(tool.serverId, tool.name, req.args ?? {});
@@ -119,6 +137,10 @@ export async function syncMcpTools(
       } catch (err) {
         errors.push(`${tool.toolId}: ${err instanceof Error ? err.message : String(err)}`);
       }
+    }
+    // 移除本 server 已下线的工具（同步段，与注册同帧完成）
+    for (const existing of registry.list()) {
+      if (existing.id.startsWith(prefix) && !keep.has(existing.id)) registry.unregister(existing.id);
     }
   }
   return { added, errors };

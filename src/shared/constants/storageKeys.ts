@@ -39,6 +39,7 @@ export const STORAGE_KEYS = {
   errorLogs: 'novelocal_error_logs',
   aiUsage: 'ai.usage',
   aiHourlyLimit: 'ai.hourlyLimit',
+  aiSessionMeta: 'ai.sessionMeta',
   appFeaturesDisabled: 'features.disabled',
   buildUserProfiles: 'build.userProfiles',
 } as const;

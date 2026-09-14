@@ -13,8 +13,10 @@ import path from 'node:path';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 
 import type { SandboxRunRequest } from '../../shared/sandbox.js';
+import { registerLocalInferenceIpc, shutdownLocalRuntime } from '../ai/localRuntime.js';
 import { IPC } from '../channels.js';
 import { closeMcpClients,registerMcpClientIpc } from '../mcp/clientIpc.js';
+import { registerPluginNetIpc } from '../net/pluginNet.js';
 import { registerProxyIpc } from '../net/proxyIpc.js';
 import { closeSqlite,registerSqliteIpc } from '../sqlite-ipc.js';
 import { registerSyncIpc } from '../sync/transportIpc.js';
@@ -28,6 +30,7 @@ import { allowPath, allowRoot, assertPathAllowed } from './fsAccess.js';
 import { registerPluginFsIpc } from './pluginFs.js';
 import { sandboxHost } from './pluginSandbox/host.js';
 import { type CosignVerifyInput, sha256Matches, verifyCosignBlob,verifyEd25519 } from './pluginSignature.js';
+import { registerPluginStoreIpc } from './pluginStoreIpc.js';
 import { isTrustedPluginKey, listTrustedPluginKeys, setTrustedPluginKeys } from './pluginTrust.js';
 import { destroyTray, registerShellIpc } from './tray.js';
 import { applyWindowSecurity, createWindow, getMainWindow } from './window.js';
@@ -407,5 +410,25 @@ export const updaterProvider: Provider = {
   name: 'updater',
   boot() {
     registerUpdaterIpc();
+  },
+};
+
+/** 插件安装 Provider：目录索引安装/卸载 + 受控网络门（白名单 + 默认拒绝）。 */
+export const pluginStoreProvider: Provider = {
+  name: 'plugin-store',
+  boot() {
+    registerPluginStoreIpc();
+    registerPluginNetIpc();
+  },
+};
+
+/** 本地推理 Provider：进程管理 + 端点探测；退出时停止托管进程。 */
+export const localInferenceProvider: Provider = {
+  name: 'local-inference',
+  boot() {
+    registerLocalInferenceIpc();
+  },
+  shutdown() {
+    shutdownLocalRuntime();
   },
 };

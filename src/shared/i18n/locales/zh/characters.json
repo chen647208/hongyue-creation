@@ -5,7 +5,8 @@
   "strategy": {
     "title": "AI 核心策略",
     "subtitle": "基于世界观自动塑造灵魂",
-    "templateLabel": "选择解析模板"
+    "templateLabel": "选择解析模板",
+    "settingsTitle": "打开设置"
   },
   "generating": "正在挖掘角色档案...",
   "generateBtn": "一键生成世界体系",
@@ -183,6 +184,7 @@
     "hasIntersection": "存在交集",
     "backToOverview": "返回全局视图",
     "hintDragging": "拖动节点调整位置，松开鼠标放置",
-    "hintIdle": "点击节点查看详情，拖动节点调整位置"
+    "hintIdle": "点击节点查看详情，拖动节点调整位置",
+    "close": "关闭图谱"
   }
 }

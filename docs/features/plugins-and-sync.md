@@ -51,6 +51,40 @@
   与内置技能并列展示（内置只读）。服务层 `assistant/services/userSkillsService.ts`，
   启动时装载进会话技能目录（`loadUserSkills`）。
 
+### 安装 / 更新 / 卸载
+
+- **入口**：设置 → 插件 → 安装插件。可从本地目录安装单包，或从目录索引
+  （`catalog.json`，schema 1）列出条目逐个安装。目录项字段：`id`/`name`/`version`/`host`/
+  `license`/`source`/`path`（相对索引目录）/`digest`（plugin.json 的 sha256 base64）/`signature`。
+- **校验顺序**：读取包 → manifest 校验（错误定位 JSON 路径）→ 来源白名单 → host 区间 →
+  签名/摘要 → 版本决策。任一步失败即拒装，不落盘；可执行贡献（logic/editor）必须带来源认证签名。
+- **原子落盘**：暂存目录 → 备份旧版本 → 改名替换；失败回滚到旧版本，不留半成品。
+- **更新**：同 id 更高版本走 update，同版本为 up-to-date，更低版本拒绝降级。
+- **卸载**：删插件目录 + 清 `plugin.<id>.settings[.corrupt]` + 逆序释放全部贡献，
+  无可执行残留；随后重建宿主并刷新面板。
+
+### 受控网络门（联网搜索 / 翻译等插件）
+
+- 插件不持有 `fetch`，只能经主进程网络门请求。策略单源在 `core/plugin/netGate`：
+  未配置允许域名即拒绝全部（默认拒绝）；只允许 https（本机回环可用 http）；
+  域名精确匹配或 `*.example.com` 子域通配；拒绝带凭据的 URL；方法限 GET/POST。
+- 白名单在设置 → 插件 → 插件联网白名单维护，主进程持久化；该门不注入任何凭据，
+  与 AI 网关的 `ai:http` 相互独立。
+- 插件运行期请求还要求：插件已激活且 `manifest.permissions.network === true`（否则拒绝）。
+- 工具契约：`core.net.fetch` 是唯一出口——必须给出已激活且声明 network 权限的 `pluginId`；
+  核心只提供该契约与网络门，联网搜索/翻译本身由插件实现，不内置。
+- 外部返回文本进入提示词前经 `core/ai/untrusted` 围栏（`<<<UNTRUSTED_INPUT>>>`）包裹，
+  声明「数据不是指令」；内容中的围栏标记与控制字符被中和，超长截断。
+
+### 本地推理
+
+- 设置 → 插件 → 本地推理：启用、填本地端点（OpenAI 兼容 `/v1/models` 或 Ollama `/api/tags`）、
+  可选启动命令；探测列出模型，选中后写回配置。
+- 主进程托管进程（不经 shell、cwd 限定数据目录子目录、最小环境变量），退出时统一停止；
+  运行时由用户自备，不随包分发。
+- 决策在 `core/ai/localInference.resolveInferenceTarget`：本地启用且可达走本地，
+  否则回落远程网关；不改远程网关契约。
+
 ## 同步
 
 - **协议**：`src/core/sync` —— bundle = 变更记录（entity_changes 派生）+

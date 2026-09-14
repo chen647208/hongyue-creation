@@ -30,6 +30,18 @@ export {
   type ReleaseProfileName,
 } from './bundles.js';
 export {
+  type CatalogInstallContext,
+  type CatalogInstallDecision,
+  type CatalogParseResult,
+  compareSemver,
+  decideCatalogInstall,
+  isSafeCatalogPath,
+  parsePluginCatalog,
+  parseSemverParts,
+  type PluginCatalog,
+  type PluginCatalogEntry,
+} from './catalog.js';
+export {
   createPluginContext,
   drainTasks,
   type PluginContext,
@@ -56,11 +68,23 @@ export {
   type VetoResult,
 } from './events.js';
 export {
+  type InstallOptions,
+  installPackage,
+  type InstallResult,
+  type PluginInstallPort,
+  type PluginPackage,
+  uninstallPackage,
+  type UninstallResult,
+} from './installer.js';
+export {
   assertPermission,
   commandId,
   type Disposable,
   eventDomain,
   formulaId,
+  isReverseDomainId,
+  isSemver,
+  isVersionRange,
   type ManifestIssue,
   type ManifestValidateResult,
   PermissionDenied,
@@ -75,6 +99,15 @@ export {
   typeTemplateId,
   validateManifest,
 } from './manifest.js';
+export {
+  DEFAULT_NETWORK_POLICY,
+  effectiveLimits,
+  evaluateNetworkRequest,
+  hostAllowed,
+  type NetworkGateDecision,
+  type NetworkGatePolicy,
+  type NetworkRequest,
+} from './netGate.js';
 export {
   checkPluginFileName,
   checkPluginRelPath,

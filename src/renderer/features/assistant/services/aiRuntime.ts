@@ -12,7 +12,7 @@
  * M3 插件宿主在此续注工具/section/技能，UI 层与 Agent 循环只消费这里的实例。
  */
 import { ApprovalBroker, PromptAssembler, registerBuiltinSections } from '@core/ai';
-import { EventBus, profileDeniesAi } from '@core/plugin';
+import { EventBus, type PluginHost, profileDeniesAi } from '@core/plugin';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 
 import { setAiGate } from '@/shared/services/ai/aiGate';
@@ -69,6 +69,20 @@ export function saveDisabledList(ids: string[]): void {
 }
 
 /** 启动期插件装载（预览环境无文件系统时空宿主）。状态面板复用同一 Promise。 */
+const pluginDeps = {
+  skillCatalog,
+  buildProfiles: buildProfileRegistry,
+  events: eventBus,
+  formulas: formulaRegistry,
+};
+
 export const pluginHostPromise = import('@/shared/services/pluginService').then((m) =>
-  m.bootstrapPlugins({ skillCatalog, buildProfiles: buildProfileRegistry, events: eventBus, formulas: formulaRegistry }, APP_VERSION, readDisabledList()),
+  m.bootstrapPlugins(pluginDeps, APP_VERSION, readDisabledList()),
 );
+
+/** 安装/卸载后重建宿主：释放旧宿主贡献再重新发现，返回新宿主供面板刷新。 */
+export async function reloadPlugins(): Promise<PluginHost> {
+  const { reloadPluginHost } = await import('@/shared/services/pluginService');
+  const previous = await pluginHostPromise.catch(() => null);
+  return reloadPluginHost(pluginDeps, APP_VERSION, previous);
+}

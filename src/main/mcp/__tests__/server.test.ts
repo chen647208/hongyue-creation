@@ -14,7 +14,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { afterEach,beforeEach, describe, expect, it } from 'vitest';
 
-import { dispatch,querySearchNodes } from '../server.js';
+import { chapterText,dispatch,entitiesText,querySearchNodes,statsText,tocText } from '../server.js';
 
 let dir = '';
 let prevEnv: string | undefined;
@@ -41,10 +41,24 @@ function readProposals(): Array<Record<string, unknown>> {
 }
 
 describe('mcp dispatch', () => {
-  it('resources/list 宣告单书目录模板', () => {
+  it('resources/list 宣告单书目录/实体/单章/统计模板', () => {
     const out = dispatch('resources/list', {}) as { resources: Array<{ uri?: string; uriTemplate?: string }> };
     expect(out.resources.some((r) => r.uri === 'books://index')).toBe(true);
-    expect(out.resources.some((r) => r.uriTemplate === 'book://{bookId}/toc')).toBe(true);
+    const templates = out.resources.map((r) => r.uriTemplate);
+    expect(templates).toEqual(expect.arrayContaining([
+      'book://{bookId}/toc',
+      'book://{bookId}/entities',
+      'book://{bookId}/chapter/{chapterId}',
+      'book://{bookId}/stats',
+    ]));
+  });
+
+  it('提案工具带 _meta 标记（宿主据此不重复弹批），读工具不带', () => {
+    const out = dispatch('tools/list', {}) as { tools: Array<{ name: string; _meta?: Record<string, unknown> }> };
+    const byName = (name: string) => out.tools.find((t) => t.name === name);
+    expect(byName('propose_chapter_write')?._meta?.['hongyue/proposal']).toBe(true);
+    expect(byName('propose_card_write')?._meta?.['hongyue/proposal']).toBe(true);
+    expect(byName('list_nodes')?._meta).toBeUndefined();
   });
 
   it('propose_chapter_write 落盘保留完整执行参数', () => {
@@ -132,6 +146,72 @@ describe('search_nodes（FTS）', () => {
     const db = makeDb();
     try {
       expect(querySearchNodes(db, 'book1', '古城')).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe('资源读取（目录/实体/单章/统计）', () => {
+  function makeDb(): Database.Database {
+    const db = new Database(':memory:');
+    db.exec(`CREATE TABLE nodes (
+      id TEXT PRIMARY KEY, book_id TEXT, type TEXT, title TEXT, body TEXT, updated_at INTEGER, erased INTEGER NOT NULL DEFAULT 0
+    )`);
+    db.exec(`CREATE TABLE attrs (
+      node_id TEXT, name TEXT, value TEXT, position INTEGER, erased INTEGER NOT NULL DEFAULT 0
+    )`);
+    const ins = db.prepare('INSERT INTO nodes(id, book_id, type, title, body, updated_at, erased) VALUES(?,?,?,?,?,?,0)');
+    ins.run('ch1', 'book1', 'novel.chapter', '第一章', '正文一', 1);
+    ins.run('card1', 'book1', 'world.character', '林渊', '', 1);
+    ins.run('loc1', 'book1', 'world.location', '古城', '', 1);
+    ins.run('kn1', 'book1', 'meta.knowledge', '设定集', '知识', 1);
+    db.prepare('INSERT INTO attrs(node_id, name, value, position, erased) VALUES(?,?,?,?,0)').run('ch1', 'pov', '第一人称', 0);
+    return db;
+  }
+
+  it('tocText 列出全部节点', () => {
+    const db = makeDb();
+    try {
+      expect(tocText(db, 'book1')).toContain('[novel.chapter] 第一章 (ch1)');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('entitiesText 只列设定实体（排除章节与知识库）', () => {
+    const db = makeDb();
+    try {
+      const text = entitiesText(db, 'book1');
+      expect(text).toContain('world.character');
+      expect(text).toContain('林渊');
+      expect(text).not.toContain('meta.knowledge');
+      expect(text).not.toContain('novel.chapter');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('chapterText 读单章标题/属性/正文，越界或跨书返回 null', () => {
+    const db = makeDb();
+    try {
+      const text = chapterText(db, 'book1', 'ch1');
+      expect(text).toContain('第一章');
+      expect(text).toContain('@pov: 第一人称');
+      expect(text).toContain('正文一');
+      expect(chapterText(db, 'book1', 'nope')).toBeNull();
+      expect(chapterText(db, 'book2', 'ch1')).toBeNull();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('statsText 汇总节点数与类型字数', () => {
+    const db = makeDb();
+    try {
+      const text = statsText(db, 'book1');
+      expect(text).toContain('节点总数：4');
+      expect(text).toContain('novel.chapter: 1 个');
     } finally {
       db.close();
     }

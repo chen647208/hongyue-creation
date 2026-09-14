@@ -9,7 +9,7 @@
 
 import { beforeAll,describe, expect, it } from 'vitest';
 
-import { DEFAULT_LANGUAGE, getEffectiveLanguage, i18n, initI18n, normalizeLanguage, SUPPORTED_LANGUAGES } from '../config';
+import { changeLanguage,DEFAULT_LANGUAGE, getEffectiveLanguage, i18n, initI18n, normalizeLanguage, SUPPORTED_LANGUAGES } from '../config';
 
 // 绕过类型化键，测试 i18next 自身的缺失回退/插值/复数行为（这些用任意键）。
 const tRaw = i18n.t.bind(i18n) as (key: string, options?: Record<string, unknown>) => string;
@@ -55,5 +55,23 @@ describe('initI18n 与取词', () => {
   it('支持语言集合与默认值符合约定', () => {
     expect([...SUPPORTED_LANGUAGES]).toEqual(['zh', 'en']);
     expect(DEFAULT_LANGUAGE).toBe('zh');
+  });
+});
+
+describe('语言切换', () => {
+  it('切到英文后关键界面文案来自英文，切回中文无残留', async () => {
+    changeLanguage('en');
+    await i18n.changeLanguage('en');
+    expect(getEffectiveLanguage()).toBe('en');
+    expect(i18n.t('settings:tab.general')).toBe('General');
+    expect(i18n.t('settings:title')).toBe('Console Settings');
+    expect(i18n.t('nav:structureTabs.outline')).toBe('Outline');
+    expect(i18n.t('common:confirm')).toBe('Confirm');
+
+    changeLanguage('zh');
+    await i18n.changeLanguage('zh');
+    expect(getEffectiveLanguage()).toBe('zh');
+    expect(i18n.t('settings:tab.general')).toBe('通用');
+    expect(i18n.t('common:confirm')).toBe('确定');
   });
 });

@@ -512,7 +512,40 @@
     "panel": {
       "title": "插件界面"
     },
-    "settingsCorrupt": "插件配置损坏，已回默认；损坏原值已备份到 plugin.<id>.settings.corrupt"
+    "settingsCorrupt": "插件配置损坏，已回默认；损坏原值已备份到 plugin.<id>.settings.corrupt",
+    "uninstall": "卸载",
+    "install": {
+      "title": "安装插件",
+      "hint": "从本地目录或目录索引（catalog.json）安装。安装前校验签名与来源，可执行贡献必须带受信任签名；失败不落盘。",
+      "fromFolder": "从目录安装",
+      "fromCatalog": "从索引安装",
+      "action": "安装",
+      "done": "已{{action}} {{id}}（{{version}}）",
+      "failed": "安装失败：{{reason}}",
+      "catalogInvalid": "目录索引格式非法。",
+      "unavailable": "当前环境不支持插件安装（缺少文件系统）。",
+      "pickFolder": "选择插件目录",
+      "pickCatalog": "选择目录索引文件"
+    },
+    "net": {
+      "title": "插件联网白名单",
+      "hint": "联网搜索/翻译等插件只允许访问清单内域名（精确或子域通配 *.example.com）。空清单即拒绝全部插件网络请求。",
+      "save": "保存白名单",
+      "saved": "已保存"
+    },
+    "local": {
+      "title": "本地推理",
+      "hint": "接入自备本地运行时（OpenAI 兼容或 Ollama 端点），运行时不经包分发。关闭或不可达时自动回落远程网关。",
+      "enabled": "启用",
+      "endpoint": "本地端点",
+      "probe": "探测",
+      "start": "启动运行时",
+      "stop": "停止运行时",
+      "reachable": "可达：{{endpoint}}，{{count}} 个模型。",
+      "unreachable": "不可达：{{error}}",
+      "routeLocal": "当前路由：本地推理。",
+      "routeRemote": "当前路由：远程网关（{{reason}}）。"
+    }
   },
   "usage": {
     "title": "用量与费用",

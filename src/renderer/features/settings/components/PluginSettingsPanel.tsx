@@ -7,18 +7,35 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-/** 插件状态面板（docs/design/04 §2）：状态汇总 + 错误详情 + 一键禁用/启用。 */
-import { type AssemblyRow, assemblyTree, DEFAULT_RELEASE_PROFILE, type PluginStatus,PROFILE_CHANGED_EVENT, profileByName, RELEASE_PROFILES } from '@core/plugin';
+/** 插件状态面板（docs/design/04 §2）：状态汇总 + 错误详情 + 一键禁用/启用 + 安装/卸载 + 受控网络门 + 本地推理。 */
+import { type AssemblyRow, assemblyTree, DEFAULT_RELEASE_PROFILE, parsePluginCatalog, type PluginCatalogEntry, type PluginHost, type PluginStatus,PROFILE_CHANGED_EVENT, profileByName, RELEASE_PROFILES } from '@core/plugin';
 import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
+import type { LocalProbeResult, LocalRuntimeConfig, LocalRuntimeStatus, PluginInstallResult } from '@shared/types';
 import React, { useEffect, useState } from 'react';
 
 import { useSettingsStore } from '@/app/stores/settingsStore';
 import { useTranslation } from '@/i18n';
 import { assistantRuntime } from '@/shared/services/assistantRuntime';
+import {
+  decideInferenceTarget,
+  getLocalInferenceConfig,
+  getLocalRuntimeStatus,
+  probeLocalInference,
+  setLocalInferenceConfig,
+  startLocalRuntime,
+  stopLocalRuntime,
+} from '@/shared/services/localInferenceService';
 import { localStore } from '@/shared/services/localStore';
 import { connectServer, disconnectServer, fetchServerTools } from '@/shared/services/mcpClient';
-import { saveAllowedPluginSources, saveTrustedPluginKeys } from '@/shared/services/pluginService';
+import {
+  installPluginFromDirectory,
+  loadPluginNetworkHosts,
+  saveAllowedPluginSources,
+  savePluginNetworkHosts,
+  saveTrustedPluginKeys,
+  uninstallPlugin,
+} from '@/shared/services/pluginService';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Input } from '@/shared/ui/Input';
@@ -26,7 +43,9 @@ import { LoadingState } from '@/shared/ui/LoadingState';
 import { defaultFromSchema, type JsonSchemaObject, SchemaForm } from '@/shared/ui/SchemaForm';
 import { Slot } from '@/shared/ui/Slot';
 import { Spinner } from '@/shared/ui/Spinner';
+import { Switch } from '@/shared/ui/Switch';
 import { Textarea } from '@/shared/ui/Textarea';
+import { APP_VERSION } from '@/shared/version';
 
 import type { McpServerConfig } from '../../../../shared/types';
 import UserSkillsCard from './UserSkillsCard';
@@ -145,6 +164,255 @@ const AllowedSourcesSection: React.FC = () => {
   );
 };
 
+/** 安装/更新/卸载：目录索引安装 + 本地目录安装；校验签名与来源后落盘。 */
+const InstallSection: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
+  const { t } = useTranslation(['settings']);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [entries, setEntries] = useState<Array<{ entry: PluginCatalogEntry; baseDir: string }>>([]);
+
+  const allowedSources = (): string[] => {
+    try {
+      const raw = localStore.getItem(STORAGE_KEYS.allowedPluginSources);
+      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+      return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const describe = (result: PluginInstallResult): string =>
+    result.ok
+      ? t('plugins.install.done', { id: result.pluginId, version: result.version, action: result.action })
+      : t('plugins.install.failed', { reason: result.reason ?? '' });
+
+  const installDir = async (sourceDir: string, expectedDigest?: string): Promise<void> => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await installPluginFromDirectory({
+        sourceDir,
+        hostVersion: APP_VERSION,
+        allowedSources: allowedSources(),
+        expectedDigest,
+      });
+      setMessage(describe(result));
+      if (result.ok) onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pickFolder = async (): Promise<void> => {
+    const api = window.electronAPI;
+    if (!api) {
+      setMessage(t('plugins.install.unavailable'));
+      return;
+    }
+    const picked = await api.openDirectoryDialog({ title: t('plugins.install.pickFolder'), properties: ['openDirectory'] });
+    const dir = picked.filePaths[0];
+    if (picked.canceled || !dir) return;
+    await installDir(dir);
+  };
+
+  const pickCatalog = async (): Promise<void> => {
+    const api = window.electronAPI;
+    if (!api) {
+      setMessage(t('plugins.install.unavailable'));
+      return;
+    }
+    const picked = await api.openFileDialog({ title: t('plugins.install.pickCatalog'), properties: ['openFile'], filters: [{ name: 'JSON', extensions: ['json'] }] });
+    const file = picked.filePaths[0];
+    if (picked.canceled || !file) return;
+    try {
+      const parsed = parsePluginCatalog(JSON.parse(await api.readFile(file)) as unknown);
+      if (!parsed.ok) {
+        setMessage(t('plugins.install.catalogInvalid'));
+        return;
+      }
+      const baseDir = file.replace(/[\\/][^\\/]*$/, '');
+      setEntries(parsed.catalog.entries.map((entry) => ({ entry, baseDir })));
+      setMessage(null);
+    } catch {
+      setMessage(t('plugins.install.catalogInvalid'));
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <div className="mb-1 text-sm font-medium">{t('plugins.install.title')}</div>
+      <p className="mb-2 text-xs text-muted-foreground">{t('plugins.install.hint')}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={() => void pickFolder()} disabled={busy}>
+          {t('plugins.install.fromFolder')}
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => void pickCatalog()} disabled={busy}>
+          {t('plugins.install.fromCatalog')}
+        </Button>
+        {busy && <Spinner className="size-4" />}
+      </div>
+      {message && <p className="mt-2 text-xs text-muted-foreground">{message}</p>}
+      {entries.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {entries.map(({ entry, baseDir }) => (
+            <div key={entry.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/20 px-3 py-2">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">{entry.name} <span className="text-muted-foreground">{entry.version}</span></div>
+                <div className="truncate font-mono text-2xs text-muted-foreground">{entry.id} · {entry.source}</div>
+              </div>
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={() => void installDir(`${baseDir}/${entry.path}`.replace(/\/+/g, '/'), entry.digest)}
+              >
+                {t('plugins.install.action')}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** 受控网络门白名单：插件联网（搜索/翻译）只允许清单内域名，空清单即拒绝全部。 */
+const NetworkGateSection: React.FC = () => {
+  const { t } = useTranslation(['settings']);
+  const [text, setText] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    void loadPluginNetworkHosts().then((hosts) => setText(hosts.join('\n')));
+  }, []);
+
+  const save = (): void => {
+    const hosts = text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+    void savePluginNetworkHosts(hosts);
+    setSaved(true);
+  };
+
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <div className="mb-1 text-sm font-medium">{t('plugins.net.title')}</div>
+      <p className="mb-2 text-xs text-muted-foreground">{t('plugins.net.hint')}</p>
+      <Textarea
+        value={text}
+        onChange={(event) => {
+          setText(event.target.value);
+          setSaved(false);
+        }}
+        rows={3}
+        className="font-mono text-xs"
+        placeholder={'api.example.com\n*.example.org'}
+      />
+      <div className="mt-2 flex items-center gap-2">
+        <Button size="sm" onClick={save}>
+          {t('plugins.net.save')}
+        </Button>
+        {saved && <span className="text-xs text-muted-foreground">{t('plugins.net.saved')}</span>}
+      </div>
+    </div>
+  );
+};
+
+/** 本地推理接入：启用 + 端点 + 模型探测；关闭或不可达即回落远程网关。 */
+const LocalInferenceSection: React.FC = () => {
+  const { t } = useTranslation(['settings']);
+  const [config, setConfig] = useState<LocalRuntimeConfig>({ enabled: false, endpoint: '' });
+  const [status, setStatus] = useState<LocalRuntimeStatus>({ running: false });
+  const [probe, setProbe] = useState<LocalProbeResult | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      setConfig(await getLocalInferenceConfig());
+      setStatus(await getLocalRuntimeStatus());
+    })();
+  }, []);
+
+  const persist = async (next: LocalRuntimeConfig): Promise<void> => {
+    setConfig(next);
+    await setLocalInferenceConfig(next);
+  };
+
+  const runProbe = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      setProbe(await probeLocalInference());
+      setStatus(await getLocalRuntimeStatus());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const target = decideInferenceTarget(config, probe?.reachable === true);
+
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">{t('plugins.local.title')}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">{t('plugins.local.enabled')}</span>
+          <Switch
+            checked={config.enabled}
+            onCheckedChange={(checked) => void persist({ ...config, enabled: checked })}
+            aria-label={t('plugins.local.enabled')}
+          />
+        </div>
+      </div>
+      <p className="mb-2 text-xs text-muted-foreground">{t('plugins.local.hint')}</p>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input
+          value={config.endpoint}
+          onChange={(event) => void persist({ ...config, endpoint: event.target.value })}
+          placeholder="http://127.0.0.1:11434"
+          className="h-8 flex-1 font-mono text-xs"
+          aria-label={t('plugins.local.endpoint')}
+        />
+        <Button size="sm" variant="outline" onClick={() => void runProbe()} disabled={busy || !config.enabled}>
+          {busy ? <Spinner className="size-3.5" /> : t('plugins.local.probe')}
+        </Button>
+        {status.running ? (
+          <Button size="sm" variant="outline" onClick={() => void stopLocalRuntime().then(() => setStatus({ running: false }))}>
+            {t('plugins.local.stop')}
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" onClick={() => void startLocalRuntime().then(setStatus)} disabled={!config.enabled}>
+            {t('plugins.local.start')}
+          </Button>
+        )}
+      </div>
+      {probe && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {probe.reachable
+            ? t('plugins.local.reachable', { count: probe.models.length, endpoint: probe.endpoint })
+            : t('plugins.local.unreachable', { error: probe.error ?? '' })}
+        </p>
+      )}
+      <p className="mt-1 text-xs text-muted-foreground">
+        {target.kind === 'local' ? t('plugins.local.routeLocal') : t('plugins.local.routeRemote', { reason: target.reason })}
+      </p>
+      {probe?.reachable && probe.models.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {probe.models.slice(0, 30).map((model) => (
+            <button
+              key={model.id}
+              type="button"
+              aria-pressed={config.model === model.id}
+              onClick={() => void persist({ ...config, model: model.id })}
+              className={`rounded-full border px-2 py-0.5 text-2xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 ${
+                config.model === model.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-foreground hover:bg-muted'
+              }`}
+            >
+              {model.id}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const PluginSettingsPanel: React.FC = () => {
   const { t } = useTranslation(['settings', 'common']);
   const [statuses, setStatuses] = useState<PluginStatus[] | null>(null);
@@ -153,24 +421,43 @@ const PluginSettingsPanel: React.FC = () => {
   const [profile, setProfile] = useState<string>(() => localStore.getItem(STORAGE_KEYS.profileCurrent) ?? DEFAULT_RELEASE_PROFILE);
   const registeredTypes = builtinRegistry.list();
 
+  const loadFromHost = React.useCallback((host: PluginHost): void => {
+    setStatuses(host.list());
+    const schemaMap: Record<string, unknown> = {};
+    for (const status of host.list()) {
+      const schema = host.manifest(status.id)?.settingsSchema;
+      if (schema) schemaMap[status.id] = schema;
+    }
+    setManifests(schemaMap);
+  }, []);
+
   useEffect(() => {
     let alive = true;
     const runtime = assistantRuntime();
     if (!runtime) return () => { alive = false; };
     void runtime.pluginHostPromise.then((host) => {
-      if (!alive) return;
-      setStatuses(host.list());
-      const schemaMap: Record<string, unknown> = {};
-      for (const status of host.list()) {
-        const schema = host.manifest(status.id)?.settingsSchema;
-        if (schema) schemaMap[status.id] = schema;
-      }
-      setManifests(schemaMap);
+      if (alive) loadFromHost(host);
     });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [loadFromHost]);
+
+  /** 安装/卸载后重建宿主并刷新面板（释放旧贡献 + 重新发现）。 */
+  const refresh = (): void => {
+    const runtime = assistantRuntime();
+    if (!runtime) return;
+    void runtime.reloadPlugins().then(loadFromHost);
+  };
+
+  const remove = (id: string): void => {
+    const runtime = assistantRuntime();
+    if (!runtime) return;
+    void runtime.pluginHostPromise.then(async (host) => {
+      await uninstallPlugin(host, id);
+      refresh();
+    });
+  };
 
   const applyProfile = (name: string): void => {
     setProfile(name);
@@ -211,9 +498,13 @@ const PluginSettingsPanel: React.FC = () => {
 
       <UserSkillsCard />
 
+      <InstallSection onChanged={refresh} />
+
       <TrustedKeysSection />
 
       <AllowedSourcesSection />
+
+      <NetworkGateSection />
 
       <div className="rounded-lg border border-border p-3">
         <div className="mb-2 text-sm font-medium">{t('plugins.panel.title')}</div>
@@ -277,19 +568,31 @@ const PluginSettingsPanel: React.FC = () => {
                   <PluginSchemaSettings pluginId={s.id} schema={manifests[s.id] as JsonSchemaObject} />
                 ) : null}
               </div>
-              {s.state === 'disabled' ? (
-                <Button size="sm" variant="outline" onClick={() => toggle(s.id, true)}>
-                  {t('plugins.enable')}
+              <div className="flex shrink-0 items-center gap-1.5">
+                {s.state === 'disabled' ? (
+                  <Button size="sm" variant="outline" onClick={() => toggle(s.id, true)}>
+                    {t('plugins.enable')}
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => toggle(s.id, false)}>
+                    {t('plugins.disable')}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => remove(s.id)}
+                >
+                  {t('plugins.uninstall')}
                 </Button>
-              ) : (
-                <Button size="sm" variant="outline" onClick={() => toggle(s.id, false)}>
-                  {t('plugins.disable')}
-                </Button>
-              )}
+              </div>
             </div>
           </div>
         ))}
       </div>
+
+      <LocalInferenceSection />
 
       <McpServersSection />
     </div>

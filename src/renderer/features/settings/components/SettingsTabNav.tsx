@@ -78,7 +78,7 @@ const SettingsTabNav: React.FC<SettingsTabNavProps> = ({ activeTab, onChange }) 
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
       {groups.map((group) => (
         <div key={group.id} className="flex items-center gap-2">
-          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
+          <span className="text-xs font-medium uppercase tracking-wider text-foreground/70">
             {t(group.labelKey, group.fallback)}
           </span>
           <div className="flex flex-wrap gap-1.5">

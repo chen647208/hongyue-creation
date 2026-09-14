@@ -108,6 +108,22 @@ export type ManifestValidateResult =
 
 const ID_RE = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/;
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:[-+][\w.-]+)?$/;
+const RANGE_RE = /^([~^*]?\d+\.\d+\.\d+|\*)$/;
+
+/** 插件 id 是否为反向域名（com.example.plugin）。 */
+export function isReverseDomainId(value: string): boolean {
+  return ID_RE.test(value);
+}
+
+/** 是否为语义化版本（x.y.z，可带预发布/构建后缀）。 */
+export function isSemver(value: string): boolean {
+  return SEMVER_RE.test(value);
+}
+
+/** 是否为受支持的版本区间（^x.y.z / ~x.y.z / x.y.z / *）。 */
+export function isVersionRange(value: string): boolean {
+  return RANGE_RE.test(value);
+}
 
 /** 版本区间匹配：^x.y.z（同主版本且 ≥）/ ~x.y.z（同主.次且 ≥）/ * / 精确版本。 */
 export function satisfiesRange(version: string, range: string): boolean {
@@ -144,10 +160,10 @@ export function validateManifest(raw: unknown): ManifestValidateResult {
   const m = raw as Record<string, unknown>;
 
   if (!str(m.id)) fail('id', '缺失且必须是字符串');
-  else if (!ID_RE.test(m.id)) fail('id', `必须是反向域名（如 com.example.golden3），实际「${m.id}」`);
+  else if (!isReverseDomainId(m.id)) fail('id', `必须是反向域名（如 com.example.golden3），实际「${m.id}」`);
 
   if (!str(m.name) || !m.name) fail('name', '缺失且必须是非空字符串');
-  if (!str(m.version) || !SEMVER_RE.test(m.version)) fail('version', '必须是语义化版本（x.y.z）');
+  if (!str(m.version) || !isSemver(m.version)) fail('version', '必须是语义化版本（x.y.z）');
   if (!str(m.host) || !m.host) fail('host', '缺失：宿主版本区间（如 ^2.0.0）');
   if (!str(m.license) || !m.license) fail('license', '缺失：插件自身许可证');
 
@@ -196,8 +212,8 @@ export function validateManifest(raw: unknown): ManifestValidateResult {
       fail('dependencies', '必须是 { 插件id: 版本区间 } 对象');
     } else {
       for (const [depId, range] of Object.entries(m.dependencies as Record<string, unknown>)) {
-        if (!ID_RE.test(depId)) fail(`dependencies.${depId}`, '依赖 id 必须是反向域名');
-        if (typeof range !== 'string' || !/^([~^*]?\d+\.\d+\.\d+|\*)$/.test(range)) {
+        if (!isReverseDomainId(depId)) fail(`dependencies.${depId}`, '依赖 id 必须是反向域名');
+        if (typeof range !== 'string' || !isVersionRange(range)) {
           fail(`dependencies.${depId}`, '版本区间必须是 ^x.y.z / ~x.y.z / x.y.z / *');
         }
       }

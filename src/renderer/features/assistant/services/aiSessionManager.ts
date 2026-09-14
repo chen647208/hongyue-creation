@@ -112,6 +112,14 @@ export interface SessionManagerDeps {
   events: EventBus;
 }
 
+/** 一次会话运行的结果：除答复外带回本次会话 id，调用方据此读取本会话事件（并行隔离）。 */
+export interface SessionRunResult extends AgentTurnResult {
+  sessionId: string;
+}
+
+/** 内存保留的已完成会话上限：超出按登记顺序淘汰，避免长驻进程无界增长。 */
+const MAX_RETAINED_SESSIONS = 24;
+
 export interface RunSessionInput {
   bookId?: string;
   task: string;
@@ -141,7 +149,10 @@ export class AiSessionManager {
   private readonly registry: ToolRegistry;
   private readonly catalog: SkillCatalog;
   readonly broker: ApprovalBroker;
-  private readonly router: ApprovalRouter;
+  /** 会话 id → 本次会话状态（事件流与装配的注入上下文）；并行会话各存一份。 */
+  private readonly sessions = new Map<string, { session: AiSession; injection: ContextInjectionResult | null }>();
+  /** 会话登记顺序（淘汰最旧用）。 */
+  private readonly sessionOrder: string[] = [];
   private lastSession: AiSession | null = null;
   private lastInjection: ContextInjectionResult | null = null;
 
@@ -153,21 +164,40 @@ export class AiSessionManager {
     this.catalog = deps.catalog;
     this.broker = deps.broker;
     this.events = deps.events;
-    this.router = new ApprovalRouter(deps.broker, (callId, toolId) => {
-      // write:direct 直接生效：留审计事件（Revision 由写工具经单一事务管线落库）
-      void this.lastSession?.emit({ t: 'write.direct', callId, toolId, at: Date.now() });
-    });
     registerBuiltinSections(this.assembler);
   }
 
-  /** 最近一次会话的事件（事件浏览器/诊断消费）。 */
-  getEvents(): AiEvent[] {
+  /**
+   * 会话事件。传 sessionId 取该会话（并行任务按各自 id 读取，互不覆盖）；
+   * 不传时取最近一次（单会话/诊断消费）。
+   */
+  getEvents(sessionId?: string): AiEvent[] {
+    if (sessionId) return this.sessions.get(sessionId)?.session.events ?? [];
     return this.lastSession?.events ?? [];
   }
 
-  /** 最近一次会话实际装配的注入上下文（可读、可核对；未跑过会话为 null）。 */
-  getLastInjection(): ContextInjectionResult | null {
+  /**
+   * 会话实际装配的注入上下文。传 sessionId 取该会话；不传时取最近一次。
+   */
+  getLastInjection(sessionId?: string): ContextInjectionResult | null {
+    if (sessionId) return this.sessions.get(sessionId)?.injection ?? null;
     return this.lastInjection;
+  }
+
+  /** 内存中保留的会话 id（登记顺序，最旧在前）；供诊断与并发用例核对隔离。 */
+  listSessionIds(): string[] {
+    return [...this.sessionOrder];
+  }
+
+  /** 登记会话并按上限淘汰最旧（当前会话始终保留）。 */
+  private retainSession(sessionId: string, session: AiSession, injection: ContextInjectionResult | null): void {
+    this.sessions.set(sessionId, { session, injection });
+    this.sessionOrder.push(sessionId);
+    while (this.sessionOrder.length > MAX_RETAINED_SESSIONS) {
+      // 当前会话刚入队尾，淘汰顺序最旧者不会命中它
+      const oldest = this.sessionOrder.shift();
+      if (oldest) this.sessions.delete(oldest);
+    }
   }
 
   /** 审批待审箱数量（角标消费）。 */
@@ -179,18 +209,18 @@ export class AiSessionManager {
    * 运行一次完整会话。技能渐进注入：目录按触发词命中后自动激活，
    * 会话结束自动卸载（不跨会话残留）。
    */
-  async run(input: RunSessionInput): Promise<AgentTurnResult> {
+  async run(input: RunSessionInput): Promise<SessionRunResult> {
     // 发行档策略：ai.request 拦截器可整体否决（minimal 档禁全部 AI，公理 4）
     const gate = this.events.request('ai.request', { task: input.task, bookId: input.bookId });
-    if (!gate.allowed) {
-      return { ok: false, reply: '', turns: 0, error: gate.reason ?? 'AI 请求被发行档策略拒绝' };
-    }
     const sessionId = `sess_${Date.now().toString(36)}_${uuidv7()}`;
+    if (!gate.allowed) {
+      return { ok: false, reply: '', turns: 0, error: gate.reason ?? 'AI 请求被发行档策略拒绝', sessionId };
+    }
     const sink = window.electronAPI ? new FileSessionSink(sessionId, input.bookId) : undefined;
 
-    // 渐进注入：触发词命中即激活全文，会话结束在 finally 中卸载
+    // 渐进注入：触发词命中即激活全文（scope=sessionId，并行会话互不覆盖），会话结束在 finally 中卸载
     const suggested = this.catalog.matchByTrigger(input.task);
-    if (suggested) this.catalog.activate(suggested.name);
+    if (suggested) this.catalog.activate(suggested.name, sessionId);
 
     const session = new AiSession({
       sessionId,
@@ -199,6 +229,11 @@ export class AiSessionManager {
       skill: suggested?.name,
       sections: [],
       sink,
+    });
+    // 每轮会话各自的路由器：write.direct 审计事件落到本会话事件流（并行时不写错会话）
+    const router = new ApprovalRouter(this.broker, (callId, toolId) => {
+      // write:direct 直接生效：留审计事件（Revision 由写工具经单一事务管线落库）
+      void session.emit({ t: 'write.direct', callId, toolId, at: Date.now() });
     });
     this.lastSession = session;
 
@@ -242,21 +277,22 @@ export class AiSessionManager {
       extraEntries: await this.collectRetrievalEntries(input.project?.id, input.task),
     });
     this.lastInjection = injection;
+    this.retainSession(sessionId, session, injection);
 
     try {
       const result = await runAgentSession(
         {
           assembler: this.assembler,
           registry: this.registry,
-          router: this.router,
+          router,
           session,
           model: input.model,
           images: input.images,
           context: () => ({
             project: input.project,
             index: input.index,
-            activeSkill: this.catalog.getActive(),
-            activeSkillTools: this.catalog.getActive()?.tools,
+            activeSkill: this.catalog.getActive(sessionId),
+            activeSkillTools: this.catalog.getActive(sessionId)?.tools,
             // 工具执行上下文：模型配置与宿主服务在此注入（缺失则需模型的工具直接失败）
             modelConfig: input.model,
             services: {
@@ -283,8 +319,8 @@ export class AiSessionManager {
                   content: h.content.slice(0, 800),
                 }));
               },
-              // 技能按名加载（会话内状态变更，不碰数据；激活后白名单对后续轮次生效）
-              skillLoad: (name: string) => this.catalog.activate(name),
+              // 技能按名加载（会话内状态变更，不碰数据；scope=本会话，激活后白名单仅对后续轮次生效）
+              skillLoad: (name: string) => this.catalog.activate(name, sessionId),
               // 双轨技能逻辑轨：沙箱执行 + 能力白名单裁决（handler 只能建议工具调用）
               skillRun: (name: string, skillInput: unknown) => {
                 const skill = this.catalog.get(name);
@@ -337,9 +373,9 @@ export class AiSessionManager {
         },
         input.task,
       );
-      return result;
+      return { ...result, sessionId };
     } finally {
-      this.catalog.deactivate();
+      this.catalog.deactivate(sessionId);
     }
   }
 

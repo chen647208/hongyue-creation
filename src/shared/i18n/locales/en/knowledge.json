@@ -89,7 +89,8 @@
     "titlePlaceholder": "Enter a title...",
     "contentPlaceholder": "Enter content...",
     "emptyEditor": "Select a knowledge base entry to edit",
-    "emptyEditorHint": "Or upload a new file to start building the knowledge base"
+    "emptyEditorHint": "Or upload a new file to start building the knowledge base",
+    "closeSearchResults": "Close search results"
   },
   "panel": {
     "locationTitle": "Locations",

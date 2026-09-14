@@ -53,6 +53,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pluginCosignVerify: (contentBase64: string, envelope: { bundle: string; publicKey?: string; certificateIdentity?: string; certificateOidcIssuer?: string }) =>
     ipcRenderer.invoke(IPC.pluginCosignVerify, contentBase64, envelope),
 
+  // 插件安装/卸载（目录索引安装：主进程校验签名与来源后落盘）
+  pluginStore: {
+    install: (request: unknown) => ipcRenderer.invoke(IPC.plugin.install, request),
+    uninstall: (pluginId: string) => ipcRenderer.invoke(IPC.plugin.uninstall, pluginId),
+    list: () => ipcRenderer.invoke(IPC.plugin.list),
+  },
+  // 插件受控网络门（白名单 + 默认拒绝；插件不持有 fetch）
+  pluginNet: {
+    getPolicy: () => ipcRenderer.invoke(IPC.plugin.netGetPolicy),
+    setPolicy: (policy: unknown) => ipcRenderer.invoke(IPC.plugin.netSetPolicy, policy),
+    fetch: (request: unknown) => ipcRenderer.invoke(IPC.plugin.netFetch, request),
+  },
+  // 本地推理运行时（进程管理 + 端点探测）
+  localInference: {
+    getConfig: () => ipcRenderer.invoke(IPC.local.getConfig),
+    setConfig: (config: unknown) => ipcRenderer.invoke(IPC.local.setConfig, config),
+    start: () => ipcRenderer.invoke(IPC.local.start),
+    stop: () => ipcRenderer.invoke(IPC.local.stop),
+    status: () => ipcRenderer.invoke(IPC.local.status),
+    probe: () => ipcRenderer.invoke(IPC.local.probe),
+  },
+
   crashReporting: {
     getConfig: () => ipcRenderer.invoke(IPC.crashGetConfig),
     setEnabled: (enabled: boolean) => ipcRenderer.invoke(IPC.crashSetEnabled, enabled),

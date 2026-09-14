@@ -126,6 +126,57 @@ describe('AiSessionManager', () => {
     expect(seenPrompt).toContain('林渊');
   });
 
+  it('并行会话：事件与注入按会话 id 隔离，互不覆盖', async () => {
+    const { EventBus } = await import('@core/plugin');
+    const { PromptAssembler, SkillCatalog, ToolRegistry, ApprovalBroker, parseSkillMd } = await import('@core/ai');
+    const catalog = new SkillCatalog();
+    catalog.register(parseSkillMd('---\nname: pov-switch\ndescription: 视角。触发词：pov\n---\n正文', 'builtin').skill!);
+    const manager = new AiSessionManager({
+      assembler: new PromptAssembler(),
+      registry: new ToolRegistry(),
+      catalog,
+      broker: new ApprovalBroker(),
+      events: new EventBus(),
+    });
+
+    // 闸门：两个会话同时停在 complete 处，验证在飞状态下的隔离
+    const gates: Array<() => void> = [];
+    mockComplete.mockImplementation(async () => {
+      await new Promise<void>((resolve) => gates.push(resolve));
+      return { content: '{"reply":"ok"}', model: 'test' };
+    });
+
+    const p1 = manager.run({ task: 'POV 任务甲', project, model });
+    const p2 = manager.run({ task: '普通任务乙', project, model, injectionEnabled: false });
+    for (let i = 0; i < 50 && gates.length < 2; i += 1) await new Promise((r) => setTimeout(r, 0));
+    expect(gates).toHaveLength(2);
+
+    const ids = manager.listSessionIds();
+    expect(ids).toHaveLength(2);
+    // 两个会话各自持有独立事件数组
+    expect(manager.getEvents(ids[0])).not.toBe(manager.getEvents(ids[1]));
+    const byTask = (task: string): string =>
+      ids.find((id) => manager.getEvents(id).some((e) => e.t === 'session.start' && e.task === task))!;
+    const idA = byTask('POV 任务甲');
+    const idB = byTask('普通任务乙');
+    expect(idA).not.toBe(idB);
+    // 注入上下文按会话隔离：乙关闭注入，甲保持默认开启
+    expect(manager.getLastInjection(idA)?.enabled).toBe(true);
+    expect(manager.getLastInjection(idB)?.enabled).toBe(false);
+    // 甲涉及 POV 触发词，激活仅作用于甲的 scope；乙看不到
+    expect(catalog.getActive(idA)?.name).toBe('pov-switch');
+    expect(catalog.getActive(idB)).toBeNull();
+
+    gates.forEach((g) => g());
+    const [r1, r2] = await Promise.all([p1, p2]);
+    expect(r1.sessionId).toBe(idA);
+    expect(r2.sessionId).toBe(idB);
+    expect(manager.getEvents(idA).at(-1)?.t).toBe('session.end');
+    expect(manager.getEvents(idB).at(-1)?.t).toBe('session.end');
+    // 会话结束后技能 scope 卸载
+    expect(catalog.getActive(idA)).toBeNull();
+  });
+
   it('无历史时 history section 缺席', async () => {
     const { PromptAssembler, historySection } = await import('@core/ai');
     const assembler = new PromptAssembler();

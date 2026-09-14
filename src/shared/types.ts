@@ -1273,6 +1273,83 @@ export interface VectorConsistencyResult {
   score: number;
 }
 
+// ── 插件安装 / 受控网络门 / 本地推理（跨主进程与渲染层的 IPC 线格式）──────
+
+export interface PluginInstallRequest {
+  sourceDir: string;
+  hostVersion: string;
+  allowedSources?: string[];
+  expectedDigest?: string;
+  requireSignature?: boolean;
+}
+
+export interface PluginInstallResult {
+  ok: boolean;
+  pluginId?: string;
+  version?: string;
+  action?: 'install' | 'update' | 'up-to-date';
+  reason?: string;
+}
+
+export interface PluginUninstallResult {
+  ok: boolean;
+  pluginId: string;
+  reason?: string;
+}
+
+export interface PluginInstalledSummary {
+  id: string;
+  name?: string;
+  version?: string;
+  source?: string;
+}
+
+export interface PluginNetworkPolicy {
+  allowedHosts: string[];
+  allowedMethods?: string[];
+  maxResponseBytes?: number;
+  timeoutMs?: number;
+}
+
+export interface PluginNetworkFetchResult {
+  ok: boolean;
+  status?: number;
+  text?: string;
+  error?: string;
+}
+
+export type LocalRuntimeFlavor = 'openai' | 'ollama';
+
+export interface LocalRuntimeConfig {
+  enabled: boolean;
+  endpoint: string;
+  model?: string;
+  command?: string;
+  args?: string[];
+  autoStart?: boolean;
+}
+
+export interface LocalModelInfo {
+  id: string;
+  name?: string;
+  sizeBytes?: number;
+  family?: string;
+  modifiedAt?: string;
+}
+
+export interface LocalProbeResult {
+  reachable: boolean;
+  endpoint: string;
+  flavor: LocalRuntimeFlavor;
+  models: LocalModelInfo[];
+  error?: string;
+}
+
+export interface LocalRuntimeStatus {
+  running: boolean;
+  pid?: number;
+}
+
 export interface ElectronAPI {
   // 文件系统操作
   getAppDataPath: () => Promise<string>;
@@ -1319,6 +1396,27 @@ export interface ElectronAPI {
     contentBase64: string,
     envelope: { bundle: string; publicKey?: string; certificateIdentity?: string; certificateOidcIssuer?: string },
   ) => Promise<boolean>;
+  /** 插件安装/更新/卸载（主进程校验签名与来源后原子落盘，失败回滚）。 */
+  pluginStore: {
+    install: (request: PluginInstallRequest) => Promise<PluginInstallResult>;
+    uninstall: (pluginId: string) => Promise<PluginUninstallResult>;
+    list: () => Promise<PluginInstalledSummary[]>;
+  };
+  /** 插件受控网络门：白名单 + 默认拒绝；插件不持有 fetch。 */
+  pluginNet: {
+    getPolicy: () => Promise<PluginNetworkPolicy>;
+    setPolicy: (policy: PluginNetworkPolicy) => Promise<{ ok: boolean }>;
+    fetch: (request: { url: string; method?: string; headers?: Record<string, string>; body?: string }) => Promise<PluginNetworkFetchResult>;
+  };
+  /** 本地推理运行时：进程管理 + 端点探测 + 配置。 */
+  localInference: {
+    getConfig: () => Promise<LocalRuntimeConfig>;
+    setConfig: (config: LocalRuntimeConfig) => Promise<{ ok: boolean }>;
+    start: () => Promise<{ running: boolean; pid?: number }>;
+    stop: () => Promise<{ ok: boolean }>;
+    status: () => Promise<LocalRuntimeStatus>;
+    probe: () => Promise<LocalProbeResult>;
+  };
   /** 崩溃上报配置（默认只本地留存；开启且宿主配置地址后上传，重启生效）。 */
   crashReporting: {
     getConfig: () => Promise<{ enabled: boolean; configured: boolean }>;
@@ -1342,7 +1440,7 @@ export interface ElectronAPI {
   /** MCP 客户端：外部 server 的连接/工具/调用（主进程持 stdio）。 */
   mcpClient: {
     connect: (id: string, command: string, args?: string[]) => Promise<{ connected: boolean }>;
-    tools: (id: string) => Promise<{ tools: Array<{ name: string; description?: string; inputSchema?: unknown; annotations?: { readOnlyHint?: boolean } }> }>;
+    tools: (id: string) => Promise<{ tools: Array<{ name: string; description?: string; inputSchema?: unknown; annotations?: { readOnlyHint?: boolean }; _meta?: Record<string, unknown> }> }>;
     call: (id: string, tool: string, args?: unknown) => Promise<unknown>;
     disconnect: (id: string) => Promise<{ connected: boolean }>;
   };

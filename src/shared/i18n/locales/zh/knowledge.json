@@ -89,7 +89,8 @@
     "titlePlaceholder": "输入标题...",
     "contentPlaceholder": "输入内容...",
     "emptyEditor": "选择一个知识库条目进行编辑",
-    "emptyEditorHint": "或上传新文件开始构建知识库"
+    "emptyEditorHint": "或上传新文件开始构建知识库",
+    "closeSearchResults": "关闭搜索结果"
   },
   "panel": {
     "locationTitle": "地点管理",

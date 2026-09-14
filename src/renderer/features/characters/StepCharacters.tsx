@@ -256,7 +256,7 @@ const StepCharacters: React.FC<StepCharactersProps> = ({
                 <h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('strategy.title')}</h4>
                 <p className="mt-0.5 text-xs text-muted-foreground">{t('strategy.subtitle')}</p>
               </div>
-              <Button variant="ghost" size="icon" className="size-7" onClick={onOpenSettings}>
+              <Button variant="ghost" size="icon" className="size-7" onClick={onOpenSettings} aria-label={t('strategy.settingsTitle')} title={t('strategy.settingsTitle')}>
                 <Settings className="size-4" />
               </Button>
             </header>

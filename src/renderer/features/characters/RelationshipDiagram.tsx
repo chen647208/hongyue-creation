@@ -153,7 +153,7 @@ const RelationshipDiagram: React.FC<RelationshipDiagramProps> = ({ characters, o
             <RefreshCw className="size-4" />
             {t('diagram.reset')}
           </Button>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label={t('diagram.close')} title={t('diagram.close')}>
             <X className="size-4" />
           </Button>
         </div>

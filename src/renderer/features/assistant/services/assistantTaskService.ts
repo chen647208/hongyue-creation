@@ -9,8 +9,9 @@
 
 /**
  * 助手后台任务（design/14）：把一次 AI 会话运行交给应用级单例，脱离面板生命周期。
- * 任务串行排队（同一时刻只有一个会话，避免共享 sessionManager 的事件流互相污染），
- * 面板关闭或切换书籍都不中止；状态栏指示器订阅本服务显示进度与中止入口。
+ * 并发上限可配（默认 1，串行）；多个会话可并行，事件与上下文按会话 id 隔离
+ * （见 aiSessionManager）。面板关闭或切换书籍都不中止；状态栏指示器订阅本服务
+ * 显示进度与中止入口。
  */
 
 export type AssistantTaskStatus = 'queued' | 'running' | 'done' | 'error' | 'aborted';
@@ -49,9 +50,17 @@ interface InternalTask {
 export class AssistantTaskService {
   private readonly tasks = new Map<string, InternalTask>();
   private queue: string[] = [];
-  private running = false;
+  private runningCount = 0;
   private readonly listeners = new Set<() => void>();
   private cache: AssistantTaskView[] = [];
+
+  /** maxConcurrent 为并行运行上限（缺省 1 = 串行）；排队任务按先入先出补位。 */
+  constructor(private readonly maxConcurrent = 1) {}
+
+  /** 当前运行中的任务数（诊断/指示器）。 */
+  get activeCount(): number {
+    return this.runningCount;
+  }
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -132,27 +141,31 @@ export class AssistantTaskService {
     if (changed) this.notify();
   }
 
+  /** 补位泵：并发未满即从队首取任务启动；每个任务结束再泵一次。 */
   private async pump(): Promise<void> {
-    if (this.running) return;
-    const id = this.queue.shift();
-    if (id === undefined) return;
-    const task = this.tasks.get(id);
-    if (!task || task.settled) {
-      void this.pump();
-      return;
+    while (this.runningCount < this.maxConcurrent) {
+      const id = this.queue.shift();
+      if (id === undefined) return;
+      const task = this.tasks.get(id);
+      if (!task || task.settled) continue;
+      this.runningCount += 1;
+      task.running = true;
+      task.view.status = 'running';
+      task.view.startedAt = Date.now();
+      this.notify();
+      void this.runTask(task);
     }
-    this.running = true;
-    task.running = true;
-    task.view.status = 'running';
-    task.view.startedAt = Date.now();
-    this.notify();
+  }
+
+  private async runTask(task: InternalTask): Promise<void> {
     try {
       const value = await task.run(task.controller.signal);
       task.onSettled({ status: 'done', value });
     } catch (error) {
       task.onSettled({ status: 'error', error: error instanceof Error ? error.message : String(error) });
     } finally {
-      this.running = false;
+      task.running = false;
+      this.runningCount -= 1;
       void this.pump();
     }
   }
@@ -169,4 +182,5 @@ export class AssistantTaskService {
   }
 }
 
-export const assistantTaskService = new AssistantTaskService();
+/** 应用级单例：最多两个助手会话并行（多助手会话），其余排队。 */
+export const assistantTaskService = new AssistantTaskService(2);

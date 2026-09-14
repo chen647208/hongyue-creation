@@ -38,6 +38,24 @@ export const IPC = {
   pluginTrustedKeysList: 'plugin-trusted-keys-list',
   pluginDigestMatches: 'plugin-digest-matches',
   pluginCosignVerify: 'plugin-cosign-verify',
+  // 插件安装/卸载与受控网络门（目录索引、签名校验、白名单请求）
+  plugin: {
+    install: 'plugin-store:install',
+    uninstall: 'plugin-store:uninstall',
+    list: 'plugin-store:list',
+    netGetPolicy: 'plugin-net:get-policy',
+    netSetPolicy: 'plugin-net:set-policy',
+    netFetch: 'plugin-net:fetch',
+  },
+  // 本地推理运行时接入（进程管理 + 端点探测）
+  local: {
+    getConfig: 'local-inference:get-config',
+    setConfig: 'local-inference:set-config',
+    start: 'local-inference:start',
+    stop: 'local-inference:stop',
+    status: 'local-inference:status',
+    probe: 'local-inference:probe',
+  },
   crashGetConfig: 'crash:get-config',
   crashSetEnabled: 'crash:set-enabled',
   openPath: 'open-path',

@@ -188,7 +188,7 @@ const CardPromptSettingsPanel: React.FC<CardPromptSettingsPanelProps> = ({
                 <div className="mb-4">
                   <label className={fieldLabel}>
                     {t('cardPrompts.contentLabel')}
-                    <span className="ml-2 font-normal normal-case tracking-normal text-muted-foreground/70">{t('cardPrompts.mustIncludeVar')}</span>
+                    <span className="ml-2 font-normal normal-case tracking-normal text-foreground/70">{t('cardPrompts.mustIncludeVar')}</span>
                   </label>
                   <Textarea
                     className=" h-48 resize-none bg-muted/40 font-mono text-sm"

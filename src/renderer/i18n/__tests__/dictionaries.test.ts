@@ -9,46 +9,7 @@
 
 import { describe, expect,it } from 'vitest';
 
-import enApp from '../../../shared/i18n/locales/en/app.json';
-import enAssistant from '../../../shared/i18n/locales/en/assistant.json';
-import enBooks from '../../../shared/i18n/locales/en/books.json';
-import enCards from '../../../shared/i18n/locales/en/cards.json';
-import enCharacters from '../../../shared/i18n/locales/en/characters.json';
-import enCommon from '../../../shared/i18n/locales/en/common.json';
-import enConsistency from '../../../shared/i18n/locales/en/consistency.json';
-import enErrors from '../../../shared/i18n/locales/en/errors.json';
-import enForeshadow from '../../../shared/i18n/locales/en/foreshadow.json';
-import enKnowledge from '../../../shared/i18n/locales/en/knowledge.json';
-import enNav from '../../../shared/i18n/locales/en/nav.json';
-import enOnboarding from '../../../shared/i18n/locales/en/onboarding.json';
-import enPrompts from '../../../shared/i18n/locales/en/prompts.json';
-import enProviders from '../../../shared/i18n/locales/en/providers.json';
-import enSettings from '../../../shared/i18n/locales/en/settings.json';
-import enSteps from '../../../shared/i18n/locales/en/steps.json';
-import enTimeline from '../../../shared/i18n/locales/en/timeline.json';
-import enVersion from '../../../shared/i18n/locales/en/version.json';
-import enWorld from '../../../shared/i18n/locales/en/world.json';
-import enWriting from '../../../shared/i18n/locales/en/writing.json';
-import zhApp from '../../../shared/i18n/locales/zh/app.json';
-import zhAssistant from '../../../shared/i18n/locales/zh/assistant.json';
-import zhBooks from '../../../shared/i18n/locales/zh/books.json';
-import zhCards from '../../../shared/i18n/locales/zh/cards.json';
-import zhCharacters from '../../../shared/i18n/locales/zh/characters.json';
-import zhCommon from '../../../shared/i18n/locales/zh/common.json';
-import zhConsistency from '../../../shared/i18n/locales/zh/consistency.json';
-import zhErrors from '../../../shared/i18n/locales/zh/errors.json';
-import zhForeshadow from '../../../shared/i18n/locales/zh/foreshadow.json';
-import zhKnowledge from '../../../shared/i18n/locales/zh/knowledge.json';
-import zhNav from '../../../shared/i18n/locales/zh/nav.json';
-import zhOnboarding from '../../../shared/i18n/locales/zh/onboarding.json';
-import zhPrompts from '../../../shared/i18n/locales/zh/prompts.json';
-import zhProviders from '../../../shared/i18n/locales/zh/providers.json';
-import zhSettings from '../../../shared/i18n/locales/zh/settings.json';
-import zhSteps from '../../../shared/i18n/locales/zh/steps.json';
-import zhTimeline from '../../../shared/i18n/locales/zh/timeline.json';
-import zhVersion from '../../../shared/i18n/locales/zh/version.json';
-import zhWorld from '../../../shared/i18n/locales/zh/world.json';
-import zhWriting from '../../../shared/i18n/locales/zh/writing.json';
+import { NAMESPACES, resources, SUPPORTED_LANGUAGES } from '../../../shared/i18n/catalog';
 
 /** 把嵌套字典扁平化为「点号键 → 字符串值」。 */
 function flatten(obj: unknown, prefix = ''): Map<string, string> {
@@ -71,31 +32,17 @@ function paramTokens(s: string): string[] {
   return [...s.matchAll(/\{\{\s*(\w+)/g)].map((m) => m[1]!).sort();
 }
 
-const NAMESPACES: Array<{ ns: string; zh: unknown; en: unknown }> = [
-  { ns: 'common', zh: zhCommon, en: enCommon },
-  { ns: 'settings', zh: zhSettings, en: enSettings },
-  { ns: 'nav', zh: zhNav, en: enNav },
-  { ns: 'app', zh: zhApp, en: enApp },
-  { ns: 'errors', zh: zhErrors, en: enErrors },
-  { ns: 'providers', zh: zhProviders, en: enProviders },
-  { ns: 'books', zh: zhBooks, en: enBooks },
-  { ns: 'version', zh: zhVersion, en: enVersion },
-  { ns: 'timeline', zh: zhTimeline, en: enTimeline },
-  { ns: 'foreshadow', zh: zhForeshadow, en: enForeshadow },
-  { ns: 'steps', zh: zhSteps, en: enSteps },
-  { ns: 'characters', zh: zhCharacters, en: enCharacters },
-  { ns: 'world', zh: zhWorld, en: enWorld },
-  { ns: 'consistency', zh: zhConsistency, en: enConsistency },
-  { ns: 'knowledge', zh: zhKnowledge, en: enKnowledge },
-  { ns: 'writing', zh: zhWriting, en: enWriting },
-  { ns: 'assistant', zh: zhAssistant, en: enAssistant },
-  { ns: 'cards', zh: zhCards, en: enCards },
-  { ns: 'prompts', zh: zhPrompts, en: enPrompts },
-  { ns: 'onboarding', zh: zhOnboarding, en: enOnboarding },
-];
-
 describe('中英字典一致性', () => {
-  for (const { ns, zh, en } of NAMESPACES) {
+  it('每种语言的命名空间集合与 NAMESPACES 完全一致（零缺失零多余）', () => {
+    for (const lang of SUPPORTED_LANGUAGES) {
+      expect(Object.keys(resources[lang]).sort()).toEqual([...NAMESPACES].sort());
+    }
+  });
+
+  for (const ns of NAMESPACES) {
+    const zh = resources.zh[ns];
+    const en = resources.en[ns];
+
     it(`${ns}: zh 与 en 键集完全一致`, () => {
       expect([...flatten(en).keys()].sort()).toEqual([...flatten(zh).keys()].sort());
     });

@@ -156,7 +156,10 @@ const DEFAULT_MANIFEST_BUDGET = 1600;
  */
 export class SkillCatalog {
   private readonly skills = new Map<string, Skill>();
-  private activeName: string | null = null;
+  /** scope（会话 id）→ 激活技能名；并行会话各持一份，互不覆盖。 */
+  private readonly activeByScope = new Map<string, string>();
+  /** 最近一次激活的技能名；无 scope 查询的兼容出口，并行会话下仅作诊断。 */
+  private lastActive: string | null = null;
   private readonly manifestBudget: number;
 
   constructor(options: SkillCatalogOptions = {}) {
@@ -166,8 +169,11 @@ export class SkillCatalog {
   /** 注册技能；同名覆盖（同名不同 source 时后注册者优先）。 */
   register(skill: Skill): this {
     this.skills.set(skill.name, skill);
-    if (this.activeName && !this.skills.has(this.activeName)) {
-      this.activeName = null;
+    for (const [scope, name] of this.activeByScope) {
+      if (!this.skills.has(name)) this.activeByScope.delete(scope);
+    }
+    if (this.lastActive && !this.skills.has(this.lastActive)) {
+      this.lastActive = this.mostRecentActive();
     }
     return this;
   }
@@ -183,7 +189,10 @@ export class SkillCatalog {
   }
 
   unregister(name: string): boolean {
-    if (this.activeName === name) this.activeName = null;
+    for (const [scope, active] of this.activeByScope) {
+      if (active === name) this.activeByScope.delete(scope);
+    }
+    if (this.lastActive === name) this.lastActive = this.mostRecentActive();
     return this.skills.delete(name);
   }
 
@@ -239,22 +248,42 @@ export class SkillCatalog {
     return this.list().find((skill) => skill.triggers.some((t) => lower.includes(t)));
   }
 
-  /** 激活技能（全文进入 prompt）；返回是否成功。 */
-  activate(name: string): boolean {
+  /**
+   * 激活技能（全文进入 prompt）；scope 标识会话，缺省为全局默认。
+   * 不同 scope 的激活状态互不影响，供并行助手会话做隔离。
+   */
+  activate(name: string, scope = ''): boolean {
     if (!this.skills.has(name)) return false;
-    this.activeName = name;
+    this.activeByScope.set(scope, name);
+    this.lastActive = name;
     return true;
   }
 
-  /** 卸载当前激活技能。 */
-  deactivate(): void {
-    this.activeName = null;
+  /** 卸载指定 scope 的激活技能；不传 scope 时清空全部。 */
+  deactivate(scope?: string): void {
+    if (scope === undefined) {
+      this.activeByScope.clear();
+      this.lastActive = null;
+      return;
+    }
+    this.activeByScope.delete(scope);
+    if (this.lastActive && ![...this.activeByScope.values()].includes(this.lastActive)) {
+      this.lastActive = this.mostRecentActive();
+    }
   }
 
-  /** 当前激活技能（PromptContext.activeSkill 数据源；tools 供 Agent 循环做白名单拦截）。 */
-  getActive(): { name: string; body: string; tools: string[]; handler?: SkillHandler } | null {
-    if (!this.activeName) return null;
-    const skill = this.skills.get(this.activeName);
+  /**
+   * 当前激活技能（PromptContext.activeSkill 数据源；tools 供 Agent 循环做白名单拦截）。
+   * 传 scope 取该会话的激活状态；不传时取最近激活（兼容单会话调用与诊断）。
+   */
+  getActive(scope?: string): { name: string; body: string; tools: string[]; handler?: SkillHandler } | null {
+    const name = scope === undefined ? this.lastActive : this.activeByScope.get(scope) ?? null;
+    if (!name) return null;
+    const skill = this.skills.get(name);
     return skill ? { name: skill.name, body: skill.body, tools: skill.tools, handler: skill.handler } : null;
+  }
+
+  private mostRecentActive(): string | null {
+    return [...this.activeByScope.values()].at(-1) ?? null;
   }
 }

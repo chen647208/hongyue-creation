@@ -43,7 +43,7 @@ const WritingEditorStatusOverlay: React.FC<WritingEditorStatusOverlayProps> = ({
             <Spinner className="mb-4 size-10 text-primary" strokeWidth={2} />
             <p className="text-xs font-medium uppercase tracking-widest text-foreground">{t('statusOverlay.generating')}</p>
             <p className="mt-2 text-xs text-muted-foreground">{t('statusOverlay.targetWords', { count: targetWordCount })}</p>
-            <p className="mt-1 text-2xs text-muted-foreground/70">{t('statusOverlay.contextInjected', { count: selectedKnowledgeCount })}</p>
+            <p className="mt-1 text-2xs text-foreground/70">{t('statusOverlay.contextInjected', { count: selectedKnowledgeCount })}</p>
           </div>
         </div>
       )}
@@ -54,10 +54,10 @@ const WritingEditorStatusOverlay: React.FC<WritingEditorStatusOverlayProps> = ({
             <Spinner className="mb-4 size-10 text-success" strokeWidth={2} />
             <p className="text-xs font-medium uppercase tracking-widest text-foreground">{t('statusOverlay.streaming')}</p>
             <p className="mt-2 text-xs tabular-nums text-muted-foreground">{t('statusOverlay.generatedSoFar', { count: streamingContentLength })}</p>
-            <p className="mt-1 text-2xs tabular-nums text-muted-foreground/70">
+            <p className="mt-1 text-2xs tabular-nums text-foreground/70">
               {t('output.inputToken')} {liveTokens.prompt} · {t('output.outputToken')} {liveTokens.completion} · {t('output.total')} {liveTokens.total}
             </p>
-            <p className="mt-1 text-2xs text-muted-foreground/70">{t('statusOverlay.streamingHint')}</p>
+            <p className="mt-1 text-2xs text-foreground/70">{t('statusOverlay.streamingHint')}</p>
             <Button
               variant="outline"
               size="sm"

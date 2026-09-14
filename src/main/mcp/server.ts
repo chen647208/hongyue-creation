@@ -88,18 +88,23 @@ function listBooks(): Array<{ bookId: string; nodes: number; updatedAt: number }
   return rows.map((r) => ({ bookId: r.book_id, nodes: r.n, updatedAt: r.last }));
 }
 
-function listNodes(bookId: string): NodeRow[] {
-  return getDb()
+/** 列出某书全部节点；传入连接以便单测直接复用内存库。 */
+export function listNodes(database: Database.Database, bookId: string): NodeRow[] {
+  return database
     .prepare(`SELECT id, book_id, type, title, body, updated_at FROM nodes WHERE book_id = ? AND erased = 0 ORDER BY type, title`)
     .all(bookId) as unknown as NodeRow[];
 }
 
-function getNode(nodeId: string): (NodeRow & { attrs: Array<{ name: string; value: string }> }) | null {
-  const node = getDb()
+/** 读单节点与属性；传入连接以便单测直接复用内存库。 */
+export function getNode(
+  database: Database.Database,
+  nodeId: string,
+): (NodeRow & { attrs: Array<{ name: string; value: string }> }) | null {
+  const node = database
     .prepare(`SELECT id, book_id, type, title, body, updated_at FROM nodes WHERE id = ? AND erased = 0`)
     .get(nodeId) as NodeRow | undefined;
   if (!node) return null;
-  const attrs = getDb()
+  const attrs = database
     .prepare(`SELECT name, value FROM attrs WHERE node_id = ? AND erased = 0 ORDER BY position`)
     .all(nodeId) as Array<{ name: string; value: string }>;
   return { ...node, attrs };
@@ -249,6 +254,8 @@ const TOOLS = [
       },
       required: ['title'],
     },
+    // 提案工具只入待审箱、不落库：宿主据此不重复弹批（内置助手与外部同一待审箱）
+    _meta: { 'hongyue/proposal': true },
   },
   {
     name: 'propose_chapter_write',
@@ -263,18 +270,70 @@ const TOOLS = [
       },
       required: ['title', 'nodeId', 'body'],
     },
+    _meta: { 'hongyue/proposal': true },
   },
 ];
 
 const RESOURCES = [
   { uri: 'books://index', name: '全部书籍索引', mimeType: 'text/plain' },
-  // URI 模板：单书目录按 book://{bookId}/toc 读取（resources/read 已实现，此处宣告可发现）
+  // URI 模板：资源按 book://{bookId}/… 读取（resources/read 已实现，此处宣告可发现）
   { uriTemplate: 'book://{bookId}/toc', name: '单书目录', mimeType: 'text/plain' },
+  { uriTemplate: 'book://{bookId}/entities', name: '单书实体清单（角色/地点/势力等设定）', mimeType: 'text/plain' },
+  { uriTemplate: 'book://{bookId}/chapter/{chapterId}', name: '单章正文', mimeType: 'text/plain' },
+  { uriTemplate: 'book://{bookId}/stats', name: '单书统计（类型计数与字数，索引摘要）', mimeType: 'text/plain' },
 ];
 
-function tocText(bookId: string): string {
-  const rows = listNodes(bookId);
+/** 章节/知识库之外的设定实体类型（目录之外的卡片）。 */
+function isEntityType(type: string): boolean {
+  return type !== 'novel.chapter' && type !== 'meta.knowledge';
+}
+
+/** 单书目录（类型/标题/id）。 */
+export function tocText(database: Database.Database, bookId: string): string {
+  const rows = listNodes(database, bookId);
   return rows.map((r) => `[${r.type}] ${r.title} (${r.id})`).join('\n') || '(空书)';
+}
+
+/** 单书实体清单：按类型分组列出设定卡片（角色/地点/势力等，不含章节与知识库）。 */
+export function entitiesText(database: Database.Database, bookId: string): string {
+  const grouped = new Map<string, NodeRow[]>();
+  for (const row of listNodes(database, bookId)) {
+    if (!isEntityType(row.type)) continue;
+    const list = grouped.get(row.type) ?? [];
+    list.push(row);
+    grouped.set(row.type, list);
+  }
+  if (grouped.size === 0) return '(无实体)';
+  return [...grouped.entries()]
+    .map(([type, rows]) => `# ${type}\n${rows.map((r) => `- ${r.title} (${r.id})`).join('\n')}`)
+    .join('\n\n');
+}
+
+/** 单章正文（含标题与属性）；节点不存在或不属于该返回 null。 */
+export function chapterText(database: Database.Database, bookId: string, chapterId: string): string | null {
+  const node = getNode(database, chapterId);
+  if (!node || node.book_id !== bookId) return null;
+  const attrs = node.attrs.map((a) => `@${a.name}: ${a.value}`).join('\n');
+  return [`# ${node.title} (${node.id})`, attrs, node.body].filter((part) => part && part.length > 0).join('\n\n');
+}
+
+/** 单书统计：类型计数与正文总字数（索引摘要的可读形态）。 */
+export function statsText(database: Database.Database, bookId: string): string {
+  const rows = listNodes(database, bookId);
+  const counts = new Map<string, { n: number; chars: number }>();
+  let totalChars = 0;
+  for (const row of rows) {
+    const chars = row.body?.length ?? 0;
+    totalChars += chars;
+    const entry = counts.get(row.type) ?? { n: 0, chars: 0 };
+    entry.n += 1;
+    entry.chars += chars;
+    counts.set(row.type, entry);
+  }
+  const lines = [...counts.entries()]
+    .sort((a, b) => b[1].n - a[1].n)
+    .map(([type, { n, chars }]) => `${type}: ${n} 个 / ${chars} 字`);
+  return [`节点总数：${rows.length}，总字数：${totalChars}`, ...lines].join('\n');
 }
 
 // ── JSON-RPC 框架 ──────────────────────────────────────────────────────
@@ -299,15 +358,25 @@ function dispatch(method: string, params: Record<string, unknown>): Record<strin
       return { resources: RESOURCES };
     case 'resources/read': {
       const uri = String(params.uri ?? '');
+      const text = (body: string): Record<string, unknown> => ({ contents: [{ uri, mimeType: 'text/plain', text: body }] });
       if (uri === 'books://index') {
-        return {
-          contents: [{ uri, mimeType: 'text/plain', text: listBooks().map((b) => `${b.bookId}（${b.nodes} 节点）`).join('\n') || '(无书籍)' }],
-        };
+        return text(listBooks().map((b) => `${b.bookId}（${b.nodes} 节点）`).join('\n') || '(无书籍)');
       }
       // book://{bookId}/toc：单书目录（design/05 §6 资源）
       const tocMatch = uri.match(/^book:\/\/([^/]+)\/toc$/);
-      if (tocMatch) {
-        return { contents: [{ uri, mimeType: 'text/plain', text: tocText(tocMatch[1] ?? '') }] };
+      if (tocMatch) return text(tocText(getDb(), tocMatch[1] ?? ''));
+      // book://{bookId}/entities：单书设定实体清单（角色/地点/势力等）
+      const entitiesMatch = uri.match(/^book:\/\/([^/]+)\/entities$/);
+      if (entitiesMatch) return text(entitiesText(getDb(), entitiesMatch[1] ?? ''));
+      // book://{bookId}/stats：单书类型计数与字数（索引摘要）
+      const statsMatch = uri.match(/^book:\/\/([^/]+)\/stats$/);
+      if (statsMatch) return text(statsText(getDb(), statsMatch[1] ?? ''));
+      // book://{bookId}/chapter/{chapterId}：单章正文
+      const chapterMatch = uri.match(/^book:\/\/([^/]+)\/chapter\/([^/]+)$/);
+      if (chapterMatch) {
+        const body = chapterText(getDb(), chapterMatch[1] ?? '', chapterMatch[2] ?? '');
+        if (body === null) throw new Error(`章节不存在：${chapterMatch[2] ?? ''}`);
+        return text(body);
       }
       throw new Error(`未知资源：${uri}`);
     }
@@ -318,9 +387,9 @@ function dispatch(method: string, params: Record<string, unknown>): Record<strin
         case 'list_books':
           return textResult(JSON.stringify(listBooks(), null, 2));
         case 'list_nodes':
-          return textResult(JSON.stringify(listNodes(String(args.bookId ?? '')).map(({ body: _body, ...rest }) => rest), null, 2));
+          return textResult(JSON.stringify(listNodes(getDb(), String(args.bookId ?? '')).map(({ body: _body, ...rest }) => rest), null, 2));
         case 'get_node': {
-          const node = getNode(String(args.nodeId ?? ''));
+          const node = getNode(getDb(), String(args.nodeId ?? ''));
           return node ? textResult(JSON.stringify(node, null, 2)) : textResult('节点不存在', true);
         }
         case 'search_nodes':

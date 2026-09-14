@@ -70,6 +70,35 @@ describe('AssistantTaskService', () => {
     expect(outcome.status).toBe('error');
   });
 
+  it('并发上限放开：两个任务并行，第三个排队', async () => {
+    const service = new AssistantTaskService(2);
+    const started: string[] = [];
+    const gates: Array<() => void> = [];
+    const make = (label: string) =>
+      service.enqueue({
+        label,
+        run: async () => {
+          started.push(label);
+          await new Promise<void>((resolve) => gates.push(resolve));
+          return label;
+        },
+      });
+    const a = make('a');
+    const b = make('b');
+    const c = make('c');
+    for (let i = 0; i < 50 && started.length < 2; i += 1) await tick();
+    expect(started).toEqual(['a', 'b']);
+    expect(service.activeCount).toBe(2);
+
+    gates.shift()!(); // a 结束，c 补位
+    for (let i = 0; i < 50 && started.length < 3; i += 1) await tick();
+    expect(started).toEqual(['a', 'b', 'c']);
+
+    gates.forEach((g) => g());
+    await Promise.all([a.result, b.result, c.result]);
+    expect(service.activeCount).toBe(0);
+  });
+
   it('hasActive 按书籍过滤，clearFinished 清理已结束', async () => {
     const service = new AssistantTaskService();
     const handle = service.enqueue({ bookId: 'book-1', label: 'a', run: async () => 1 });
