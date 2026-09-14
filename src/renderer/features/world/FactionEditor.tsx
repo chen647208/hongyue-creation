@@ -207,13 +207,13 @@ export const FactionEditor: React.FC<FactionEditorProps> = ({
     const colors = {
       ally: 'bg-chart-1/10 text-chart-1',
       enemy: 'bg-destructive/10 text-destructive',
-      neutral: 'bg-muted text-muted-foreground',
+      neutral: 'bg-muted text-foreground/80',
       vassal: 'bg-chart-4/10 text-chart-4',
       suzerain: 'bg-chart-2/10 text-chart-2',
       rival: 'bg-chart-6/10 text-chart-6',
       trade: 'bg-chart-5/10 text-chart-5'
     };
-    return (colors as Record<string, string>)[type] || 'bg-muted text-muted-foreground';
+    return (colors as Record<string, string>)[type] || 'bg-muted text-foreground/80';
   };
 
   return (

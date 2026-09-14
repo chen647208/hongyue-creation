@@ -219,9 +219,9 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
       faction: 'bg-chart-2/10 text-chart-2',
       battle: 'bg-destructive/10 text-destructive',
       discovery: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
-      other: 'bg-muted text-muted-foreground'
+      other: 'bg-muted text-foreground/80'
     };
-    return colors[type] || 'bg-muted text-muted-foreground';
+    return colors[type] || 'bg-muted text-foreground/80';
   };
 
   // 格式化日期显示

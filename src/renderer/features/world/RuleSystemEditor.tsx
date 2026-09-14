@@ -93,7 +93,7 @@ export const RuleSystemEditor: React.FC<RuleSystemEditorProps> = ({
       organization: 'bg-chart-1/10 text-chart-1',
       profession: 'bg-chart-5/10 text-chart-5',
       title: 'bg-chart-2/10 text-chart-2',
-      custom: 'bg-muted text-muted-foreground'
+      custom: 'bg-muted text-foreground/80'
     };
     return colors[type];
   };
