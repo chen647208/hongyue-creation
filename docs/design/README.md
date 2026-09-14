@@ -27,6 +27,20 @@
 20. **[27 IPC 信任边界加固](27-ipc-hardening.md)** — SQL 语义通道、文件 IPC 收敛与 CSP 决策
 21. **[28 文档已写、代码未落地清单](28-doc-impl-gaps.md)** — 设计/特性文档与实现的对账时点快照
 22. **[29 通用创作平台](29-general-creation-platform.md)** — 实体类型与字段自定义、双轴时间线、多视图、类型模板、可开关界面与分期改造计划
+23. **[30 惰性载入](30-lazy-node-loading.md)** — 骨架载入、活动书补载、释放策略
+24. **[31 存储后端切换与哨兵](31-storage-backend-migration.md)** — 后端哨兵、阻断提示与 local→OPFS 单向迁移
+25. **[32 AI 写入治理](32-ai-write-governance.md)** — 提案 diff 与权限边界
+26. **[33 动效规范](33-motion.md)** — 允许/禁止、可访问性与实现约定
+27. **[34 创作域能力矩阵](34-creation-domain-matrix.md)** — 通用件定位、各创作域 A/S 档位与缺口总表
+28. **[35 跨设备与移动端](35-cross-device-and-mobile.md)** — 移动只读与轻编辑、窄视口与数据路径
+29. **[36 数据同步与冲突](36-data-sync-and-conflict.md)** — 同步包落库修复、WebDAV/S3 传输、冲突与恢复提示
+30. **[37 AI 上下文注入与可信检索](37-ai-context-and-grounding.md)** — 关键词命中注入、预算与溯源逐字校验
+31. **[38 修订、批注与关联](38-revision-annotation-and-linking.md)** — 逐处接受/拒绝、行内批注、反向引用、登场章节与章纲提取
+32. **[39 编译与导出](39-compile-and-export.md)** — 编译目标与模板、ODT、分镜表与口播输出
+33. **[40 生态与运行时能力](40-ecosystem-and-runtime.md)** — 插件分发、多助手会话、MCP 资源面、联网搜索/翻译、本地推理
+34. **[41 非虚构与引用](41-nonfiction-and-reference.md)** — 引文/脚注/参考文献、对照视图
+35. **[42 分支叙事与绘本](42-branching-and-picturebook.md)** — 分支与变量、完整性校验、图位与页
+36. **[43 无障碍与国际化品质](43-accessibility-and-i18n.md)** — 全量 axe、对比度 AA、中英对齐校验
 
 ## 一页纸总览
 
