@@ -149,7 +149,7 @@ const WorkspaceTopbar: React.FC<WorkspaceTopbarProps> = ({
           </Button>
         )}
         {showHint && suggested && (
-          <div className="ml-2 hidden shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/5 py-0.5 pl-2 pr-0.5 text-xs md:flex">
+          <div className="ml-2 flex shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/5 py-0.5 pl-2 pr-0.5 text-xs">
             <Compass className="size-3 text-primary" />
             <Button
               variant="link"

@@ -175,10 +175,10 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
               <Button variant="ghost" size="icon" className={iconBtn} onClick={onOpenTools} title={t('toolbar.toolsTitle')}>
                 <Wrench className="size-4" />
               </Button>
-              <Button variant="ghost" size="icon" className={iconBtnSecondary} onClick={onSplitChapter} disabled={!canSplitChapter} title={t('toolbar.splitChapterTitle')}>
+              <Button variant="ghost" size="icon" className={iconBtn} onClick={onSplitChapter} disabled={!canSplitChapter} title={t('toolbar.splitChapterTitle')}>
                 <Scissors className="size-4" />
               </Button>
-              <Button variant="ghost" size="icon" className={iconBtnSecondary} onClick={onMergeChapter} disabled={!canMergeChapter} title={t('toolbar.mergeChapterTitle')}>
+              <Button variant="ghost" size="icon" className={iconBtn} onClick={onMergeChapter} disabled={!canMergeChapter} title={t('toolbar.mergeChapterTitle')}>
                 <Merge className="size-4" />
               </Button>
               {activeChapterId && (
