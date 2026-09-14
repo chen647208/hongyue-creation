@@ -17,7 +17,8 @@
  *  - 双方都改（hash 不一致）→ **冲突副本**：保留本地，远端版本以新 id 插入
  *    （标题追加「冲突副本」标记），绝不覆盖——LWW 禁用的落地；
  *  - 远端墓碑（erased）且本地存在 → 本地软删（删除传播优先）；
- *  - attrs/edges 冲突无法独立成副本 → 报告人工处理，绝不覆盖。
+ *  - attrs/edges 冲突无法独立成副本 → 报告人工处理，绝不覆盖；
+ *  - 边本地缺失 → 按稳定键插入（重复导入幂等），关系不丢。
  *
  * canonicalHash：跨设备一致的实体内容指纹（稳定序列化 + FNV-1a），合并
  * 判定只信任它；entity_changes.hash（仓库内部哈希）随 bundle 留档审计。
@@ -95,6 +96,14 @@ export function canonicalHash(entity: unknown): string {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
+/**
+ * 边的稳定去重键：from/to/kind/role 决定关系身份，跨设备同一条边映射到同一键。
+ * 与投影桥 `core/project/bridge.ts` 的确定性边 id 同构，故同时可作 id 兜底。
+ */
+export function edgeStableKey(edge: Pick<EdgeEntity, 'fromId' | 'toId' | 'kind' | 'role'>): string {
+  return `e:${edge.fromId}>${edge.toId}:${edge.kind}:${edge.role ?? ''}`;
+}
+
 /** 从本地实体集构造合并输入（canonical hash 全量计算）。 */
 export function localState(entities: EntitySnapshot): LocalEntityState {
   const hashByEntityId = new Map<string, string>();
@@ -126,9 +135,9 @@ function conflictedNodeCopy(node: NodeEntity, allAttrs: AttributeEntity[]): { no
 
 /**
  * 合并远端 bundle 到本地。返回报告 + 建议写入本地的实体集
- * （applied 节点 + 冲突副本；attrs/edges 由调用方按报告人工处理）。
+ * （applied 节点 + 冲突副本 + 缺失的边；attrs/edges 冲突由调用方按报告人工处理）。
  */
-export function mergeBundle(bundle: SyncBundle, local: LocalEntityState): MergeReport & { insertNodes: NodeEntity[]; insertAttrs: AttributeEntity[] } {
+export function mergeBundle(bundle: SyncBundle, local: LocalEntityState): MergeReport & { insertNodes: NodeEntity[]; insertAttrs: AttributeEntity[]; insertEdges: EdgeEntity[] } {
   const localNodes = new Map(local.entities.nodes.map((n) => [n.id, n]));
   const localAttrsByNode = new Map<string, AttributeEntity[]>();
   for (const a of local.entities.attrs) {
@@ -141,6 +150,7 @@ export function mergeBundle(bundle: SyncBundle, local: LocalEntityState): MergeR
   const report: MergeReport = { applied: [], conflictCopies: [], skipped: [], manual: [] };
   const insertNodes: NodeEntity[] = [];
   const insertAttrs: AttributeEntity[] = [];
+  const insertEdges: EdgeEntity[] = [];
 
   const remoteNodeChanges = new Map<string, SyncChange>();
   for (const change of bundle.changes) {
@@ -184,15 +194,50 @@ export function mergeBundle(bundle: SyncBundle, local: LocalEntityState): MergeR
     report.conflictCopies.push({ node: copy.node, attrs: copy.attrs });
   }
 
-  // attrs/edges 冲突：无法独立成副本，报告人工
+  // attrs 冲突：无法独立成副本，报告人工
   for (const change of bundle.changes) {
-    if (change.entityName === 'attrs' || change.entityName === 'edges') {
+    if (change.entityName === 'attrs') {
       const localHash = local.hashByEntityId.get(change.entityId);
       if (localHash && localHash !== change.hash) {
-        report.manual.push({ entityName: change.entityName, entityId: change.entityId, reason: '属性/边双方都改：人工比对（不自动覆盖）' });
+        report.manual.push({ entityName: 'attrs', entityId: change.entityId, reason: '属性双方都改：人工比对（不自动覆盖）' });
       }
     }
   }
 
-  return { ...report, insertNodes, insertAttrs };
+  // edges：本地缺失 → 插入；稳定键已存在 → 跳过（重复导入幂等）；双方都改 → 人工
+  const localEdgeById = new Map(local.entities.edges.map((e) => [e.id, e]));
+  const localEdgeKeys = new Set(
+    local.entities.edges.filter((e) => !e.erased).map((e) => edgeStableKey(e))
+  );
+  const remoteEdgeById = new Map(bundle.entities.edges.map((e) => [e.id, e]));
+  for (const change of bundle.changes) {
+    if (change.entityName !== 'edges') continue;
+    if (change.isErased) {
+      report.skipped.push(
+        localEdgeById.has(change.entityId)
+          ? `${change.entityId}: 边墓碑——本地应软删（由仓库执行）`
+          : `${change.entityId}: 边墓碑且本地不存在`
+      );
+      continue;
+    }
+    const remoteEdge = remoteEdgeById.get(change.entityId);
+    if (!remoteEdge) continue;
+    const localEdge = localEdgeById.get(change.entityId);
+    if (!localEdge) {
+      if (localEdgeKeys.has(edgeStableKey(remoteEdge))) {
+        report.skipped.push(`${change.entityId}: 边已存在（稳定键重复）`);
+        continue;
+      }
+      insertEdges.push(remoteEdge);
+      continue;
+    }
+    const localHash = local.hashByEntityId.get(change.entityId) ?? '';
+    if (localHash === change.hash || canonicalHash(localEdge) === canonicalHash(remoteEdge)) {
+      report.skipped.push(`${change.entityId}: 已同步`);
+      continue;
+    }
+    report.manual.push({ entityName: 'edges', entityId: change.entityId, reason: '边双方都改：人工比对（不自动覆盖）' });
+  }
+
+  return { ...report, insertNodes, insertAttrs, insertEdges };
 }

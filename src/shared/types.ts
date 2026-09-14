@@ -199,6 +199,8 @@ export interface Chapter {
   order: number;
   /** 写作状态（缺席=draft，免迁移）：草稿/写作中/完稿/定稿 */
   status?: 'draft' | 'writing' | 'done' | 'final';
+  /** 是否素材（缺席=false，免迁移）：素材不计入字数与码字统计、不进成稿编译；设定集优先取。 */
+  material?: boolean;
   history?: AIHistoryRecord[]; // AI生成历史记录
   snapshots?: ChapterSnapshot[]; // 手动编辑快照（用于误删/回退恢复）
   

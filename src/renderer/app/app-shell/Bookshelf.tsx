@@ -82,11 +82,11 @@ interface BookshelfProps {
   onOpenSearch: () => void;
 }
 
-/** 统计全书正文字数（CJK 按字符计）。 */
+/** 统计全书正文字数（CJK 按字符计）；素材章节不计入。 */
 function wordCount(book: Project): number {
   // 惰性载入下未打开的书只有骨架：优先用库侧聚合的字数缓存。
   if (book.hydrated === false && typeof book.wordCountCache === 'number') return book.wordCountCache;
-  return book.chapters.reduce((sum, c) => sum + (c.content?.length ?? 0), 0);
+  return book.chapters.reduce((sum, c) => sum + (c.material ? 0 : (c.content?.length ?? 0)), 0);
 }
 
 /** 依据界面语言格式化"最后编辑"时间。 */

@@ -94,6 +94,8 @@ export interface SearchHit {
   snippet: string;
   /** FTS rank，越小越相关 */
   rank: number;
+  /** 该命中的节点是否标记为素材（知识条目恒为非素材）。 */
+  material?: boolean;
 }
 
 export interface SearchOptions {
@@ -101,6 +103,8 @@ export interface SearchOptions {
   projectId?: string;
   /** 返回条数上限，默认 50 */
   limit?: number;
+  /** 素材优先：为真时把标记为素材的命中稳定排在非素材之前（设定集检索用）。 */
+  preferMaterial?: boolean;
 }
 
 /** 文档附件元数据（二进制存 blobs，附件行存元信息；node 为书本实体 id）。 */

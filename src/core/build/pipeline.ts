@@ -27,6 +27,23 @@ export interface SelectedNode {
   /** 构建序（order 属性优先，退化为 title 排序键） */
   order: number;
   status?: string;
+  /** 是否素材（缺失=false）：成稿编译剔除，设定集优先。 */
+  material?: boolean;
+}
+
+/** 素材口径：exclude 剔除素材；include 保留原序；prefer 保留并把素材排到前面。 */
+export type MaterialPolicy = 'exclude' | 'include' | 'prefer';
+
+/**
+ * 素材过滤/排序纯函数：调用方已按构建序排好，prefer 时素材整体前移且组内保持原序。
+ * 不改入参。
+ */
+export function applyMaterialPolicy(nodes: SelectedNode[], policy: MaterialPolicy = 'exclude'): SelectedNode[] {
+  if (policy === 'include') return nodes;
+  if (policy === 'prefer') {
+    return [...nodes].sort((a, b) => Number(Boolean(b.material)) - Number(Boolean(a.material)));
+  }
+  return nodes.filter((node) => !node.material);
 }
 
 function orderOf(node: NodeEntity, attrByNode: Map<string, AttributeEntity[]>): number {
@@ -39,9 +56,14 @@ function statusOf(node: NodeEntity, attrByNode: Map<string, AttributeEntity[]>):
   return attrByNode.get(node.id)?.find((a) => a.name === 'status' && !a.erased)?.value;
 }
 
-/** 选择：includeTypes + 单点排除 + 整类开关 + 状态过滤，输出按序节点。 */
+function materialOf(node: NodeEntity, attrByNode: Map<string, AttributeEntity[]>): boolean {
+  return attrByNode.get(node.id)?.find((a) => a.name === 'material' && !a.erased)?.value === 'true';
+}
+
+/** 选择：includeTypes + 单点排除 + 整类开关 + 状态过滤 + 素材口径，输出按序节点。 */
 export function select(profile: BuildProfile, entities: { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] }): SelectedNode[] {
   const { selection } = profile;
+  const policy: MaterialPolicy = selection.materialPolicy ?? 'exclude';
   const attrByNode = new Map<string, AttributeEntity[]>();
   for (const attr of entities.attrs) {
     if (attr.erased) continue;
@@ -54,16 +76,29 @@ export function select(profile: BuildProfile, entities: { nodes: NodeEntity[]; a
 
   const selected = entities.nodes
     .filter((n) => !n.erased && !excluded.has(n.id))
-    .filter((n) => selection.includeTypes.some((p) => typeMatches(n.type, p)))
     .filter((n) => {
+      if (selection.includeInactive || !['inactive', 'archived'].includes(statusOf(n, attrByNode) ?? '')) return true;
+      return false;
+    })
+    .filter((n) => {
+      if (materialOf(n, attrByNode) && policy === 'prefer') return true; // 设定集：素材无视类型规则纳入
+      if (!selection.includeTypes.some((p) => typeMatches(n.type, p))) return false;
       if (selection.rootSwitches.cards === false && n.type.startsWith('card.')) return false;
       if (selection.rootSwitches.meta === false && n.type.startsWith('meta.')) return false;
       return true;
     })
-    .filter((n) => selection.includeInactive || !['inactive', 'archived'].includes(statusOf(n, attrByNode) ?? ''))
-    .map((n) => ({ id: n.id, type: n.type, title: n.title, body: n.body, order: orderOf(n, attrByNode), status: statusOf(n, attrByNode) }));
+    .map((n) => ({
+      id: n.id,
+      type: n.type,
+      title: n.title,
+      body: n.body,
+      order: orderOf(n, attrByNode),
+      status: statusOf(n, attrByNode),
+      material: materialOf(n, attrByNode),
+    }));
 
-  return selected.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, 'zh'));
+  selected.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, 'zh'));
+  return applyMaterialPolicy(selected, policy);
 }
 
 // ── transform ────────────────────────────────────────────────────────
@@ -111,7 +146,8 @@ export function transform(profile: BuildProfile, nodes: SelectedNode[]): DocBloc
   const blocks: DocBlock[] = [];
 
   for (const node of nodes) {
-    if (headings.hide.includes(node.type)) continue;
+    // 素材按口径纳入设定集时不受 hide 限制（否则设定集只选到却不渲染）
+    if (headings.hide.includes(node.type) && !node.material) continue;
 
     const isChapter = node.type.startsWith('novel.chapter') || node.type.startsWith('meta.');
     const isScene = node.type.startsWith('novel.scene');

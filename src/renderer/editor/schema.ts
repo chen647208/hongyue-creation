@@ -21,6 +21,8 @@
 import { type Extensions,Mark, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 
+import { BlockId } from './blockId';
+
 /** 场景分隔（*** 行；Enter×2 产物）——块级叶节点 */
 export const SceneBreak = Node.create({
   name: 'sceneBreak',
@@ -199,5 +201,6 @@ export function createNovelExtensions(options: { undoRedo?: boolean } = {}): Ext
     DialogueBlock,
     QuoteStyle,
     TagRef,
+    BlockId,
   ];
 }

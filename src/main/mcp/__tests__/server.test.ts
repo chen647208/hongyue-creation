@@ -89,6 +89,9 @@ describe('search_nodes（FTS）', () => {
     db.exec(`CREATE TABLE nodes (
       id TEXT PRIMARY KEY, book_id TEXT, type TEXT, title TEXT, body TEXT, erased INTEGER NOT NULL DEFAULT 0
     )`);
+    db.exec(`CREATE TABLE attrs (
+      node_id TEXT, name TEXT, value TEXT, erased INTEGER NOT NULL DEFAULT 0
+    )`);
     const insFts = db.prepare('INSERT INTO nodes_fts(book_id, node_id, type, title, content) VALUES(?,?,?,?,?)');
     const insNode = db.prepare('INSERT INTO nodes(id, book_id, type, title, body, erased) VALUES(?,?,?,?,?,0)');
     // 章节与知识库进 FTS；角色卡只进 nodes（标题回退覆盖）

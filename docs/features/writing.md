@@ -55,6 +55,19 @@
 - 封面导出：书架卡片菜单「导出封面」由 `core/build/cover.ts` 生成竖版 SVG，
   经 `shared/services/coverService.ts` 光栅化为 PNG 另存；环境无 canvas 时退回 SVG。
 
+## 素材隔离
+
+- 标记：`Chapter.material`（布尔，缺省 false）是素材的单一真源；经投影桥存为章节节点的
+  `material` 属性，随 `saveProject` 落库。章节导航工具栏与每章条目可标记/取消，导出弹窗对素材章显示徽标。
+- 字数：`nodes.wordCountByBook` 与索引器 `wordCounts` 跳过素材章节，
+  `computeBookStats` 的 `totalCharCount`/`todayCharCount` 与码字统计不计素材；
+  书架骨架书的 `wordCountCache` 随之变化。
+- 编译：`BuildSelection.materialPolicy` 控制口径——`exclude`（缺省）剔除素材，
+  `include` 保留，`prefer` 把素材排到最前并纳入设定集（`COMPENDIUM_BUILD_PROFILE` 用 `prefer`）。
+  成稿默认档（`DEFAULT_BUILD_PROFILE`）对素材章不产出正文字数。
+- 检索：`repository.search` 的 `SearchOptions.preferMaterial` 经 `rankSearchHits` 把素材命中稳定前移；
+  AI 检索工具与知识库关键词检索按此口径返回。
+
 ## 无可用模型时的行为
 
 - 可用口径统一为 `isModelUsable`（已启用且已配好凭证）：默认模型未填 Key

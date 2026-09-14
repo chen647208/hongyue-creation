@@ -17,8 +17,9 @@ import { vectorIntegrationService } from './vectorIntegrationService';
 
 export type KnowledgeSearchMode = 'semantic' | 'hybrid' | 'keyword';
 
-/** FTS 关键词检索接口（由调用方注入 repository，避免 feature 直连内部实现）。 */
-export type KeywordSearchFn = (query: string, options: { projectId: string; limit: number }) => Promise<Array<{ scope: string; id: string }>>;
+/** FTS 关键词检索接口（由调用方注入 repository，避免 feature 直连内部实现）。
+ *  preferMaterial：设定集检索时素材命中优先返回。 */
+export type KeywordSearchFn = (query: string, options: { projectId: string; limit: number; preferMaterial?: boolean }) => Promise<Array<{ scope: string; id: string }>>;
 
 export const SEARCH_LIMIT = 10;
 export const SEARCH_THRESHOLD = 0.3;
@@ -58,7 +59,7 @@ export async function searchKnowledge({ projectId, query, mode, categoryItems, s
       // 关键词检索优先走 FTS5(trigram) 索引；短查询(<3 字符) trigram 无法命中，回退内存子串匹配。
       let matchedItems: KnowledgeItem[];
       if (query.trim().length >= 3) {
-        const hits = await search(query, { projectId, limit: 50 });
+        const hits = await search(query, { projectId, limit: 50, preferMaterial: true });
         const byId = new Map(categoryItems.map((i) => [i.id, i]));
         matchedItems = hits
           .filter((h) => h.scope === 'knowledge')

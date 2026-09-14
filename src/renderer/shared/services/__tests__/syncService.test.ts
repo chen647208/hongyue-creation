@@ -35,6 +35,33 @@ const edgeRow = {
   position: 0, book_id: 'b1', erased: 0,
 };
 
+function nodeEntity(id: string, title: string) {
+  return { id, bookId: 'b1', type: 'novel.chapter', title, body: '正文', path: undefined, createdAt: 1, updatedAt: 2, erased: false };
+}
+
+function edgeEntity(id: string, fromId: string, toId: string, kind = 'contain', role?: string) {
+  return { id, fromId, toId, kind, role, position: 0, bookId: 'b1', erased: false };
+}
+
+function edgeChange(entityId: string) {
+  return { changeId: 1, entityName: 'edges' as const, entityId, hash: 'remote-hash', isErased: false, agentId: 'sync', utcDateChanged: 1 };
+}
+
+function edgeBundle(edges: ReturnType<typeof edgeEntity>[], nodes: ReturnType<typeof nodeEntity>[] = []) {
+  return {
+    version: 1, bookId: 'b1', instanceId: 'remote', generatedAt: 1,
+    changes: [
+      ...nodes.map((n) => ({ changeId: 1, entityName: 'nodes' as const, entityId: n.id, hash: 'remote-hash', isErased: false, agentId: 'sync', utcDateChanged: 1 })),
+      ...edges.map((e) => edgeChange(e.id)),
+    ],
+    entities: { nodes, edges, attrs: [] },
+  };
+}
+
+function localEdgeRow(edge: ReturnType<typeof edgeEntity>) {
+  return { id: edge.id, from_id: edge.fromId, to_id: edge.toId, kind: edge.kind, role: edge.role ?? null, position: edge.position, book_id: edge.bookId, erased: 0 };
+}
+
 function stubApi(options: { rows?: Record<string, unknown[]>; fileContent?: { value: string } } = {}) {
   const rows = options.rows ?? {};
   const fileContent = options.fileContent ?? { value: '' };
@@ -116,5 +143,83 @@ describe('importSyncBundle', () => {
     expect(writes.map((w) => w.id)).toEqual(['nodes.upsert', 'attrs.upsert']);
     expect(writes[0]!.params[0]).toBe('n2');
     expect(dbRun.mock.calls.every((c) => SQL_ID.test(c[0]))).toBe(true);
+  });
+
+  it('远端节点与其之间的边一并落库', async () => {
+    const n2 = nodeEntity('n2', '第二章');
+    const n3 = nodeEntity('n3', '第三章');
+    const edge = edgeEntity('e:n2>n3:contain:', 'n2', 'n3');
+    const { writes } = stubApi({
+      rows: { 'nodes.selectByBook': [nodeRow], 'attrs.selectByBook': [], 'edges.selectByBook': [] },
+      fileContent: { value: JSON.stringify(edgeBundle([edge], [n2, n3])) },
+    });
+
+    const report = await importSyncBundle();
+
+    expect(writes.map((w) => w.id)).toEqual(['nodes.upsert', 'nodes.upsert', 'edges.upsert']);
+    const edgeWrite = writes.find((w) => w.id === 'edges.upsert')!;
+    expect(edgeWrite.params.slice(0, 4)).toEqual([edge.id, 'n2', 'n3', 'contain']);
+    expect(report.applied).toBe(3);
+  });
+
+  it('本地已有节点、远端仅补边：关系不丢', async () => {
+    const edge = edgeEntity('e:n1>n2:contain:', 'n1', 'n2');
+    const { writes } = stubApi({
+      rows: {
+        'nodes.selectByBook': [nodeRow, { ...nodeRow, id: 'n2', title: '第二章' }],
+        'attrs.selectByBook': [],
+        'edges.selectByBook': [],
+      },
+      fileContent: { value: JSON.stringify(edgeBundle([edge])) },
+    });
+
+    const report = await importSyncBundle();
+
+    expect(writes.map((w) => w.id)).toEqual(['edges.upsert']);
+    expect(report.applied).toBe(1);
+  });
+
+  it('重复导入同一条边：幂等，不重复写', async () => {
+    const edge = edgeEntity('e:n1>n2:contain:', 'n1', 'n2');
+    const { writes } = stubApi({
+      rows: { 'nodes.selectByBook': [nodeRow], 'attrs.selectByBook': [], 'edges.selectByBook': [localEdgeRow(edge)] },
+      fileContent: { value: JSON.stringify(edgeBundle([edge])) },
+    });
+
+    const report = await importSyncBundle();
+
+    expect(writes).toHaveLength(0);
+    expect(report.applied).toBe(0);
+    expect(report.skipped).toBe(1);
+  });
+
+  it('稳定键去重：不同 id 的同一条关系不重复插入', async () => {
+    const remote = edgeEntity('e-remote', 'n1', 'n2');
+    const local = edgeEntity('e-local', 'n1', 'n2');
+    const { writes } = stubApi({
+      rows: { 'nodes.selectByBook': [nodeRow], 'attrs.selectByBook': [], 'edges.selectByBook': [localEdgeRow(local)] },
+      fileContent: { value: JSON.stringify(edgeBundle([remote])) },
+    });
+
+    const report = await importSyncBundle();
+
+    expect(writes).toHaveLength(0);
+    expect(report.applied).toBe(0);
+    expect(report.skipped).toBe(1);
+  });
+
+  it('同 id 的边双方都改：报告人工，不自动覆盖', async () => {
+    const remote = edgeEntity('e1', 'n1', 'n3');
+    const local = edgeEntity('e1', 'n1', 'n2');
+    const { writes } = stubApi({
+      rows: { 'nodes.selectByBook': [nodeRow], 'attrs.selectByBook': [], 'edges.selectByBook': [localEdgeRow(local)] },
+      fileContent: { value: JSON.stringify(edgeBundle([remote])) },
+    });
+
+    const report = await importSyncBundle();
+
+    expect(writes).toHaveLength(0);
+    expect(report.applied).toBe(0);
+    expect(report.manual).toBe(1);
   });
 });

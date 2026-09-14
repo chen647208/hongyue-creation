@@ -1,0 +1,119 @@
+/*
+ * 本文件属于 红月创作 (Hongyue Creation) 项目。
+ * Copyright (C) 2026 chen647208
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * 本程序为自由软件：您可依据 GNU Affero 通用公共许可证第 3 版（AGPL-3.0-only）修改与分发；
+ * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
+ */
+
+/**
+ * 块索引：从 ProseMirror 文档 JSON 提取块级标识与纯文本摘要。
+ *
+ * 纯函数、不依赖编辑器实例，供引用面板与单测使用。文档（PM-JSON）中块节点的
+ * `blockId` 属性由 blockId.ts 的编辑器扩展维护；从 DSL 文本重新解析的文档
+ * 不携带该属性，此时 id 为 null（见 blockIndex.ts 头部「丢链边界」）。
+ */
+
+import { dslToPmDoc, type PmNode } from './serialization';
+
+/** 块级节点承载稳定标识的属性名（blockId.ts 的编辑器扩展写入）。 */
+export const BLOCK_ID_ATTRIBUTE = 'blockId';
+
+/** 摘要最大字符数，超出截断并追加省略号。 */
+export const BLOCK_SUMMARY_MAX_LENGTH = 120;
+
+/** 顶层块记录。 */
+export interface BlockRecord {
+  /** 稳定标识；文档无该属性（如从 DSL 文本解析）时为 null。 */
+  id: string | null;
+  /** 节点类型名（paragraph / heading / sceneBreak / keywordLine …）。 */
+  type: string;
+  /** 纯文本摘要：行内引用取显示名，占位符取名字，场景分隔记为 ***。 */
+  text: string;
+}
+
+function inlineText(nodes: PmNode[] | undefined): string {
+  if (!nodes) return '';
+  let out = '';
+  for (const node of nodes) {
+    switch (node.type) {
+      case 'text':
+        out += node.text ?? '';
+        break;
+      case 'hardBreak':
+        out += '\n';
+        break;
+      case 'chapterRef': {
+        const display = node.attrs?.display;
+        const tag = node.attrs?.tag;
+        out += typeof display === 'string' && display.length > 0 ? display : String(tag ?? '');
+        break;
+      }
+      case 'placeholder': {
+        const name = String(node.attrs?.name ?? '');
+        const kind = node.attrs?.kind;
+        out += typeof kind === 'string' && kind.length > 0 ? `{${name}|${kind}}` : `{${name}}`;
+        break;
+      }
+      default:
+        out += inlineText(node.content);
+    }
+  }
+  return out;
+}
+
+/** 单个块节点的纯文本（不含格式）。 */
+export function blockText(node: PmNode): string {
+  switch (node.type) {
+    case 'sceneBreak':
+      return '***';
+    case 'keywordLine':
+      return `# @${String(node.attrs?.keyword ?? '')}: ${String(node.attrs?.value ?? '')}`.trimEnd();
+    case 'darlingSlot':
+      return String(node.attrs?.text ?? '');
+    default:
+      return inlineText(node.content);
+  }
+}
+
+function truncate(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > BLOCK_SUMMARY_MAX_LENGTH ? `${flat.slice(0, BLOCK_SUMMARY_MAX_LENGTH)}…` : flat;
+}
+
+function toRecord(node: PmNode): BlockRecord {
+  const id = node.attrs?.[BLOCK_ID_ATTRIBUTE];
+  return {
+    id: typeof id === 'string' && id.length > 0 ? id : null,
+    type: node.type,
+    text: truncate(blockText(node)),
+  };
+}
+
+/** 列出文档顶层块（id + 类型 + 摘要），不递归容器内部块。 */
+export function listBlocks(doc: PmNode): BlockRecord[] {
+  return (doc.content ?? []).map(toRecord);
+}
+
+/** 按标识查找顶层块；未命中返回 null。 */
+export function findBlockById(doc: PmNode, id: string): BlockRecord | null {
+  return listBlocks(doc).find((block) => block.id === id) ?? null;
+}
+
+/** 文档中已存在的块标识，按出现顺序返回（不去重）。 */
+export function collectBlockIds(doc: PmNode): string[] {
+  return listBlocks(doc)
+    .map((block) => block.id)
+    .filter((id): id is string => id !== null);
+}
+
+/**
+ * 章节 body（DSL 文本）→ 顶层块记录。
+ *
+ * DSL 文本不携带 blockId，因此 id 恒为 null；这是 markdown 存储下的已知丢链边界。
+ * 需要带 id 的块记录时，改用编辑器当前文档的 `getJSON()` 结果调用 listBlocks。
+ */
+export function listBlocksFromBody(body: string): BlockRecord[] {
+  return listBlocks(dslToPmDoc(body));
+}

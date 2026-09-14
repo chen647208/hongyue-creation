@@ -6,7 +6,7 @@
  * 本程序为自由软件：您可依据 GNU Affero 通用公共许可证第 3 版（AGPL-3.0-only）修改与分发；
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
-import { CheckSquare, ChevronRight, LayoutGrid, List, Square, Trash2 } from 'lucide-react';
+import { Bookmark, CheckSquare, ChevronRight, LayoutGrid, List, Square, Trash2 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -77,6 +77,16 @@ const ChapterNavigationSection: React.FC<ChapterNavigationSectionProps> = ({
     setSelectedIds(new Set());
   };
 
+  const toggleMaterial = (chapter: Chapter) => {
+    onChaptersChange(chapters.map((c) => (c.id === chapter.id ? { ...c, material: !c.material } : c)));
+  };
+
+  const markSelectedMaterial = (material: boolean) => {
+    if (selectedIds.size === 0) return;
+    onChaptersChange(chapters.map((c) => (selectedIds.has(c.id) ? { ...c, material } : c)));
+    setSelectedIds(new Set());
+  };
+
   const deleteSelected = async () => {
     if (selectedIds.size === 0) return;
     const ok = await dialogService.confirm({
@@ -139,6 +149,12 @@ const ChapterNavigationSection: React.FC<ChapterNavigationSectionProps> = ({
           <Button variant="ghost" size="sm" className="h-6 px-2 text-2xs" onClick={() => markSelected('draft')} disabled={selectedIds.size === 0}>
             {t('navigation.markDraft')}
           </Button>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-2xs" onClick={() => markSelectedMaterial(true)} disabled={selectedIds.size === 0}>
+            {t('navigation.markMaterial')}
+          </Button>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-2xs" onClick={() => markSelectedMaterial(false)} disabled={selectedIds.size === 0}>
+            {t('navigation.unmarkMaterial')}
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -186,6 +202,22 @@ const ChapterNavigationSection: React.FC<ChapterNavigationSectionProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
+                className={cn(
+                  'size-6 shrink-0',
+                  chapter.material ? 'text-primary' : 'text-muted-foreground opacity-0 group-hover:opacity-100'
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleMaterial(chapter);
+                }}
+                title={chapter.material ? t('navigation.unmarkMaterialTitle') : t('navigation.markMaterialTitle')}
+                aria-pressed={Boolean(chapter.material)}
+              >
+                <Bookmark className={cn('size-3.5', chapter.material && 'fill-current')} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 className="size-6 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -222,19 +254,37 @@ const ChapterNavigationSection: React.FC<ChapterNavigationSectionProps> = ({
                 {chapter.contentSummary || chapter.summary || t('navigation.noSummary')}
               </p>
               <div className="mt-2 flex items-center justify-between text-2xs tabular-nums text-muted-foreground">
-                <span>{t(statusLabelKey[statusOf(chapter)])} · {(chapter.content || '').length}{t('navigation.charsUnit')}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteChapter(chapter.id);
-                  }}
-                  title={t('navigation.deleteTitle', { title: chapter.title })}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
+                <span>
+                  {chapter.material && <span className="mr-1 rounded bg-primary/10 px-1 py-0.5 text-primary">{t('navigation.materialBadge')}</span>}
+                  {t(statusLabelKey[statusOf(chapter)])} · {(chapter.content || '').length}{t('navigation.charsUnit')}
+                </span>
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn('size-6', chapter.material ? 'text-primary' : 'text-muted-foreground opacity-0 group-hover:opacity-100')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleMaterial(chapter);
+                    }}
+                    title={chapter.material ? t('navigation.unmarkMaterialTitle') : t('navigation.markMaterialTitle')}
+                    aria-pressed={Boolean(chapter.material)}
+                  >
+                    <Bookmark className={cn('size-3.5', chapter.material && 'fill-current')} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteChapter(chapter.id);
+                    }}
+                    title={t('navigation.deleteTitle', { title: chapter.title })}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))}

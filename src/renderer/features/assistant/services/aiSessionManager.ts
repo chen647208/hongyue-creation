@@ -223,10 +223,11 @@ export class AiSessionManager {
             services: {
               consistencyTemplates: toConsistencyRecord(useSettingsStore.getState().consistencyPrompts),
               cardTemplate: input.cardTemplate,
-              // 全文检索（SQLite FTS5）：延迟加载仓库，测试与预览环境不预付成本
+              // 全文检索（SQLite FTS5）：延迟加载仓库，测试与预览环境不预付成本；
+              // 检索用于装配设定/素材上下文，素材命中优先返回。
               textSearch: async (query: string, limit: number) => {
                 const { repository } = await import('@/shared/services/repository/index.js');
-                return repository.search(query, { projectId: input.project?.id, limit });
+                return repository.search(query, { projectId: input.project?.id, limit, preferMaterial: true });
               },
               // 语义检索（向量库 + 嵌入，自动降级）：不可用返回空数组，工具层如实回填
               semanticSearch: async (query: string, limit: number) => {

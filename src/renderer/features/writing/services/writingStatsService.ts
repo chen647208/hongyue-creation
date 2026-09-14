@@ -14,13 +14,18 @@ import { DEFAULT_BUILD_PROFILE, runBuild } from '@core/build';
 
 import { i18n } from '@/i18n';
 
-import type { Project } from '../../../../shared/types';
+import type { Chapter, Project } from '../../../../shared/types';
 import type { BookStats,ChapterStats } from '../types';
 import { projectToBuildEntities } from '../utils';
 
 export type { BookStats,ChapterStats };
 
 const READING_CHARS_PER_MINUTE = 400;
+
+/** 字数口径：标记为素材的章节不参与字数与码字统计（未标记即计数）。 */
+export function countableChapters(chapters: Chapter[]): Chapter[] {
+  return chapters.filter((chapter) => !chapter.material);
+}
 
 export function computeChapterStats(content: string): ChapterStats {
   const text = content ?? '';
@@ -38,15 +43,16 @@ export function computeChapterStats(content: string): ChapterStats {
 
 export function computeBookStats(project: Project, now: number = Date.now()): BookStats {
   const chapters = project.chapters ?? [];
-  const totalCharCount = chapters.reduce((sum, c) => sum + computeChapterStats(c.content).charCount, 0);
-  const writtenChapters = chapters.filter((c) => (c.content ?? '').trim().length > 0);
+  const counted = countableChapters(chapters);
+  const totalCharCount = counted.reduce((sum, c) => sum + computeChapterStats(c.content).charCount, 0);
+  const writtenChapters = counted.filter((c) => (c.content ?? '').trim().length > 0);
 
   // 今日新增：每章取今日最早快照与当前内容之差的近似
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
   const dayStartMs = startOfDay.getTime();
   let todayCharCount = 0;
-  for (const chapter of chapters) {
+  for (const chapter of counted) {
     const todaySnapshots = (chapter.snapshots ?? []).filter((s) => s.timestamp >= dayStartMs);
     const baseline = todaySnapshots.length > 0 ? todaySnapshots[0]?.charCount ?? 0 : 0;
     const current = computeChapterStats(chapter.content).charCount;

@@ -79,18 +79,18 @@ export const getPreviousChapterSummaryIds = (chapters: Chapter[], currentChapter
 };
 
 /** Project.chapters → 构建管线实体视图（导出与统计共用，单一口径）。 */export function projectToBuildEntities(project: Project): { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] } {
-  return {
-    nodes: project.chapters.map((c) => ({
-      id: c.id,
-      bookId: project.id,
-      type: 'novel.chapter',
-      title: c.title,
-      body: c.content || i18n.t('writing:export.noContent'),
-      createdAt: 0,
-      updatedAt: 0,
-      erased: false,
-    })),
-    attrs: project.chapters.map((c) => ({
+  const nodes: NodeEntity[] = project.chapters.map((c) => ({
+    id: c.id,
+    bookId: project.id,
+    type: 'novel.chapter',
+    title: c.title,
+    body: c.content || i18n.t('writing:export.noContent'),
+    createdAt: 0,
+    updatedAt: 0,
+    erased: false,
+  }));
+  const attrs: AttributeEntity[] = project.chapters.flatMap((c) => {
+    const list: AttributeEntity[] = [{
       id: `attr-order-${c.id}`,
       nodeId: c.id,
       type: 'label' as never,
@@ -99,9 +99,22 @@ export const getPreviousChapterSummaryIds = (chapters: Chapter[], currentChapter
       inheritable: false,
       position: 0,
       erased: false,
-    })),
-    edges: [],
-  };
+    }];
+    if (c.material) {
+      list.push({
+        id: `attr-material-${c.id}`,
+        nodeId: c.id,
+        type: 'label' as never,
+        name: 'material',
+        value: 'true',
+        inheritable: false,
+        position: 1,
+        erased: false,
+      });
+    }
+    return list;
+  });
+  return { nodes, attrs, edges: [] };
 }
 
 const escapeHtml = (text: string) =>

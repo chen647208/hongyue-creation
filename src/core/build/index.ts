@@ -20,9 +20,11 @@ export {
   htmlToDocxParagraphs,
 } from './package.js';
 export {
+  applyMaterialPolicy,
   type DocBlock,
   listRenderers,
   listTransformers,
+  type MaterialPolicy,
   registerRenderer,
   registerTransformer,
   renderDoc,

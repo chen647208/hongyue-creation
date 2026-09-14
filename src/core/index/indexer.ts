@@ -131,6 +131,10 @@ export function buildIndex(entities: BookEntities): IndexSnapshot {
     if (!tags.has(key)) tags.set(key, entry);
   };
 
+  /** 是否素材：material 属性为 'true'（缺失/非真即非素材）。字数口径据此剔除。 */
+  const isMaterial = (nodeId: string): boolean =>
+    getAttr(attrs, nodeId, 'material')?.value === 'true';
+
   // 第一遍：声明标签（@tag: 主名 | 别名）+ 卡片标题隐式标签
   for (const node of nodes) {
     const parsed = parseKeywords(node.body);
@@ -144,7 +148,7 @@ export function buildIndex(entities: BookEntities): IndexSnapshot {
     if (node.type.startsWith('card.') || node.type === 'meta.timeline-event') {
       addTag(node.title, { nodeId: node.id, displayName: node.title, aliases: [], kind: 'implicit' });
     }
-    wordCounts.set(node.id, countWords(node.body));
+    wordCounts.set(node.id, isMaterial(node.id) ? 0 : countWords(node.body));
   }
 
   const resolveTag = (target: string): TagEntry | undefined => {
@@ -194,6 +198,7 @@ export function buildIndex(entities: BookEntities): IndexSnapshot {
   const strandProgress = new Map<string, StrandStat>();
   for (const node of nodes) {
     if (node.type !== 'novel.scene' && node.type !== 'novel.chapter') continue;
+    if (isMaterial(node.id)) continue;
     const strandTags: string[] = [];
     const attr = getAttr(attrs, node.id, 'strand');
     if (attr) strandTags.push(attr.value);

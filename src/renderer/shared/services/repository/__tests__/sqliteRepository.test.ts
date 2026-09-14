@@ -213,6 +213,34 @@ for (const fixture of [nodeSqliteFixture, wasmFixture]) {
       expect(full?.chapters[0]?.content).toBe('乙书正文');
     });
 
+    it('wordCountCache 排除素材章节（45 §5）', async () => {
+      const a = project('a', { chapters: [chapter('a-c1', '第一章', '正文一')] });
+      const b = project('b', {
+        chapters: [
+          chapter('b-c1', '第一章', '正文一'),
+          { ...chapter('b-c2', '素材章', '素材正文'), material: true },
+        ],
+      });
+      await repo.saveAll(baseState([a, b]));
+      const loaded = await repo.loadAll();
+      const shellB = loaded!.projects.find(p => p.id === 'b')!;
+      expect(shellB.hydrated).toBe(false);
+      expect(shellB.wordCountCache).toBe(3);
+    });
+
+    it('码字统计（修订）排除素材章节（45 §5）', async () => {
+      const a = project('a', {
+        chapters: [
+          chapter('a-c1', '第一章', '正文一'),
+          { ...chapter('a-c2', '素材章', '素材正文'), material: true },
+        ],
+      });
+      await repo.saveAll(baseState([a]));
+      const stats = await repo.loadRevisionStats('a');
+      expect(stats.some(s => s.nodeId === 'a-c1')).toBe(true);
+      expect(stats.some(s => s.nodeId === 'a-c2')).toBe(false);
+    });
+
     it('未 hydrate 的书保存不会清空正文', async () => {
       const a = project('a', { chapters: [chapter('a-c1', '第一章', '甲书正文')] });
       const b = project('b', { chapters: [chapter('b-c1', '第一章', '乙书正文')] });

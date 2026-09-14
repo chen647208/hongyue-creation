@@ -185,7 +185,11 @@ export const SQL = {
   'nodes.selectAllLite': `SELECT id, book_id, type, title, path, created_at, updated_at, erased, hash FROM nodes`,
   'nodes.selectByBook': `SELECT * FROM nodes WHERE book_id = ?`,
   'nodes.selectByTitleLike': `SELECT id, type, title FROM nodes WHERE book_id = ? AND erased = 0 AND title LIKE ? ESCAPE '\\' LIMIT ?`,
-  'nodes.wordCountByBook': `SELECT book_id, SUM(length(body)) AS words FROM nodes WHERE type = 'novel.chapter' AND erased = 0 GROUP BY book_id`,
+  'nodes.wordCountByBook': `SELECT book_id, SUM(length(body)) AS words FROM nodes
+         WHERE type = 'novel.chapter' AND erased = 0
+           AND NOT EXISTS (SELECT 1 FROM attrs a
+                            WHERE a.node_id = nodes.id AND a.name = 'material' AND a.value = 'true' AND a.erased = 0)
+         GROUP BY book_id`,
   'nodes.selectDistinctBooks': `SELECT DISTINCT book_id FROM nodes`,
   'nodes.selectHashesByBook': `SELECT id, hash, body FROM nodes WHERE book_id = ?`,
   'nodes.deleteById': `DELETE FROM nodes WHERE id = ?`,
@@ -239,7 +243,10 @@ export const SQL = {
          WHERE n.book_id = ? ORDER BY r.created_at DESC, r.seq DESC LIMIT ?`,
   'revisions.selectStatsByBook': `SELECT r.node_id, r.created_at, length(r.body) AS len
          FROM revisions r JOIN nodes n ON n.id = r.node_id
-         WHERE n.book_id = ? ORDER BY r.created_at ASC, r.seq ASC`,
+         WHERE n.book_id = ?
+           AND NOT EXISTS (SELECT 1 FROM attrs a
+                            WHERE a.node_id = n.id AND a.name = 'material' AND a.value = 'true' AND a.erased = 0)
+         ORDER BY r.created_at ASC, r.seq ASC`,
 
   // ── entity_changes ──
   'changes.insert': `INSERT INTO entity_changes(entity_name, entity_id, hash, is_erased, instance_id, agent_id, utc_date_changed)
@@ -287,7 +294,9 @@ export const SQL = {
   'fts.deleteByBook': `DELETE FROM nodes_fts WHERE book_id = ?`,
   'fts.deleteAll': `DELETE FROM nodes_fts`,
   'fts.search': `SELECT book_id, node_id, type, title,
-              snippet(nodes_fts, 4, '[', ']', '…', 16) AS snip, rank
+              snippet(nodes_fts, 4, '[', ']', '…', 16) AS snip, rank,
+              EXISTS (SELECT 1 FROM attrs a
+                       WHERE a.node_id = nodes_fts.node_id AND a.name = 'material' AND a.value = 'true' AND a.erased = 0) AS material
          FROM nodes_fts
         WHERE nodes_fts MATCH ? AND (? IS NULL OR book_id = ?)
         ORDER BY rank LIMIT ?`,

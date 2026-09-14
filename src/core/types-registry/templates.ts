@@ -61,6 +61,7 @@ const NOVEL_TEMPLATES: TypeTemplate[] = [
       { key: 'wordGoal', label: '字数目标', type: 'number' },
       { key: 'setGoal', label: '场景地点', type: 'ref', refType: 'card.location' },
       { key: 'compile', label: '参与编译', type: 'enum', enum: ['yes', 'no'] },
+      { key: 'material', label: '素材', labelEn: 'Material', type: 'boolean' },
       { key: 'mainLocationId', label: '主要地点', type: 'ref', refType: 'card.location' },
       { key: 'involvedFactionIds', label: '涉及势力', type: 'list' },
       { key: 'timelineEventId', label: '时间线事件', type: 'ref', refType: 'meta.timeline-event' },

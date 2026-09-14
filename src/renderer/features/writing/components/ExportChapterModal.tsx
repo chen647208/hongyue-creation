@@ -166,8 +166,11 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
                     {isSelected && <Check className="size-3" />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h4 className={cn('truncate text-sm', isSelected ? 'font-medium text-foreground' : 'text-foreground/80')}>
-                      {t('export.chapterEntry', { num: chapter.order + 1, title: chapter.title })}
+                    <h4 className={cn('flex items-center gap-1.5 truncate text-sm', isSelected ? 'font-medium text-foreground' : 'text-foreground/80')}>
+                      <span className="truncate">{t('export.chapterEntry', { num: chapter.order + 1, title: chapter.title })}</span>
+                      {chapter.material && (
+                        <span className="shrink-0 rounded bg-primary/10 px-1 py-0.5 text-2xs text-primary">{t('navigation.materialBadge')}</span>
+                      )}
                     </h4>
                     <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">{t('export.wordCountLabel', { count: wordLength })}</p>
                   </div>

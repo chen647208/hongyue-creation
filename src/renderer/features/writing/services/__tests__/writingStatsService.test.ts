@@ -12,7 +12,7 @@ import { describe, expect,it } from 'vitest';
 
 import type { Project } from '../../../../../shared/types';
 import { projectToBuildEntities } from '../../utils';
-import { computeBookStats, computeChapterStats, formatCharCount } from '../writingStatsService';
+import { computeBookStats, computeChapterStats, countableChapters, formatCharCount } from '../writingStatsService';
 
 describe('computeChapterStats', () => {
   it('统计净字数/段落/句子', () => {
@@ -65,6 +65,29 @@ describe('computeBookStats', () => {
     const snap = { id: 's1', content: 'x'.repeat(500), timestamp: dayStart.getTime() + 60_000, charCount: 500, source: 'auto' as const };
     const p = project([chapter('c1', 'x'.repeat(100), [snap])]);
     expect(computeBookStats(p, now).todayCharCount).toBe(0);
+  });
+});
+
+describe('素材隔离（design/45 §5）', () => {
+  const project = (chapters: Project['chapters']): Project => ({ title: '书', chapters } as Project);
+  const chapter = (id: string, content: string, material = false): Project['chapters'][number] =>
+    ({ id, title: id, summary: '', content, order: 0, material });
+  const materialChapter = (id: string, content: string): Project['chapters'][number] =>
+    ({ id, title: id, summary: '', content, order: 0, material: true });
+
+  it('countableChapters 只保留非素材', () => {
+    const list = [chapter('c1', '一'), materialChapter('c2', '二')];
+    expect(countableChapters(list).map((c) => c.id)).toEqual(['c1']);
+  });
+
+  it('素材不计入总字数/完成章节数，成稿字数与剔除后一致', () => {
+    const withMaterial = project([chapter('c1', '一二三'), materialChapter('c2', '六七八九十')]);
+    const withoutMaterial = project([chapter('c1', '一二三')]);
+    const stats = computeBookStats(withMaterial);
+    expect(stats.chapterCount).toBe(2);
+    expect(stats.writtenChapterCount).toBe(1);
+    expect(stats.totalCharCount).toBe(3);
+    expect(stats.builtCharCount).toBe(computeBookStats(withoutMaterial).builtCharCount);
   });
 });
 

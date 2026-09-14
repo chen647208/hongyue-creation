@@ -11,6 +11,7 @@ import { MIN_SEARCH_QUERY_LENGTH } from '../../../../shared/constants/search';
 import { APP_STATE_VERSION } from '../../../../shared/constants/versions';
 import type { AppState, ConsistencyCheckConfig, ConsistencyCheckPromptTemplate,Project, StorageConfig } from '../../../../shared/types';
 import { storage } from '../storage';
+import { rankSearchHits } from './searchRank';
 import type { CommitOptions,SearchHit, SearchOptions, StorageRepository } from './types';
 
 /** 内存子串检索的片段窗口长度 */
@@ -99,7 +100,7 @@ export const jsonRepository: StorageRepository = {
       if (options?.projectId && project.id !== options.projectId) continue;
       for (const ch of project.chapters) {
         if (ch.content?.toLowerCase().includes(lower) || ch.title?.toLowerCase().includes(lower)) {
-          hits.push({ scope: 'chapter', projectId: project.id, id: ch.id, title: ch.title, snippet: makeSnippet(ch.content ?? '', q), rank: hits.length });
+          hits.push({ scope: 'chapter', projectId: project.id, id: ch.id, title: ch.title, snippet: makeSnippet(ch.content ?? '', q), rank: hits.length, material: Boolean(ch.material) });
         }
       }
       for (const item of project.knowledge ?? []) {
@@ -109,7 +110,7 @@ export const jsonRepository: StorageRepository = {
       }
       if (hits.length >= limit) break;
     }
-    return hits.slice(0, limit);
+    return rankSearchHits(hits, options?.preferMaterial).slice(0, limit);
   },
 
   exportAll: (state: AppState) => storage.exportData(state),

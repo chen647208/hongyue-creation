@@ -23,6 +23,11 @@ export interface BuildSelection {
   exclude: string[];
   /** 整类开关 */
   rootSwitches: { cards: boolean; meta: boolean };
+  /**
+   * 素材口径：exclude（默认）剔除标记为素材的节点；include 保留原序；
+   * prefer 保留并把素材排在非素材之前。缺席按 exclude。
+   */
+  materialPolicy?: 'exclude' | 'include' | 'prefer';
 }
 
 export interface BuildTransform {
@@ -73,6 +78,7 @@ export const DEFAULT_BUILD_PROFILE: BuildProfile = {
     includeInactive: false,
     exclude: [],
     rootSwitches: { cards: false, meta: false },
+    materialPolicy: 'exclude',
   },
   transform: {
     headings: { chapter: '%N、%T', scene: '* * *', hide: [], renumber: true },
@@ -91,6 +97,7 @@ export const COMPENDIUM_BUILD_PROFILE: BuildProfile = {
     includeInactive: true,
     exclude: [],
     rootSwitches: { cards: true, meta: true },
+    materialPolicy: 'prefer',
   },
   transform: {
     headings: { chapter: '【%T】', scene: '', hide: ['novel.chapter'], renumber: false },

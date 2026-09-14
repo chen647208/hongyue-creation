@@ -37,13 +37,13 @@ function vectorHitToSearchHit(result: SearchResult, rank: number): SearchHit {
  */
 export async function hybridSearch(
   query: string,
-  options?: { projectId?: string; limit?: number },
+  options?: { projectId?: string; limit?: number; preferMaterial?: boolean },
 ): Promise<SearchHit[]> {
   const limit = options?.limit ?? 50;
   const q = query.trim();
   if (q.length < MIN_SEARCH_QUERY_LENGTH) return [];
 
-  const fts = await repository.search(q, { limit: limit * 2 }).catch(() => [] as SearchHit[]);
+  const fts = await repository.search(q, { limit: limit * 2, preferMaterial: options?.preferMaterial }).catch(() => [] as SearchHit[]);
   if (!options?.projectId) return fts.slice(0, limit);
 
   let vector: SearchHit[] = [];

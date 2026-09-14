@@ -102,9 +102,13 @@ export async function importSyncBundle(): Promise<SyncApplyReport> {
     const hash = await hashEntity('attrs', attr);
     await db().run('attrs.upsert', [attr.id, attr.nodeId, attr.type, attr.name, attr.value, attr.inheritable ? 1 : 0, attr.position, attr.erased ? 1 : 0, hash]);
   }
+  for (const edge of report.insertEdges) {
+    const hash = await hashEntity('edges', edge);
+    await db().run('edges.upsert', [edge.id, edge.fromId, edge.toId, edge.kind, edge.role ?? null, edge.position, edge.bookId, edge.erased ? 1 : 0, hash]);
+  }
 
   return {
-    applied: report.applied.length,
+    applied: report.applied.length + report.insertEdges.length,
     conflictCopies: report.conflictCopies.map((c) => ({ id: c.node.id, title: c.node.title })),
     skipped: report.skipped.length,
     manual: report.manual.length,

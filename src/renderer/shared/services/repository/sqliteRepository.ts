@@ -34,6 +34,7 @@ import { logger } from '../../utils/logger';
 import { ensureBuiltinItemTypes } from './builtinTypes';
 import { jsonRepository } from './jsonRepository';
 import { META_KEYS,migrate, SCHEMA_VERSION,SETTING_KEYS } from './schema';
+import { rankSearchHits } from './searchRank';
 import type { AttachmentMeta,CommitOptions,DbEncryptionStatus, FieldDefinition, ItemTypeDefinition, OperationLogEntry, RevisionStat, SearchHit, SearchOptions, SequenceItem, SqlDriver, StorageRepository, ViewDefinition } from './types';
 
 /** 节点类型 → 检索 scope（与旧 chapters_fts/knowledge_fts 双域对齐） */
@@ -705,12 +706,14 @@ export class SqliteRepository implements StorageRepository {
     const limit = options?.limit ?? DEFAULT_SEARCH_LIMIT;
     const match = toFtsPhrase(q);
     const projectFilter = options?.projectId ?? null;
+    // 素材优先需要把可能落在截断线外的素材一并取回，再排序后截断
+    const sqlLimit = options?.preferMaterial ? limit * 3 : limit;
 
     const rows = await this.driver.all<{
-      book_id: string; node_id: string; type: string; title: string; snip: string; rank: number;
+      book_id: string; node_id: string; type: string; title: string; snip: string; rank: number; material: number;
     }>(
       'fts.search',
-      [match, projectFilter, projectFilter, limit]
+      [match, projectFilter, projectFilter, sqlLimit]
     );
 
     const hits: SearchHit[] = [];
@@ -724,10 +727,11 @@ export class SqliteRepository implements StorageRepository {
         title: r.title,
         snippet: r.snip,
         rank: Number(r.rank),
+        material: Number(r.material) === 1,
       });
     }
     hits.sort((a, b) => a.rank - b.rank);
-    return hits.slice(0, limit);
+    return rankSearchHits(hits, options?.preferMaterial).slice(0, limit);
   }
 
   // ========== 引擎无关：文件传输 / 存储配置（委托 JSON 后端） ==========

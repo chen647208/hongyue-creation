@@ -137,6 +137,28 @@ export function runStorageRepositoryContract(options: RepositoryContractOptions)
       expect(hits.some((h) => h.id === 'p1-c1')).toBe(true);
     });
 
+    it('素材标记随章节持久化往返', async () => {
+      const repo = await fresh();
+      const b = book('p1', '甲书');
+      b.chapters[0]!.material = true;
+      await repo.saveProject(b);
+      const loaded = await readBook(repo, 'p1');
+      expect(loaded?.chapters[0]?.material).toBe(true);
+    });
+
+    it('preferMaterial 把素材命中排在非素材之前并带 material 标记', async () => {
+      const repo = await fresh();
+      const b = book('p1', '甲书');
+      b.chapters = [
+        { id: 'p1-c1', title: '第一章', summary: '', content: '他走进了房间', order: 0 },
+        { id: 'p1-c2', title: '第二章', summary: '', content: '她走进了花园', order: 1, material: true },
+      ];
+      await repo.saveProject(b);
+      const hits = await repo.search('走进了', { preferMaterial: true });
+      expect(hits[0]?.id).toBe('p1-c2');
+      expect(hits[0]?.material).toBe(true);
+    });
+
     it('clear 后 loadAll 为 null', async () => {
       const repo = await fresh();
       await repo.saveAll(fullState([book('p1', '甲书')]));
