@@ -60,22 +60,26 @@ export function useBookActions(enterWorkspace: () => void): BookActions {
   }, [enterWorkspace]);
 
   const createBook = useCallback((title: string, description?: string, templateType?: BookTemplate, sourceBookId?: string) => {
-    const intro = description?.trim() || undefined;
-    let newBook: Project;
-    if (templateType === 'duplicate' && sourceBookId) {
-      const sourceBook = useProjectStore.getState().projects.find(p => p.id === sourceBookId);
-      newBook = sourceBook
-        ? cloneProject(sourceBook, title, intro ?? sourceBook.intro)
-        : emptyBook(title, intro);
-    } else if (templateType === 'example') {
-      newBook = buildExampleProject(title, intro ?? i18n.t('books:example.intro'));
-    } else if (templateType === 'screenplay' || templateType === 'bible' || templateType === 'storyboard' || templateType === 'comic') {
-      newBook = buildTemplatedProject(title, intro ?? '', templateType);
-    } else {
-      newBook = emptyBook(title, intro);
-    }
-    useProjectStore.getState().upsertProject(newBook);
-    enterWorkspace();
+    void (async () => {
+      const intro = description?.trim() || undefined;
+      let newBook: Project;
+      if (templateType === 'duplicate' && sourceBookId) {
+        // 惰性载入：复制前补全源书正文，避免复制出空书。
+        await useProjectStore.getState().hydrateAll([sourceBookId]);
+        const sourceBook = useProjectStore.getState().projects.find(p => p.id === sourceBookId);
+        newBook = sourceBook
+          ? cloneProject(sourceBook, title, intro ?? sourceBook.intro)
+          : emptyBook(title, intro);
+      } else if (templateType === 'example') {
+        newBook = buildExampleProject(title, intro ?? i18n.t('books:example.intro'));
+      } else if (templateType === 'screenplay' || templateType === 'bible' || templateType === 'storyboard' || templateType === 'comic') {
+        newBook = buildTemplatedProject(title, intro ?? '', templateType);
+      } else {
+        newBook = emptyBook(title, intro);
+      }
+      useProjectStore.getState().upsertProject(newBook);
+      enterWorkspace();
+    })();
   }, [enterWorkspace]);
 
   const createQuickBook = useCallback(() => {
@@ -145,19 +149,30 @@ export function useBookActions(enterWorkspace: () => void): BookActions {
   }, []);
 
   const duplicateBook = useCallback((bookId: string) => {
-    const sourceBook = useProjectStore.getState().projects.find(p => p.id === bookId);
-    if (!sourceBook) return;
-    useProjectStore.getState().upsertProject(
-      cloneProject(sourceBook, i18n.t('app:book.duplicateTitle', { title: sourceBook.title })),
-    );
-    enterWorkspace();
+    void (async () => {
+      // 惰性载入：复制前补全源书正文。
+      await useProjectStore.getState().hydrateAll([bookId]);
+      const sourceBook = useProjectStore.getState().projects.find(p => p.id === bookId);
+      if (!sourceBook) return;
+      useProjectStore.getState().upsertProject(
+        cloneProject(sourceBook, i18n.t('app:book.duplicateTitle', { title: sourceBook.title })),
+      );
+      enterWorkspace();
+    })();
   }, [enterWorkspace]);
 
   const exportBook = useCallback((book: Project) => {
-    void repository.exportBook(book).catch((error: unknown) => {
-      logger.error('Failed to export book:', error);
-      dialogService.alert(i18n.t('app:book.exportFailed', { message: error instanceof Error ? error.message : String(error) }));
-    });
+    void (async () => {
+      try {
+        // 惰性载入：导出前补全正文，避免导出空书。
+        await useProjectStore.getState().hydrateAll([book.id]);
+        const current = useProjectStore.getState().projects.find((item) => item.id === book.id) ?? book;
+        await repository.exportBook(current);
+      } catch (error) {
+        logger.error('Failed to export book:', error);
+        dialogService.alert(i18n.t('app:book.exportFailed', { message: error instanceof Error ? error.message : String(error) }));
+      }
+    })();
   }, []);
 
   const importBook = useCallback(async () => {

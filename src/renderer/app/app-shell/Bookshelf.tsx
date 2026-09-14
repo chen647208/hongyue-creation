@@ -84,6 +84,8 @@ interface BookshelfProps {
 
 /** 统计全书正文字数（CJK 按字符计）。 */
 function wordCount(book: Project): number {
+  // 惰性载入下未打开的书只有骨架：优先用库侧聚合的字数缓存。
+  if (book.hydrated === false && typeof book.wordCountCache === 'number') return book.wordCountCache;
   return book.chapters.reduce((sum, c) => sum + (c.content?.length ?? 0), 0);
 }
 

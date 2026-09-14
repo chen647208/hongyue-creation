@@ -192,7 +192,9 @@ export class SqliteRepository implements StorageRepository {
 
   async loadAll(): Promise<AppState | null> {
     await this.ready;
-    const nodeRows = await this.driver.all<NodeRow>('nodes.selectAll');
+    const nodeRows = await this.driver.all<NodeRow>('nodes.selectAllLite');
+    const wordRows = await this.driver.all<{ book_id: string; words: number }>('nodes.wordCountByBook');
+    const wordsByBook = new Map(wordRows.map((row) => [row.book_id, Number(row.words)]));
     const settingRows = await this.driver.all<{ key: string; value: string }>('settings.selectAll');
     const metaRows = await this.driver.all<{ key: string; value: string }>('meta.selectAll');
     if (nodeRows.length === 0 && settingRows.length === 0) return null;
@@ -220,7 +222,10 @@ export class SqliteRepository implements StorageRepository {
       // 索引是实体的派生缓存：冷启动从已加载实体全量重建（指纹短路避免重复 loadAll 重算）
       indexService.rebuild(bookId, group);
       try {
-        projects.push(entitiesToProject(group));
+        const project = entitiesToProject(group);
+        project.hydrated = false;
+        project.wordCountCache = wordsByBook.get(bookId) ?? 0;
+        projects.push(project);
       } catch (error) {
         logger.error(`[repository] 书 ${bookId} 投影失败，已跳过`, error);
       }
@@ -260,6 +265,15 @@ export class SqliteRepository implements StorageRepository {
     if (typeof editorFont === 'string' && editorFont.length > 0) state.editorFont = editorFont;
     const customFonts = parse<AppState['customFonts']>('customFonts');
     if (Array.isArray(customFonts)) state.customFonts = customFonts;
+
+    // 惰性载入：仅活动书当场 hydrate，其余保持骨架（打开时再载入）。
+    if (state.activeProjectId) {
+      const full = await this.loadBookContent(state.activeProjectId).catch(() => null);
+      if (full) {
+        const index = state.projects.findIndex((project) => project.id === full.id);
+        if (index >= 0) state.projects[index] = full;
+      }
+    }
     return state;
   }
 
@@ -968,7 +982,7 @@ interface RevisionRow {
 
 function rowToNode(r: NodeRow): NodeEntity {
   return {
-    id: r.id, type: r.type, title: r.title, bookId: r.book_id, body: r.body,
+    id: r.id, type: r.type, title: r.title, bookId: r.book_id, body: r.body ?? '',
     path: r.path ?? undefined, createdAt: Number(r.created_at), updatedAt: Number(r.updated_at),
     erased: r.erased === 1,
   };

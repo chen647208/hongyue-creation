@@ -252,6 +252,39 @@ for (const fixture of [nodeSqliteFixture, wasmFixture]) {
       expect(loaded!.projects.map(p => p.id).sort()).toEqual(['a', 'c']);
     });
 
+    it('惰性载入：非活动书只给骨架，loadBookContent 补全正文', async () => {
+      const a = project('a', { chapters: [chapter('a-c1', '第一章', '甲书正文')] });
+      const b = project('b', { chapters: [chapter('b-c1', '第一章', '乙书正文')] });
+      await repo.saveAll(baseState([a, b]));
+
+      const loaded = await repo.loadAll();
+      const active = loaded!.projects.find(p => p.id === 'a')!;
+      const inactive = loaded!.projects.find(p => p.id === 'b')!;
+      expect(active.hydrated).toBe(true);
+      expect(active.chapters[0]?.content).toBe('甲书正文');
+      expect(inactive.hydrated).toBe(false);
+      expect(inactive.chapters[0]?.content).toBe('');
+      expect(inactive.wordCountCache).toBeGreaterThan(0);
+
+      const full = await repo.loadBookContent('b');
+      expect(full?.hydrated).toBe(true);
+      expect(full?.chapters[0]?.content).toBe('乙书正文');
+    });
+
+    it('未 hydrate 的书保存不会清空正文', async () => {
+      const a = project('a', { chapters: [chapter('a-c1', '第一章', '甲书正文')] });
+      const b = project('b', { chapters: [chapter('b-c1', '第一章', '乙书正文')] });
+      await repo.saveAll(baseState([a, b]));
+
+      const loaded = await repo.loadAll();
+      const shellB = loaded!.projects.find(p => p.id === 'b')!;
+      expect(shellB.hydrated).toBe(false);
+      await repo.saveProject(shellB);
+
+      const full = await repo.loadBookContent('b');
+      expect(full?.chapters[0]?.content).toBe('乙书正文');
+    });
+
     it('差分保存：内容未变不写库，仅变更节点追加修订', async () => {
       const count = (sql: string, params: SqlValue[] = []): number =>
         rawAll<{ c: number }>(sql, params)[0]!.c;

@@ -133,6 +133,8 @@ async function doFlush(): Promise<void> {
 async function maybeAutoBackup(): Promise<void> {
   const config = await getCachedStorageConfig();
   if (!config.autoBackupEnabled || !autoBackupService.shouldPerformBackup(config)) return;
+  // 惰性载入：备份要含全部正文，落盘前先补载未打开的书。
+  await useProjectStore.getState().hydrateAll();
   const backedUp = await autoBackupService.performBackup(config, () => composeAppState());
   // 数据库一致副本（VACUUM INTO）：与 JSON 快照互补，含 WAL 中未 checkpoint 的数据。
   await repository.hotBackup?.(config.maxBackupFiles).catch((error) => {

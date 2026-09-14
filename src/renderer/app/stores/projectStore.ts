@@ -19,6 +19,7 @@ import { create } from 'zustand';
 
 import { type Project } from '../../../shared/types';
 import { i18n } from '../../i18n';
+import { repository } from '../../shared/services/repository';
 import type { CommitOptions } from '../../shared/services/repository/types';
 
 /**
@@ -37,6 +38,8 @@ interface ProjectState {
   /** 从 repository 载入的初始状态整体灌入（首启动/全量导入/删除后重定向）。 */
   hydrate: (projects: Project[], activeProjectId: string | null) => void;
   setActiveProject: (bookId: string | null) => void;
+  /** 惰性载入：补载指定书（缺省全部未载入书）的正文，导出/备份前调用。 */
+  hydrateAll: (bookIds?: string[]) => Promise<void>;
   /**
    * 更新活动书（无活动书时按旧语义创建默认书）；正文/大纲等编辑统一入口。
    * opts 标注变更来源（AI 落笔传 { agentId: 'ai:<来源>', cause }），绑定到新对象引用，
@@ -55,7 +58,20 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   projects: [],
   activeProjectId: null,
   hydrate: (projects, activeProjectId) => set({ projects, activeProjectId }),
-  setActiveProject: (bookId) => set({ activeProjectId: bookId }),
+  setActiveProject: (bookId) => {
+    set({ activeProjectId: bookId });
+    // 惰性载入：打开未 hydrate 的书时补载正文（等值写回，不会产生变更/修订）。
+    if (!bookId) return;
+    const book = get().projects.find((project) => project.id === bookId);
+    if (!book || book.hydrated !== false) return;
+    void repository
+      .loadBookContent?.(bookId)
+      .then((full) => {
+        if (!full) return;
+        set((state) => ({ projects: state.projects.map((project) => (project.id === bookId ? full : project)) }));
+      })
+      .catch(() => undefined);
+  },
 
   updateActiveProject: (updates, opts) => {
     const { activeProjectId, projects } = get();
@@ -114,6 +130,17 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         p.id === bookId ? { ...p, ...updates, lastModified: Date.now() } : p,
       ),
     })),
+
+  hydrateAll: async (bookIds) => {
+    if (!repository.loadBookContent) return;
+    const targets = get().projects.filter(
+      (project) => project.hydrated === false && (!bookIds || bookIds.includes(project.id)),
+    );
+    for (const book of targets) {
+      const full = await repository.loadBookContent(book.id).catch(() => null);
+      if (full) set((state) => ({ projects: state.projects.map((p) => (p.id === book.id ? full : p)) }));
+    }
+  },
 }));
 
 /** 便捷选择器：当前活动书（无则 null）。 */

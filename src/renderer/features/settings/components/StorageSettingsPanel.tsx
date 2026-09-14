@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 import { checkImportVersion,normalizeImportedState } from '@/app/initialState';
 import { composeAppState, seedPersistBaseline } from '@/app/stores/persistenceBridge';
+import { useProjectStore } from '@/app/stores/projectStore';
 import { hydrateStoresFromState } from '@/app/useAppBootstrap';
 import { useTranslation } from '@/i18n';
 import { autoBackupService } from '@/shared/services/autoBackupService';
@@ -93,8 +94,9 @@ const StorageSettingsPanel: React.FC<StorageSettingsPanelProps> = ({
   const handleManualBackup = async (): Promise<void> => {
     setBackupBusy(true);
     try {
-      const ok = await autoBackupService.performBackup(storageConfig, () => composeAppState());
-      dialogService.alert(t(ok ? 'storage.backupDone' : 'storage.backupFailed'));
+      // 惰性载入：手动备份前补载全部正文
+      await useProjectStore.getState().hydrateAll();
+      const ok = await autoBackupService.performBackup(storageConfig, () => composeAppState());      dialogService.alert(t(ok ? 'storage.backupDone' : 'storage.backupFailed'));
       reloadBackups();
     } catch (error) {
       logger.error('手动备份失败:', error);

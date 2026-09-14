@@ -751,6 +751,8 @@ export interface Project {
   timelineMarkers?: TimelineMarker[];
   /** 正文是否已载入（惰性载入标记；false = 仅骨架，写库前须守卫）。 */
   hydrated?: boolean;
+  /** 正文字数缓存（惰性载入时由库侧聚合，书库卡片展示用；非持久字段）。 */
+  wordCountCache?: number;
   /** 时间线轨道（缺席=单条主轨，免迁移）。 */
   timelineTracks?: TimelineTrackDef[];
   /** 写作计划/待办（选题→大纲→章节→修订→校验；缺席=[]，免迁移）。 */
