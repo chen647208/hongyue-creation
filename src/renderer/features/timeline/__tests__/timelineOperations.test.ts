@@ -10,7 +10,7 @@
 import type { Chapter } from '@shared/types';
 import { describe, expect, it } from 'vitest';
 
-import { insertClip, moveClip, overwriteClip, removeClip, slideClip, TimelineHistory } from '../timelineOperations';
+import { insertClip, MAX_TIMELINE_EDITS, moveClip, overwriteClip, removeClip, rollBoundary, sameChapters, slideClip, TimelineHistory, type TimelineHistoryState } from '../timelineOperations';
 
 function chapter(id: string, order: number, over: Partial<Chapter> = {}): Chapter {
   return { id, title: id, summary: '', content: '', order, ...over };
@@ -93,5 +93,93 @@ describe('TimelineHistory 撤销与重做', () => {
     const history = new TimelineHistory([chapter('c1', 0)]);
     expect(history.undo()).toBeNull();
     expect(history.redo()).toBeNull();
+  });
+});
+
+describe('卷动相邻边界', () => {
+  it('同时调整两段时长，总时长不变且其余片段不动', () => {
+    const base = [chapter('c1', 0, { duration: 2 }), chapter('c2', 1, { duration: 3 }), chapter('c3', 2, { duration: 1 })];
+    const next = rollBoundary(base, 'c1', 0.5);
+    expect(next.find((c) => c.id === 'c1')?.duration).toBe(2.5);
+    expect(next.find((c) => c.id === 'c2')?.duration).toBe(2.5);
+    expect(next.find((c) => c.id === 'c3')?.duration).toBe(1);
+    const total = (chapters: Chapter[]): number => chapters.reduce((sum, c) => sum + (c.duration ?? 1), 0);
+    expect(total(next)).toBe(total(base));
+  });
+
+  it('夹在两侧最小长度范围内', () => {
+    const base = [chapter('c1', 0, { duration: 1 }), chapter('c2', 1, { duration: 1 })];
+    const grow = rollBoundary(base, 'c1', 100);
+    expect(grow.find((c) => c.id === 'c2')?.duration).toBeGreaterThanOrEqual(0.25);
+    const shrink = rollBoundary(base, 'c1', -100);
+    expect(shrink.find((c) => c.id === 'c1')?.duration).toBeGreaterThanOrEqual(0.25);
+  });
+
+  it('同轨后继才卷动：跨轨或末尾原样返回', () => {
+    const base = [chapter('c1', 0, { duration: 1, trackId: 'a' }), chapter('c2', 1, { duration: 1, trackId: 'b' })];
+    expect(rollBoundary(base, 'c1', 0.5)).toBe(base);
+  });
+
+  it('卷动作为一次可撤销编辑入栈', () => {
+    const base = [chapter('c1', 0, { duration: 2 }), chapter('c2', 1, { duration: 2 })];
+    const history = new TimelineHistory(base);
+    const after = rollBoundary(base, 'c1', 0.5);
+    history.record({ kind: 'roll', label: '卷动边界', author: 'user' }, after);
+    expect(history.current).toEqual(after);
+    expect(history.undo()).toEqual(base);
+  });
+});
+
+describe('撤销栈与外部写入', () => {
+  it('外部写入登记为可撤销编辑，撤销回到外部写入之前', () => {
+    const base = [chapter('c1', 0, { content: '原文' })];
+    const external = [chapter('c1', 0, { content: 'AI 改过' })];
+    const history = new TimelineHistory(base);
+    const edit = history.recordExternal(external, '外部改动');
+    expect(edit?.author).toBe('external');
+    expect(history.canUndo).toBe(true);
+    expect(history.undo()).toEqual(base);
+    expect(history.redo()).toEqual(external);
+  });
+
+  it('与当前状态等价的外部写入不入栈', () => {
+    const base = [chapter('c1', 0, { content: '原文' })];
+    const history = new TimelineHistory(base);
+    expect(history.recordExternal(base)).toBeNull();
+    expect(history.canUndo).toBe(false);
+  });
+
+  it('sameChapters 引用快路径与按值比较', () => {
+    const a = [chapter('c1', 0, { content: 'x' })];
+    expect(sameChapters(a, a)).toBe(true);
+    expect(sameChapters(a, [chapter('c1', 0, { content: 'x' })])).toBe(true);
+    expect(sameChapters(a, [chapter('c1', 0, { content: 'y' })])).toBe(false);
+  });
+
+  it('序列化往返保留撤销与重做能力', () => {
+    const base = [chapter('c1', 0)];
+    const history = new TimelineHistory(base);
+    const after = insertClip(base, { index: 1, chapter: chapter('cN', 0), mode: 'ripple' });
+    history.record({ kind: 'insert', label: '插入', author: 'user' }, after);
+    history.undo();
+    const restored = TimelineHistory.fromJSON(JSON.parse(JSON.stringify(history.toJSON())) as TimelineHistoryState);
+    expect(restored.current).toEqual(base);
+    expect(restored.canRedo).toBe(true);
+    expect(restored.redo()).toEqual(after);
+  });
+
+  it('编辑条数超过上限时丢弃最旧一条并前移基线', () => {
+    const base = [chapter('c1', 0)];
+    const history = new TimelineHistory(base);
+    for (let index = 0; index < MAX_TIMELINE_EDITS; index += 1) {
+      history.record({ kind: 'move', label: `e${index}`, author: 'user' }, [chapter('c1', 0, { tension: index / MAX_TIMELINE_EDITS })]);
+    }
+    const first = history.list()[0];
+    history.record({ kind: 'move', label: 'overflow', author: 'user' }, [chapter('c1', 0, { tension: 1 })]);
+    expect(history.list()).toHaveLength(MAX_TIMELINE_EDITS);
+    expect(history.list()[0]?.label).not.toBe(first?.label);
+    // 最旧一条被丢弃后，撤销到底回到它的 before（前移后的基线）
+    for (let index = 0; index < MAX_TIMELINE_EDITS; index += 1) history.undo();
+    expect(history.current).toBeDefined();
   });
 });

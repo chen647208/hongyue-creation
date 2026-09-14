@@ -193,6 +193,10 @@
     "draftDiscard": "放弃",
     "draftSkipped": "已有细纲，跳过",
     "draftApplied": "已写入 {{count}} 章细纲",
-    "draftNoneSelected": "没有可写入的细纲（已有细纲的章节不会被覆盖）。"
+    "draftNoneSelected": "没有可写入的细纲（已有细纲的章节不会被覆盖）。",
+    "draftEditLabel": "编辑该章细纲草稿",
+    "extractBatchProgress": "已提取 {{done}}/{{total}} 批",
+    "extractContinue": "续提剩余批次",
+    "extractPartial": "已完成 {{done}}/{{total}} 批，剩余可在预览中续提。失败：{{error}}"
   }
 }

@@ -205,6 +205,8 @@ export interface Chapter {
   snapshots?: ChapterSnapshot[]; // 手动编辑快照（用于误删/回退恢复）
   /** 行内批注（侧车标注层，缺席=[]，免迁移）：不进入正文、字数与导出。 */
   annotations?: ChapterAnnotation[];
+  /** 修订对比中间态（侧车字段，缺席=无进行中对比，免迁移）：基线选择 + 逐处接受/拒绝，重开页面可续审。 */
+  revisionReview?: RevisionReviewState;
   
   // ===== 世界观关联字段（Phase 1 Integration）=====
   /** 主要发生地点ID */
@@ -233,6 +235,22 @@ export interface ChapterSnapshot {
   charCount: number;
   /** 快照来源：自动定时 / 手动 / 清空前 / 回滚前 */
   source: 'auto' | 'manual' | 'before-clear' | 'before-rollback';
+}
+
+/** 修订对比里一处改动的处理决定：接受=采用基线该段；拒绝=保留当前该段。 */
+export type RevisionDecision = 'accept' | 'reject';
+
+/**
+ * 修订对比中间态（侧车，随章节序列化）：选定基线与逐处决定。
+ * 基线文本随字段保存，来源快照/修订被删也能续审；缺省不写，免迁移。
+ */
+export interface RevisionReviewState {
+  /** 基线来源标签（快照时间或修订序号），仅用于界面展示。 */
+  label: string;
+  /** 基线文本（选定版本的完整内容）。 */
+  baseline: string;
+  /** 改动处 id（`h0`、`h1`…）→ 决定；缺省视为拒绝（保留当前）。 */
+  decisions: Record<string, RevisionDecision>;
 }
 
 /**
@@ -790,6 +808,87 @@ export interface Reference {
   updatedAt?: number;
 }
 
+// ========== 分支叙事数据模型（docs/design/42 §1–§4） ==========
+
+/** 分支变量类型（受限子集）。 */
+export type BranchVariableType = 'number' | 'boolean' | 'string';
+
+/** 作品级分支变量声明。 */
+export interface BranchVariableDef {
+  name: string;
+  type?: BranchVariableType;
+  /** 初值（number 用 0，boolean 用 0/1）。 */
+  initial?: number;
+}
+
+/** 场景上的选择项：文案 + 条件 + 目标场景 id。 */
+export interface BranchChoiceDef {
+  text: string;
+  target: string;
+  /** 条件表达式（受限子集）；缺席即恒真。 */
+  condition?: string;
+}
+
+/** 分支场景：场景即节点，选择项为节点属性。 */
+export interface BranchSceneDef {
+  id: string;
+  title: string;
+  choices?: BranchChoiceDef[];
+  /** 结局标记；结局可无出口。 */
+  ending?: boolean;
+  /** 场景正文（设计稿文本）。 */
+  body?: string;
+}
+
+/** 分支模型：落在 Project 上的真实数据，视图与校验由此投影。 */
+export interface BranchingModel {
+  /** 起点场景 id；缺席取首个场景。 */
+  startId?: string;
+  variables?: BranchVariableDef[];
+  scenes: BranchSceneDef[];
+}
+
+// ========== 对照视图数据模型（docs/design/41 §4） ==========
+
+/** 一对原文/译文段落：关系存为段落间的关联，不改正文结构。 */
+export interface TranslationPair {
+  id: string;
+  /** 原文段落。 */
+  source: string;
+  /** 译文段落。 */
+  target: string;
+  /** 原文段落块锚（可选，用于正文变动后重新定位）。 */
+  sourceBlockId?: string;
+  /** 逐段确认状态。 */
+  confirmed: boolean;
+}
+
+/** 对照文档：段落对齐与确认状态（侧车，不进入正文与导出）。 */
+export interface TranslationAlignment {
+  pairs: TranslationPair[];
+}
+
+// ========== 绘本数据模型（docs/design/42 §6） ==========
+
+/** 绘本页：页序复用顺序层，图位为占位属性（可替换图引用）。 */
+export interface PictureBookPage {
+  id: string;
+  title: string;
+  /** 图位引用（知识库条目 id 或外部资源标识）；缺席即占位。 */
+  imageId?: string;
+  /** 图位替代文本（缺图与无障碍读取）。 */
+  imageAlt?: string;
+  /** 图注。 */
+  caption?: string;
+  /** 页面文字。 */
+  text: string;
+}
+
+/** 绘本：页结构 + 图位。 */
+export interface PictureBook {
+  pages: PictureBookPage[];
+}
+
 // ========== 项目数据模型 ==========
 
 export interface Project {
@@ -834,6 +933,12 @@ export interface Project {
   groups?: ContentGroup[];
   /** 参考文献来源条目（非虚构/论文；缺席=[]，免迁移）。 */
   references?: Reference[];
+  /** 分支叙事模型（游戏叙事/互动小说；缺席=无分支，免迁移）。 */
+  branching?: BranchingModel;
+  /** 译文/原文对照与逐段确认（侧车；缺席=无对照，免迁移）。 */
+  translation?: TranslationAlignment;
+  /** 绘本页结构与图位（缺席=无绘本，免迁移）。 */
+  pictureBook?: PictureBook;
 }
 
 /** 写作计划阶段（对应创作工作流）。 */

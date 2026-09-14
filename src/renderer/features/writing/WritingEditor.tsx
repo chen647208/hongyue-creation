@@ -19,6 +19,7 @@ import { buildBlockTextMap, resolveAnnotation } from '@/editor/annotations';
 import { buildBlockRefIndex, resolveBlockProjection } from '@/editor/blockRefs';
 import { useViewportTier } from '@/shared/hooks/useViewportTier';
 import { dialogService } from '@/shared/services/dialogService';
+import { resetEditorContext, setEditorContext } from '@/shared/services/editorContextService';
 import { onEditorOps } from '@/shared/services/editorOps';
 import { openForeshadows, overdueForeshadows } from '@/shared/services/foreshadowService';
 import { localStore } from '@/shared/services/localStore';
@@ -85,6 +86,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
       cause: template.id,
     });
   const [activeChapterId, setActiveChapterId] = useState<string | null>(initialChapterId || null);
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => !isMobile);
   const [lastSaved, setLastSaved] = useState<number>(Date.now());
   const [saveDirty, setSaveDirty] = useState(false);
@@ -206,6 +208,17 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
       .filter((r) => r.status === 'anchored')
       .map((r) => ({ annotationId: r.annotationId, blockId: r.blockId, start: r.start, end: r.end }));
   }, [activeChapter, annotationBlockTexts]);
+
+  // 正文批注高亮点击：高亮左栏对应线程并确保面板可见（窄视口为抽屉）。
+  const handleAnnotationClick = useCallback((annotationId: string) => {
+    setActiveAnnotationId(annotationId);
+    setIsSidebarOpen(true);
+  }, []);
+
+  // 换章后旧的定位高亮失效
+  useEffect(() => {
+    setActiveAnnotationId(null);
+  }, [activeChapterId]);
 
   const handleAddAnnotation = () => {
     const anchor = editorRef.current?.getSelectionAnchor();
@@ -370,6 +383,15 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
     handleMouseMove,
   } = useSelectionMenu(editorRef, selectionBlocked);
 
+  // 向助手暴露当前活动章节与选中文本（上下文注入按真实状态装配，不靠任务文本反推）
+  useEffect(() => {
+    setEditorContext({
+      chapterId: activeChapterId ?? undefined,
+      selectionText: selectedText || undefined,
+    });
+    return () => resetEditorContext();
+  }, [activeChapterId, selectedText]);
+
   // 插件编辑器扩展请求的受控操作（design/22 §4）：应用到编辑器
   useEffect(() => onEditorOps((ops) => {
     const handle = editorRef.current;
@@ -493,6 +515,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
         activeChapterId,
         annotations: annotationController.annotations,
         blockTexts: annotationBlockTexts,
+        activeAnnotationId,
         onJump: handleJumpToBlock,
         onAddFromSelection: handleAddAnnotation,
         onReply: annotationController.reply,
@@ -720,6 +743,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
           onOpenSource={handleJumpToBlock}
           onActiveBlockChange={setActiveBlockId}
           annotations={annotationInputs}
+          onAnnotationClick={handleAnnotationClick}
           onStopStreaming={gen.stopStreaming}
           onStopBatchGeneration={gen.stopBatchGeneration}
           streamingTokens={gen.streamingTokens}

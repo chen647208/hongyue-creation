@@ -71,9 +71,12 @@ export async function buildSyncBundle(bookId: string): Promise<{ bundle: SyncBun
   return { bundle, changeCount: changes.length };
 }
 
-/** 同步对象在传输后端上的默认键；多书共用一个传输目录。 */
+/** 同步对象在传输后端上的公共前缀；多书共用一个传输目录。 */
+export const SYNC_OBJECT_PREFIX = 'hongyue-sync/';
+
+/** 同步对象在传输后端上的默认键。 */
 export function syncObjectKey(bookId: string): string {
-  return `hongyue-sync/${bookId}.json`;
+  return `${SYNC_OBJECT_PREFIX}${bookId}.json`;
 }
 
 /** 导出某本书的同步包（JSON），写入用户选择的路径。 */
@@ -146,6 +149,8 @@ export interface SyncMergePlan {
 
 export interface SyncApplyReport {
   applied: number;
+  /** 本次写入的属性数（新节点随迁 + 既有节点新增补插）。 */
+  appliedAttrs: number;
   conflictCopies: Array<{ id: string; title: string }>;
   skipped: number;
   manual: number;
@@ -204,6 +209,11 @@ export async function prepareDownloadBundle(
   const raw = await getSyncObject(config, key, options);
   if (raw === null || raw === undefined) throw new Error(`远端不存在同步包：${key}`);
   return prepareSync(JSON.parse(raw) as SyncBundle);
+}
+
+/** 用已持有的同步包重新预合并（重解已登记冲突，无需重新导入整包）。 */
+export async function prepareBundlePlan(bundle: SyncBundle): Promise<SyncMergePlan> {
+  return prepareSync(bundle);
 }
 
 async function upsertNode(node: NodeEntity): Promise<void> {
@@ -287,6 +297,7 @@ export async function applySyncPlan(plan: SyncMergePlan, policy: SyncConflictPol
 
   return {
     applied: baseNodes.length + report.insertEdges.length,
+    appliedAttrs: baseAttrs.length,
     conflictCopies: policy === 'keep-copy'
       ? report.conflictCopies.map((c) => ({ id: c.node.id, title: c.node.title }))
       : [],

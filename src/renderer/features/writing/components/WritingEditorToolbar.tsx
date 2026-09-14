@@ -278,7 +278,7 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
           className="absolute inset-x-0 bottom-0"
           title={`${chapterStats.charCount}/${targetWordCount}`}
         >
-          <Progress value={Math.round(progress * 100)} className="h-0.5 rounded-none bg-muted" />
+          <Progress value={Math.round(progress * 100)} className="h-0.5 rounded-none bg-muted" aria-label={`${chapterStats.charCount}/${targetWordCount}`} />
         </div>
       )}
     </PageHeader>

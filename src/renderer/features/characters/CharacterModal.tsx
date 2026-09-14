@@ -7,6 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import { indexService } from '@core/index';
 import { BookOpen, Brain, Check, Download, Eye, IdCard, LineChart, ScrollText, Share2, Shield, UserRound } from 'lucide-react';
 import React from 'react';
 
@@ -29,7 +30,7 @@ import { type Character, type Project } from '../../../shared/types';
 import { exportCharacterCard } from './characterCard';
 import { BirthInfoEditor } from './components/BirthInfoEditor';
 import { WorldRelationEditor } from './components/WorldRelationEditor';
-import { findCharacterAppearances } from './services/characterAppearance';
+import { characterAliasesFromIndex, findCharacterAppearances } from './services/characterAppearance';
 import { generateName } from './services/nameGeneratorService';
 
 interface CharacterModalProps {
@@ -54,10 +55,12 @@ function SectionTitle({ icon: Icon, children }: { icon: React.ComponentType<{ cl
 
 const CharacterModal: React.FC<CharacterModalProps> = ({ character, project, isOpen, onClose, onUpdate, onNavigateToChapter }) => {
   const { t } = useTranslation('characters');
-  const appearances = React.useMemo(
-    () => findCharacterAppearances(character.name, project.chapters ?? []),
-    [character.name, project.chapters],
-  );
+  // 别名取自派生索引（标签声明与引用原文）；legacy 角色对象无别名时退化为仅按名匹配。
+  const appearances = React.useMemo(() => {
+    const snapshot = indexService.snapshot(project.id);
+    const aliases = snapshot ? characterAliasesFromIndex(character.name, snapshot) : [];
+    return findCharacterAppearances(character.name, project.chapters ?? [], aliases);
+  }, [character.name, project.id, project.chapters]);
 
   return (
     <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
@@ -90,6 +93,7 @@ const CharacterModal: React.FC<CharacterModalProps> = ({ character, project, isO
                   <Select
                     value={character.role}
                     onChange={(e) => onUpdate({ role: normalizeRoleId(e.target.value) })}
+                    aria-label={t('modal.roleLabel')}
                   >
                     {/* value 存枚举 id，仅展示文案走 i18n */}
                     <option value="protagonist">{t('modal.roleOptions.protagonist')}</option>
@@ -103,6 +107,7 @@ const CharacterModal: React.FC<CharacterModalProps> = ({ character, project, isO
                   <Select
                     value={character.gender}
                     onChange={(e) => onUpdate({ gender: normalizeGenderId(e.target.value) })}
+                    aria-label={t('modal.genderLabel')}
                   >
                     <option value="male">{t('modal.genderOptions.male')}</option>
                     <option value="female">{t('modal.genderOptions.female')}</option>

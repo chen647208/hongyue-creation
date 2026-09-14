@@ -9,7 +9,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Chapter } from '../../../../shared/types';
-import { findCharacterAppearances } from '../services/characterAppearance';
+import {
+  characterAliasesFromIndex,
+  findCharacterAppearances,
+  normalizeAppearanceNames,
+} from '../services/characterAppearance';
 
 const chapter = (over: Partial<Chapter>): Pick<Chapter, 'id' | 'title' | 'order' | 'content'> => ({
   id: 'ch',
@@ -76,5 +80,66 @@ describe('findCharacterAppearances', () => {
   it('空内容章节不产生命中', () => {
     const chapters = [chapter({ id: 'empty', content: '' })];
     expect(findCharacterAppearances('林砚', chapters)).toEqual([]);
+  });
+
+  it('别名同样计入登场与提及数', () => {
+    const chapters = [
+      chapter({ id: 'a', title: '开端', order: 0, content: '林砚走进雾港。' }),
+      chapter({ id: 'b', title: '重逢', order: 1, content: '林师兄回头，林砚点头。' }),
+    ];
+    const appearances = findCharacterAppearances('林砚', chapters, ['林师兄']);
+    expect(appearances).toEqual([
+      { chapterId: 'a', title: '开端', order: 0, mentions: 1 },
+      { chapterId: 'b', title: '重逢', order: 1, mentions: 2 },
+    ]);
+  });
+
+  it('别名去重且忽略空名，主名不重复计数', () => {
+    const chapters = [chapter({ id: 'a', content: '林砚' })];
+    expect(findCharacterAppearances('林砚', chapters, [' 林砚 ', '', '  '])).toEqual([
+      { chapterId: 'a', title: '章', order: 0, mentions: 1 },
+    ]);
+  });
+});
+
+describe('normalizeAppearanceNames', () => {
+  it('裁剪去重并保持主名在前', () => {
+    expect(normalizeAppearanceNames(' 林砚 ', ['林师兄', '林砚', '  '])).toEqual(['林砚', '林师兄']);
+  });
+
+  it('全空返回空数组', () => {
+    expect(normalizeAppearanceNames('  ', ['', ' '])).toEqual([]);
+  });
+});
+
+describe('characterAliasesFromIndex', () => {
+  it('主名命中标签声明时取其别名', () => {
+    const source = {
+      tags: new Map([['林砚', { displayName: '林砚', aliases: ['林师兄', '小砚'] }]]),
+      refs: new Map([['林砚', [{ target: '林师兄' }]]]),
+    };
+    expect(characterAliasesFromIndex('林砚', source).sort()).toEqual(['小砚', '林师兄'].sort());
+  });
+
+  it('角色名本身是别名时取主名与其余别名', () => {
+    const source = {
+      tags: new Map([['林砚', { displayName: '林砚', aliases: ['林师兄', '小砚'] }]]),
+      refs: new Map(),
+    };
+    expect(characterAliasesFromIndex('林师兄', source).sort()).toEqual(['小砚', '林砚'].sort());
+  });
+
+  it('引用原文里的别名也纳入', () => {
+    const source = {
+      tags: new Map([['苏墨', { displayName: '苏墨', aliases: [] }]]),
+      refs: new Map([['苏墨', [{ target: '墨先生' }, { target: '苏墨' }]]]),
+    };
+    expect(characterAliasesFromIndex('苏墨', source)).toEqual(['墨先生']);
+  });
+
+  it('空名或索引缺失返回空数组', () => {
+    const empty = { tags: new Map(), refs: new Map() };
+    expect(characterAliasesFromIndex('  ', empty)).toEqual([]);
+    expect(characterAliasesFromIndex('无人', empty)).toEqual([]);
   });
 });

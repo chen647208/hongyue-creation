@@ -113,7 +113,7 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">{t('tools.format.paper')}</span>
-            <Select value={paper} onChange={(event) => onPaperChange(event.target.value as PaperStyle)} className="h-8 w-28 text-xs">
+            <Select value={paper} onChange={(event) => onPaperChange(event.target.value as PaperStyle)} className="h-8 w-28 text-xs" aria-label={t('tools.format.paper')}>
               <option value="plain">{t('tools.format.paperPlain')}</option>
               <option value="grid">{t('tools.format.paperGrid')}</option>
               <option value="lined">{t('tools.format.paperLined')}</option>

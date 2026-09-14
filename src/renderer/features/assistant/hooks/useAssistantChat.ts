@@ -12,7 +12,7 @@
  * 会话记忆、卡片模板选择。卡片落库经 addCardToProject 回调交回组件（保持归因与审批语义）。
  */
 import type { Citation, ContextInjectionResult } from '@core/ai';
-import { inferContextTarget } from '@core/ai';
+import { composeContextTarget } from '@core/ai';
 import { indexService } from '@core/index';
 import type { TFunction } from 'i18next';
 import { useEffect, useRef, useState } from 'react';
@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AICardCommandService } from '@/shared/services/cards/aiCardCommandService';
 import { AICardCreationService } from '@/shared/services/cards/aiCardCreationService';
 import { getDefaultCardPrompts } from '@/shared/services/cards/cardPromptService';
+import { getEditorContext } from '@/shared/services/editorContextService';
 import { isModelUsable } from '@/shared/utils/modelReadiness';
 
 import { ATTACHMENT_TRUNCATE } from '../../../../shared/constants/chapters';
@@ -259,8 +260,8 @@ export function useAssistantChat({
         fallbackModel: models.find((m) => m.id !== activeModel?.id && m.isEnabled !== false && isModelUsable(m)),
         history,
         images,
-        // 上下文注入（design/37）：按任务文本推断章节/实体目标，开关与单条关闭由此透传
-        contextTarget: inferContextTarget(project, text),
+        // 上下文注入（design/37）：编辑器真实状态（活动章节/选中实体）优先于任务文本推断
+        contextTarget: composeContextTarget(project, text, getEditorContext()),
         injectionEnabled,
         disabledInjectionIds,
         cardTemplate: selectedCardTemplateId

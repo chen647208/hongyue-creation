@@ -134,6 +134,7 @@
     "availablePlaceholders": "Available placeholders: {content}, {title}, {summary}",
     "deleteTemplate": "Delete this template",
     "addTemplate": "Add custom prompt template",
+    "categoryLabel": "Category",
     "category": {
       "inspiration": "Inspiration",
       "character": "Character",
@@ -175,6 +176,7 @@
   "models": {
     "namePlaceholder": "Name this model...",
     "activeBadge": "Active",
+    "setActiveLabel": "Set as active model",
     "deploymentLocal": "Local",
     "deploymentCloud": "Cloud",
     "deleteTitle": "Delete this model",
@@ -632,6 +634,16 @@
     "testFail": "Connection failed: {{error}}",
     "exitExportLabel": "Export bundle on exit",
     "exitExportHint": "Upload each book's sync bundle to the transport above when the app quits. Failures are recorded and shown on next start.",
+    "exitExportBooks": "Books included on exit",
+    "exitExportAllBooks": "All books",
+    "exitExportNoBooks": "No books yet.",
+    "remoteShow": "Browse remote folder",
+    "remoteHide": "Hide remote folder",
+    "remoteLoading": "Loading…",
+    "remoteEmpty": "No sync bundles on the remote yet.",
+    "remoteFailed": "Failed to load: {{error}}",
+    "remoteRemove": "Delete",
+    "remoteRemoveConfirm": "Delete remote object {{key}}? This cannot be undone.",
     "desktopOnly": "Sync transport is available on desktop only."
   }
 }

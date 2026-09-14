@@ -193,6 +193,10 @@
     "draftDiscard": "Discard",
     "draftSkipped": "Already has outline, skipped",
     "draftApplied": "Wrote outlines for {{count}} chapters",
-    "draftNoneSelected": "No outline to write (chapters with an existing outline are never overwritten)."
+    "draftNoneSelected": "No outline to write (chapters with an existing outline are never overwritten).",
+    "draftEditLabel": "Edit this chapter's outline draft",
+    "extractBatchProgress": "Extracted {{done}}/{{total}} batches",
+    "extractContinue": "Continue remaining batches",
+    "extractPartial": "Completed {{done}}/{{total}} batches; continue the rest from the preview. Error: {{error}}"
   }
 }

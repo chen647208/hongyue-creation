@@ -323,6 +323,8 @@
     "label": "AI trial: {{label}}",
     "rollback": "Back to before task",
     "confirm": "Confirm rollback",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "pickStep": "Pick a rollback step",
+    "step": "Step {{n}}: {{label}}"
   }
 }

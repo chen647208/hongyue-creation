@@ -15,12 +15,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   defaultSyncTransportConfig,
+  listSyncObjects,
   loadSyncTransportConfig,
+  removeSyncObject,
   retryAsync,
   saveSyncTransportConfig,
   storeSyncTransportSecret,
   SYNC_SECRET_IDS,
   testSyncTransport,
+  withTimeout,
 } from '../syncTransportService';
 
 afterEach(() => {
@@ -71,6 +74,31 @@ describe('凭据与连通测试', () => {
     const testTransport = vi.fn(async () => ({ ok: false, message: '认证失败' }));
     setElectronAPI({ sync: { testTransport } });
     expect(await testSyncTransport(defaultSyncTransportConfig())).toEqual({ ok: false, message: '认证失败' });
+  });
+});
+
+describe('远端目录 list / remove', () => {
+  it('列出对象与删除对象都委托主进程', async () => {
+    const list = vi.fn(async () => [{ key: 'hongyue-sync/b1.json', size: 12 }]);
+    const remove = vi.fn(async () => ({ ok: true }));
+    setElectronAPI({ sync: { list, remove } });
+
+    const objects = await listSyncObjects(defaultSyncTransportConfig(), 'hongyue-sync/', { maxAttempts: 1 });
+    expect(objects).toEqual([{ key: 'hongyue-sync/b1.json', size: 12 }]);
+    expect(list).toHaveBeenCalledWith(defaultSyncTransportConfig(), 'hongyue-sync/');
+
+    await removeSyncObject(defaultSyncTransportConfig(), 'hongyue-sync/b1.json', { maxAttempts: 1 });
+    expect(remove).toHaveBeenCalledWith(defaultSyncTransportConfig(), 'hongyue-sync/b1.json');
+  });
+});
+
+describe('withTimeout', () => {
+  it('超时抛出可读错误', async () => {
+    await expect(withTimeout(new Promise(() => {}), 0, '上传超时')).rejects.toThrow('上传超时');
+  });
+
+  it('未超时透传结果', async () => {
+    await expect(withTimeout(Promise.resolve('ok'), 1000)).resolves.toBe('ok');
   });
 });
 

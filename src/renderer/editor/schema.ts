@@ -251,6 +251,8 @@ export interface NovelExtensionOptions {
   onOpenSource?: (id: string) => void;
   /** 待装饰的批注范围读取器（缺省不装饰）。 */
   getAnnotations?: () => readonly AnnotationDecorationInput[];
+  /** 点击批注高亮回调（缺省不处理）。 */
+  onAnnotationClick?: (annotationId: string) => void;
 }
 
 export function createNovelExtensions(options: NovelExtensionOptions = {}): Extensions {
@@ -274,7 +276,10 @@ export function createNovelExtensions(options: NovelExtensionOptions = {}): Exte
       onOpenSource: options.onOpenSource ?? (() => { /* 未接线时静默 */ }),
     }),
     BlockRefDecorations.configure({ resolveBlock: options.resolveBlock ?? (() => null) }),
-    AnnotationDecorations.configure({ getAnnotations: options.getAnnotations ?? (() => []) }),
+    AnnotationDecorations.configure({
+      getAnnotations: options.getAnnotations ?? (() => []),
+      onAnnotationClick: options.onAnnotationClick,
+    }),
     BlockId,
   ];
 }

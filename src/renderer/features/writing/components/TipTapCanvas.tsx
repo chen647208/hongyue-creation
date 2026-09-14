@@ -90,6 +90,8 @@ interface TipTapCanvasProps {
   onActiveBlockChange?: (id: string | null) => void;
   /** 行内批注装饰范围（未解决且已锚定；变化时重算装饰）。 */
   annotations?: readonly AnnotationDecorationInput[];
+  /** 点击正文批注高亮时回调批注 id（宿主打开左栏对应线程）。 */
+  onAnnotationClick?: (annotationId: string) => void;
   onContentChange: (content: string) => void;
   onMouseUp: (event: React.MouseEvent<HTMLDivElement>) => void;
   onKeyUp: () => void;
@@ -102,7 +104,7 @@ interface TipTapCanvasProps {
  * 传入 collaboration 时改为 y-prosemirror 节点级绑定。
  */
 const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function TipTapCanvas(
-  { content, activeChapterId, locked, collaboration, screenplayFormat, paper, isFocusMode, isGenerating, isStreaming, typewriter, onNewChapter, resolveBlock, onOpenSource, onActiveBlockChange, annotations, onContentChange, onMouseUp, onKeyUp, onMouseMove },
+  { content, activeChapterId, locked, collaboration, screenplayFormat, paper, isFocusMode, isGenerating, isStreaming, typewriter, onNewChapter, resolveBlock, onOpenSource, onActiveBlockChange, annotations, onAnnotationClick, onContentChange, onMouseUp, onKeyUp, onMouseMove },
   ref,
 ) {
   const { t } = useTranslation('writing');
@@ -120,10 +122,13 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
   onOpenSourceRef.current = onOpenSource;
   const annotationsRef = useRef<readonly AnnotationDecorationInput[]>(annotations ?? []);
   annotationsRef.current = annotations ?? [];
+  const onAnnotationClickRef = useRef(onAnnotationClick);
+  onAnnotationClickRef.current = onAnnotationClick;
   // 稳定的扩展选项身份：项目数据变化经 ref 读取，不触发编辑器重建。
   const stableResolveBlock = useCallback((id: string) => resolveBlockRef.current?.(id) ?? null, []);
   const stableOnOpenSource = useCallback((id: string) => { onOpenSourceRef.current?.(id); }, []);
   const stableGetAnnotations = useCallback(() => annotationsRef.current, []);
+  const stableOnAnnotationClick = useCallback((id: string) => { onAnnotationClickRef.current?.(id); }, []);
   // 记录最近一次由本编辑器吐出的 DSL，用于区分「外部受控更新」与「自身回环」。
   const lastEmitted = useRef<string>(content);
   const [isEmpty, setIsEmpty] = useState(() => content.trim().length === 0);
@@ -135,8 +140,8 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
   const extensions = useMemo(
     () => [
       ...(collaborative
-        ? createCollaborativeExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource, getAnnotations: stableGetAnnotations })
-        : createNovelExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource, getAnnotations: stableGetAnnotations })),
+        ? createCollaborativeExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource, getAnnotations: stableGetAnnotations, onAnnotationClick: stableOnAnnotationClick })
+        : createNovelExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource, getAnnotations: stableGetAnnotations, onAnnotationClick: stableOnAnnotationClick })),
       ...createWritingPrimitives({ onNewChapter: () => onNewChapterRef.current?.() }),
       ...(screenplayFormat ? [createScreenplayFormatting()] : []),
       ...(fragment && awareness
@@ -151,7 +156,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
           ]
         : []),
     ],
-    [collaborative, fragment, awareness, screenplayFormat, stableResolveBlock, stableOnOpenSource, stableGetAnnotations],
+    [collaborative, fragment, awareness, screenplayFormat, stableResolveBlock, stableOnOpenSource, stableGetAnnotations, stableOnAnnotationClick],
   );
 
   const editor = useEditor(

@@ -234,4 +234,41 @@ describe('runAgentSession', () => {
     const end = session.events.at(-1);
     expect(end?.t).toBe('session.end');
   });
+
+  it('写类工具执行前触发 onBeforeToolExecute，读工具不触发', async () => {
+    const directTool: ToolSpec = {
+      id: 'core.summary.extract',
+      description: '直写',
+      parameters: { type: 'object', properties: {} },
+      permission: 'write:direct',
+      execute: async () => ({ ok: true, data: {} }),
+    };
+    const assembler = new PromptAssembler();
+    assembler.register({ id: 'identity', title: '身份', order: 10, render: () => '身份' });
+    const registry = new ToolRegistry();
+    registry.register(readTool).register(directTool);
+    const session = new AiSession({ sessionId: 's-hook', task: '任务', sections: [] });
+    const seen: string[] = [];
+    let call = 0;
+    const result = await runAgentSession({
+      assembler,
+      registry,
+      router: new ApprovalRouter(new ApprovalBroker()),
+      session,
+      model,
+      complete: async () => {
+        call += 1;
+        return call === 1
+          ? {
+              content: '{"reply":"","toolCalls":[{"callId":"c1","toolId":"core.index.query","args":{"query":"tags"}},{"callId":"c2","toolId":"core.summary.extract","args":{}}]}',
+              model: 'test',
+            }
+          : { content: '{"reply":"完成","toolCalls":[]}', model: 'test' };
+      },
+      context: () => ({ project: { title: '书' } }),
+      onBeforeToolExecute: ({ toolId }) => { seen.push(toolId); },
+    }, '任务');
+    expect(result.ok).toBe(true);
+    expect(seen).toEqual(['core.summary.extract']);
+  });
 });

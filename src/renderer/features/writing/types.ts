@@ -28,6 +28,8 @@ export interface ExportCompileOptions {
   rangeTo: number | null;
   /** 作为分卷标题的节点 id（章节）。 */
   volumeIds: string[];
+  /** 作为分卷的类型模板 id（如 'novel.part'）；与 volumeIds 取并集。 */
+  volumeTypes: string[];
   /** 前置页节点 id，按给定顺序置于正文前。 */
   frontMatterIds: string[];
   /** 后置页节点 id，按给定顺序置于正文后。 */
@@ -338,6 +340,8 @@ export interface WritingAnnotationsPanelProps {
   annotations: readonly ChapterAnnotation[];
   /** 块 id → 块内纯文本，用于解析锚点与判定失锚。 */
   blockTexts: ReadonlyMap<string, string>;
+  /** 正文高亮点击定位到的批注 id；对应线程高亮并滚入视野。 */
+  activeAnnotationId?: string | null;
   onJump: (blockId: string) => void;
   onAddFromSelection: () => void;
   onReply: (annotationId: string, body: string) => void;
@@ -389,6 +393,8 @@ export interface WritingEditorCanvasProps {
   onActiveBlockChange?: (id: string | null) => void;
   /** 行内批注装饰范围。 */
   annotations?: readonly AnnotationDecorationInput[];
+  /** 点击正文批注高亮：打开左栏对应线程。 */
+  onAnnotationClick?: (annotationId: string) => void;
   onStopStreaming: () => void;
   onStopBatchGeneration: () => void;
   streamingTokens: TokenUsage;

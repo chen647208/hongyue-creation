@@ -23,7 +23,7 @@ import type { Citation } from './grounding.js';
 import type { PromptAssembler } from './promptAssembler.js';
 import { diffLines } from './proposalDiff.js';
 import type { AiSession } from './session.js';
-import type { ToolRegistry } from './tools.js';
+import type { ToolPermission, ToolRegistry } from './tools.js';
 
 /** 写类提案的 diff 文本（unified 风格）与可执行载荷。 */
 function unifiedDiff(diff: ReturnType<typeof diffLines>): string {
@@ -106,6 +106,16 @@ export interface AgentLoopDeps {
   signal?: AbortSignal;
   /** 会话启动（session.start 落盘）后的回调：宿主在此补记装配元事件，保证 start 仍是首事件。 */
   onStarted?: () => void | Promise<void>;
+  /**
+   * 工具事务前置钩子：写类工具（permission !== 'read'）审批通过、执行之前调用，
+   * 宿主在此落试错快照，使会话内可回滚到任意一次工具事务之前；读工具不触发。
+   */
+  onBeforeToolExecute?: (info: {
+    toolId: string;
+    permission: ToolPermission;
+    turn: number;
+    callId: string;
+  }) => void | Promise<void>;
   /**
    * 首轮 prompt 字符预算（超限只丢可再生上下文段，任务/协议/工具受保护）。
    * 宿主按模型上下文档位传入；缺席则不截断。
@@ -275,6 +285,10 @@ export async function runAgentSession(deps: AgentLoopDeps, task: string): Promis
             observations.push(`[工具 ${call.toolId}] 审批未通过（${decision?.verdict ?? 'rejected'}），已挂起或被拒绝，继续其余工作。`);
             continue;
           }
+        }
+
+        if (spec.permission !== 'read' && deps.onBeforeToolExecute) {
+          await deps.onBeforeToolExecute({ toolId: call.toolId, permission: spec.permission, turn, callId: call.callId });
         }
 
         const output = await deps.registry.execute(call.toolId, call.args, {

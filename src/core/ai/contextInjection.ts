@@ -275,6 +275,42 @@ export function inferContextTarget(project: Project | null | undefined, query: s
   return target;
 }
 
+/** 编辑器向助手暴露的当前状态：活动章节与选中的文本。 */
+export interface EditorContext {
+  /** 编辑器当前打开的章节 id。 */
+  chapterId?: string;
+  /** 编辑器当前选中的文本（用于解析选中实体）。 */
+  selectionText?: string;
+}
+
+/**
+ * 合并任务文本推断与编辑器真实状态，得到本次装配目标：
+ * 编辑器活动章节优先于文本推断；选中文本命中实体名时注入该实体；query 合并两者。
+ */
+export function composeContextTarget(
+  project: Project | null | undefined,
+  task: string,
+  editor?: EditorContext,
+): ContextTarget {
+  const target: ContextTarget = inferContextTarget(project, task);
+  const chapterId = editor?.chapterId?.trim();
+  if (chapterId) target.chapterId = chapterId;
+
+  const selectionText = editor?.selectionText?.trim();
+  if (selectionText) {
+    const fromSelection = inferContextTarget(project, selectionText);
+    if (fromSelection.entityId) {
+      target.entityId = fromSelection.entityId;
+      target.entityKind = fromSelection.entityKind;
+    }
+    target.viewName = 'writing';
+  }
+
+  const query = [task.trim(), selectionText ?? ''].filter(Boolean).join('\n');
+  if (query) target.query = query;
+  return target;
+}
+
 /**
  * 规划注入候选（未做预算）：当前章节正文片段与细纲、前情、选中实体、关键词相关设定、时间线。
  * 结果按优先级不排序，交由装配阶段统一裁剪。

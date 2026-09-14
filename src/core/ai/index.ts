@@ -43,10 +43,12 @@ export {
 } from './builtinSections.js';
 export {
   assembleContextInjection,
+  composeContextTarget,
   type ContextInjectionInput,
   type ContextInjectionResult,
   type ContextTarget,
   type DroppedInjection,
+  type EditorContext,
   inferContextTarget,
   type InjectionEntry,
   type InjectionScope,
@@ -65,6 +67,7 @@ export {
   quoteAppearsExactly,
   renderCitations,
   type RetrievalOutcome,
+  stripSnippetMarkers,
   toCitation,
 } from './grounding.js';
 export {

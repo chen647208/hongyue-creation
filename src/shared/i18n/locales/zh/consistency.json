@@ -95,6 +95,7 @@
     "namePlaceholder": "模板名称",
     "duplicateTitle": "复制模板",
     "deleteTitle": "删除模板",
+    "toggleTitle": "展开或收起模板",
     "categoryLabel": "模板分类",
     "modesLabel": "适用模式",
     "modeAi": "AI检查",

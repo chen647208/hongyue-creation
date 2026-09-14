@@ -177,13 +177,16 @@ export function projectToEntities(project: Project, now = Date.now()): BookEntit
     project.lastModified ?? now
   );
   nodes.push(bookNode);
-  attrs.push(
-    ...fieldsToAttrs(
-      bookId,
-      { inspiration: project.inspiration, intro: project.intro, outline: project.outline },
-      builtinRegistry.get('novel.book')
-    )
-  );
+  const bookFields: Record<string, unknown> = {
+    inspiration: project.inspiration,
+    intro: project.intro,
+    outline: project.outline,
+  };
+  // 侧车/结构数据以 JSON 属性随书节点落库，round-trip 无损（分支、对照、绘本）。
+  if (project.branching) bookFields.branching = project.branching;
+  if (project.translation) bookFields.translation = project.translation;
+  if (project.pictureBook) bookFields.pictureBook = project.pictureBook;
+  attrs.push(...fieldsToAttrs(bookId, bookFields, builtinRegistry.get('novel.book')));
 
   // 平铺集合
   for (const spec of COLLECTIONS) {
@@ -304,6 +307,15 @@ export function entitiesToProject(entities: BookEntities): Project {
 
   const bookAttr = (name: string): string | undefined =>
     (attrsByNode.get(bookId) ?? []).find((a) => a.name === name)?.value;
+  const bookJson = (name: string): unknown => {
+    const raw = bookAttr(name);
+    if (raw === undefined) return undefined;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
+  };
 
   const project: Project = {
     id: bookId,
@@ -373,6 +385,14 @@ export function entitiesToProject(entities: BookEntities): Project {
       (bag[node.type] ??= []).push(nodeToObj(node, 'title', 'body'));
     }
   }
+
+  // 侧车/结构数据随书节点恢复（分支、对照、绘本）。
+  const branching = bookJson('branching');
+  if (branching && typeof branching === 'object') project.branching = branching as Project['branching'];
+  const translation = bookJson('translation');
+  if (translation && typeof translation === 'object') project.translation = translation as Project['translation'];
+  const pictureBook = bookJson('pictureBook');
+  if (pictureBook && typeof pictureBook === 'object') project.pictureBook = pictureBook as Project['pictureBook'];
 
   return project;
 }

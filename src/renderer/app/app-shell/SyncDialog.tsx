@@ -16,10 +16,20 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { dialogService } from '@/shared/services/dialogService';
-import { appendSyncRecoveryRecord, listSyncRecoveryRecords, type SyncRecoveryKind, type SyncRecoveryRecord } from '@/shared/services/syncRecoveryService';
+import {
+  appendSyncRecoveryRecord,
+  clearPendingMerge,
+  listPendingMerges,
+  listSyncRecoveryRecords,
+  type PendingMergeConflict,
+  registerPendingMerge,
+  type SyncRecoveryKind,
+  type SyncRecoveryRecord,
+} from '@/shared/services/syncRecoveryService';
 import {
   applySyncPlan,
   exportSyncBundle,
+  prepareBundlePlan,
   prepareDownloadBundle,
   prepareImportBundle,
   type SyncApplyReport,
@@ -47,12 +57,14 @@ export const SyncDialog: React.FC<{ project: Project | null }> = ({ project }) =
   const [report, setReport] = useState<SyncApplyReport | null>(null);
   const [showRecovery, setShowRecovery] = useState(false);
   const [records, setRecords] = useState<SyncRecoveryRecord[]>(() => listSyncRecoveryRecords());
+  const [pendingMerges, setPendingMerges] = useState<PendingMergeConflict[]>(() => listPendingMerges());
   const [transportConfig, setTransportConfig] = useState<SyncTransportConfig | null>(() => loadSyncTransportConfig());
 
   const ready = isTransportReady(transportConfig);
 
   const refreshRecords = useCallback((): void => {
     setRecords(listSyncRecoveryRecords());
+    setPendingMerges(listPendingMerges());
   }, []);
 
   useEffect(() => {
@@ -113,6 +125,8 @@ export const SyncDialog: React.FC<{ project: Project | null }> = ({ project }) =
   const dispatchPlan = async (next: SyncMergePlan, kind: SyncRecoveryKind): Promise<void> => {
     if (next.conflicts.length === 0) {
       const result = await applySyncPlan(next, 'keep-copy');
+      clearPendingMerge(next.bookId);
+      refreshRecords();
       setReport(result);
       recordMerge(kind, next.bookId, result);
       return;
@@ -177,11 +191,31 @@ export const SyncDialog: React.FC<{ project: Project | null }> = ({ project }) =
     setBusy(true);
     try {
       const result = await applySyncPlan(plan, policy);
+      if (result.pendingConflicts > 0) {
+        registerPendingMerge({ bookId: plan.bookId, kind: mergeKind, bundle: plan.bundle });
+      } else {
+        clearPendingMerge(plan.bookId);
+      }
       setPlan(null);
       setReport(result);
       recordMerge(mergeKind, plan.bookId, result);
+      refreshRecords();
     } catch (err) {
       recordFailure(mergeKind, plan.bookId, err);
+      showError(t('sync.importFailed'), err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** 重新解决某条已登记冲突：用留档的同步包重新预合并，无需重新导入整包。 */
+  const handleResolvePending = async (pending: PendingMergeConflict): Promise<void> => {
+    setBusy(true);
+    try {
+      const next = await prepareBundlePlan(pending.bundle);
+      await dispatchPlan(next, pending.kind);
+    } catch (err) {
+      recordFailure(pending.kind, pending.bookId, err);
       showError(t('sync.importFailed'), err);
     } finally {
       setBusy(false);
@@ -313,6 +347,30 @@ export const SyncDialog: React.FC<{ project: Project | null }> = ({ project }) =
               {transportConfig && (
                 <p>{ready ? t('sync.transportHint', { backend: transportConfig.kind }) : t('sync.transportMissing')}</p>
               )}
+            </div>
+          )}
+
+          {!plan && pendingMerges.length > 0 && (
+            <div className="mt-4 rounded-md border border-border p-2 text-xs">
+              <div className="mb-1 font-medium">{t('sync.pendingMergesTitle')}</div>
+              <ul className="space-y-1">
+                {pendingMerges.map((pending) => (
+                  <li key={pending.id} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-muted-foreground">
+                      {pending.bookId} · {t(`sync.recoveryKind.${pending.kind}`)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 shrink-0"
+                      disabled={busy}
+                      onClick={() => void handleResolvePending(pending)}
+                    >
+                      {t('sync.pendingMergeResolve')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

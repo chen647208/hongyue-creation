@@ -287,6 +287,7 @@ const StepOutline: React.FC<StepOutlineProps> = ({ project }) => {
             value={selectedPromptId}
             onChange={(e) => setSelectedPromptId(e.target.value)}
             className="h-9 w-auto"
+            aria-label={t('steps:common.promptTemplate')}
           >
             {outlinePrompts.map(p => <option key={p.id} value={p.id}>{templateDisplayName(p)}</option>)}
           </Select>
@@ -296,6 +297,7 @@ const StepOutline: React.FC<StepOutlineProps> = ({ project }) => {
             value={outputMode}
             onChange={(e) => setOutputMode(e.target.value as OutputMode)}
             className="h-9 w-auto"
+            aria-label={t('steps:common.outputMode')}
           >
             <option value="streaming">{t('steps:common.streaming')}</option>
             <option value="traditional">{t('steps:common.traditional')}</option>

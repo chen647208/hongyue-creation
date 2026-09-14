@@ -33,6 +33,7 @@ import {
   inferContextTarget,
   registerBuiltinSections,
   runAgentSession,
+  stripSnippetMarkers,
 } from '@core/ai';
 import { uuidv7 } from '@core/entities';
 import type { EventBus, SeamPolicy } from '@core/plugin';
@@ -274,7 +275,7 @@ export class AiSessionManager {
       target: input.contextTarget ?? inferContextTarget(input.project, input.task),
       enabled: input.injectionEnabled !== false,
       disabledIds: input.disabledInjectionIds,
-      extraEntries: await this.collectRetrievalEntries(input.project?.id, input.task),
+      extraEntries: await this.collectRetrievalEntries(input.project, input.task),
     });
     this.lastInjection = injection;
     this.retainSession(sessionId, session, injection);
@@ -370,6 +371,15 @@ export class AiSessionManager {
             budgetChars: injection.budgetChars,
             at: Date.now(),
           }),
+          // 工具事务级试错快照：每次写类工具执行前落一步，会话内可回滚到任意一步
+          onBeforeToolExecute: ({ toolId }) => {
+            aiTrialSnapshots.begin({
+              sessionId,
+              bookId: input.bookId,
+              label: toolId,
+              chapters: input.project?.chapters ?? [],
+            });
+          },
         },
         input.task,
       );
@@ -381,9 +391,11 @@ export class AiSessionManager {
 
   /**
    * 全文检索命中转注入条目：来源即出处（章节/知识库），供装配阶段参与预算与溯源。
+   * 片段去掉高亮标记后带原文，由装配阶段逐字校验：与原文不一致的条目不注入并标出。
    * 检索不可用或查询过短时返回空数组（注入仍可走内置规划）。
    */
-  private async collectRetrievalEntries(projectId: string | undefined, task: string): Promise<InjectionEntry[]> {
+  private async collectRetrievalEntries(project: Project | null | undefined, task: string): Promise<InjectionEntry[]> {
+    const projectId = project?.id;
     const query = task.trim();
     if (!projectId || query.length < MIN_SEARCH_QUERY_LENGTH) return [];
     try {
@@ -393,14 +405,19 @@ export class AiSessionManager {
         limit: MAX_RETRIEVAL_INJECTION_ENTRIES,
         preferMaterial: true,
       });
+      const originals = new Map<string, string>();
+      for (const chapter of project?.chapters ?? []) originals.set(`chapter:${chapter.id}`, chapter.content ?? '');
+      for (const item of project?.knowledge ?? []) originals.set(`knowledge:${item.id}`, item.content ?? '');
       return buildCitations(hits).map((citation) => ({
         id: `search:${citation.anchor}`,
         title: `检索命中：${citation.title}`,
-        text: citation.snippet,
+        text: stripSnippetMarkers(citation.snippet),
         source: { kind: citation.sourceKind, refId: citation.refId, title: citation.title, locator: '全文检索命中' },
         trigger: '全文检索',
         priority: 60,
         scope: 'book' as const,
+        quote: true,
+        original: originals.get(citation.anchor) ?? '',
       }));
     } catch {
       return [];

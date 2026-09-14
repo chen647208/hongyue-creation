@@ -22,6 +22,7 @@ vi.mock('@core/entities', async (importOriginal) => {
 import {
   applySyncPlan,
   exportSyncBundle,
+  prepareBundlePlan,
   prepareDownloadBundle,
   prepareImportBundle,
   syncObjectKey,
@@ -57,7 +58,7 @@ function edgeChange(entityId: string) {
 
 function edgeBundle(edges: ReturnType<typeof edgeEntity>[], nodes: ReturnType<typeof nodeEntity>[] = []) {
   return {
-    version: 1, bookId: 'b1', instanceId: 'remote', generatedAt: 1,
+    version: 1 as const, bookId: 'b1', instanceId: 'remote', generatedAt: 1,
     changes: [
       ...nodes.map((n) => ({ changeId: 1, entityName: 'nodes' as const, entityId: n.id, hash: 'remote-hash', isErased: false, agentId: 'sync', utcDateChanged: 1 })),
       ...edges.map((e) => edgeChange(e.id)),
@@ -70,7 +71,7 @@ function edgeBundle(edges: ReturnType<typeof edgeEntity>[], nodes: ReturnType<ty
 function conflictBundle(remoteBody: string) {
   const remoteNode = { id: 'n1', bookId: 'b1', type: 'novel.chapter', title: '第一章', body: remoteBody, path: undefined, createdAt: 1, updatedAt: 5, erased: false };
   return {
-    version: 1, bookId: 'b1', instanceId: 'remote', generatedAt: 1,
+    version: 1 as const, bookId: 'b1', instanceId: 'remote', generatedAt: 1,
     changes: [{ changeId: 1, entityName: 'nodes' as const, entityId: 'n1', hash: 'remote-hash', isErased: false, agentId: 'sync', utcDateChanged: 5 }],
     entities: { nodes: [remoteNode], edges: [], attrs: [] },
   };
@@ -310,6 +311,49 @@ describe('冲突三选的分支逻辑', () => {
     expect(writes).toHaveLength(0);
     expect(report.pendingConflicts).toBe(1);
     expect(report.conflictCopies).toHaveLength(0);
+  });
+});
+
+describe('prepareBundlePlan（重解已登记冲突）', () => {
+  it('用留档同步包重新预合并，无需重新导入文件', async () => {
+    const { sync, writes } = stubApi({
+      rows: { 'nodes.selectByBook': [nodeRow], 'attrs.selectByBook': [attrRow], 'edges.selectByBook': [] },
+      fileContent: { value: JSON.stringify(conflictBundle('远端改写的正文')) },
+    });
+
+    const plan = await prepareBundlePlan(conflictBundle('远端改写的正文'));
+
+    expect(plan.conflicts).toHaveLength(1);
+    expect(writes).toHaveLength(0);
+    expect(sync.get).not.toHaveBeenCalled();
+  });
+});
+
+describe('既有节点新增属性补插', () => {
+  it('节点未变、远端新增属性时写入 attrs.upsert', async () => {
+    const remoteAttr = {
+      id: 'a9', nodeId: 'n1', type: 'label', name: '标签', value: '远端新增',
+      inheritable: false, position: 0, erased: false,
+    };
+    const bundle = {
+      version: 1, bookId: 'b1', instanceId: 'remote', generatedAt: 1,
+      changes: [
+        { changeId: 1, entityName: 'nodes' as const, entityId: 'n1', hash: 'remote-hash', isErased: false, agentId: 'sync', utcDateChanged: 1 },
+        { changeId: 2, entityName: 'attrs' as const, entityId: 'a9', hash: 'remote-attr-hash', isErased: false, agentId: 'sync', utcDateChanged: 1 },
+      ],
+      entities: { nodes: [nodeEntity('n1', '第一章')], edges: [], attrs: [remoteAttr] },
+    };
+    const { writes } = stubApi({
+      rows: { 'nodes.selectByBook': [nodeRow], 'attrs.selectByBook': [attrRow], 'edges.selectByBook': [] },
+      fileContent: { value: JSON.stringify(bundle) },
+    });
+
+    const plan = await prepareImportBundle();
+    const report = await applySyncPlan(plan!, 'keep-copy');
+
+    expect(report.appliedAttrs).toBe(1);
+    expect(writes.map((w) => w.id)).toEqual(['attrs.upsert']);
+    expect(writes[0]!.params[0]).toBe('a9');
   });
 });
 

@@ -22,6 +22,8 @@ import { countWords } from '@core/index/words';
 import { formulaDisplay } from '@shared/formulaScript';
 import type { Chapter, HistoryDate, Project } from '@shared/types';
 
+import { projectBranchData, validateProjectBranching } from './branchView';
+import { buildComparisonView } from './comparisonView';
 import type { EntityViewData, ViewColumn, ViewLink, ViewRow } from './types';
 
 export const ENTITY_VIEW_COLUMNS: ViewColumn[] = [
@@ -306,6 +308,54 @@ export function buildEntityView(project: Project): EntityViewData {
       }
     }
   }
+
+  // 分支叙事：场景成行、选择项成边，完整性问题写入 detail；数据取自 Project.branching。
+  const branch = projectBranchData(project);
+  if (branch.scenes.length > 0) {
+    const issuesByScene = new Map<string, string[]>();
+    for (const issue of validateProjectBranching(project)) {
+      const list = issuesByScene.get(issue.sceneId) ?? [];
+      list.push(issue.kind);
+      issuesByScene.set(issue.sceneId, list);
+    }
+    const known = new Set(branch.scenes.map((scene) => scene.id));
+    for (const scene of branch.scenes) {
+      const choices = scene.choices ?? [];
+      rows.push(
+        flattenRow(scene.id, 'branch-scene', scene.title, {
+          name: scene.title,
+          summary: String(choices.length),
+          detail: (issuesByScene.get(scene.id) ?? []).join(', '),
+          ending: scene.ending === true,
+          choiceCount: choices.length,
+        }),
+      );
+      for (const choice of choices) {
+        if (known.has(choice.target)) links.push({ source: scene.id, target: choice.target, label: choice.text });
+      }
+    }
+  }
+
+  // 对照视图：原文/译文段成行，确认状态随 Project.translation 同源。
+  const comparison = buildComparisonView(project.translation);
+  if (comparison.rows.length > 0) rows.push(...comparison.rows);
+
+  // 绘本页：页序与图位投影为行，供视图管理图位替换。
+  (project.pictureBook?.pages ?? []).forEach((page, index) => {
+    rows.push(
+      flattenRow(page.id, 'picture-page', page.title, {
+        name: page.title,
+        summary: String(index + 1),
+        detail: page.caption ?? '',
+        order: index + 1,
+        imageId: page.imageId ?? '',
+        imageAlt: page.imageAlt ?? '',
+        caption: page.caption ?? '',
+        text: page.text,
+        hasImage: Boolean(page.imageId),
+      }),
+    );
+  });
 
   // 扩展类型：project.extensions[type] 的条目直接投影，字段键保持条目原样。
   for (const [type, list] of Object.entries(project.extensions ?? {})) {

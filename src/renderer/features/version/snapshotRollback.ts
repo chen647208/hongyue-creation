@@ -117,9 +117,14 @@ function withRollbackSnapshot(chapter: Chapter, now: number): Chapter {
   return appendSnapshot(chapter, createSnapshot(chapter.content ?? '', 'before-rollback', now));
 }
 
+/** 应用任意新内容前的自动再快照：先把当前正文留为 before-rollback，再写入新内容，使应用可再撤销。 */
+export function applyContentWithPreSnapshot(chapter: Chapter, content: string, now: number = Date.now()): Chapter {
+  return { ...withRollbackSnapshot(chapter, now), content };
+}
+
 /** 整体回滚到快照：先给当前正文留 before-rollback 快照，再替换为快照内容。 */
 export function rollbackWhole(chapter: Chapter, snapshot: ChapterSnapshot, now: number = Date.now()): Chapter {
-  return { ...withRollbackSnapshot(chapter, now), content: snapshot.content };
+  return applyContentWithPreSnapshot(chapter, snapshot.content, now);
 }
 
 /** 逐段回滚：只把选中段替换为快照文本，其余保留当前文本。 */

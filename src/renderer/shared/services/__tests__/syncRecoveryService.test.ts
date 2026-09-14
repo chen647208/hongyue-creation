@@ -17,16 +17,21 @@ import {
   appendSyncRecoveryRecord,
   clearExitExportFailure,
   clearPendingExitExports,
+  clearPendingMerge,
+  clearPendingMerges,
   clearSyncRecoveryRecords,
   listPendingExitExports,
+  listPendingMerges,
   listSyncRecoveryRecords,
   markExitExportFailed,
   MAX_SYNC_RECORDS,
+  registerPendingMerge,
 } from '../syncRecoveryService';
 
 afterEach(() => {
   clearSyncRecoveryRecords();
   clearPendingExitExports();
+  clearPendingMerges();
 });
 
 describe('恢复记录读写', () => {
@@ -76,5 +81,39 @@ describe('退出导出失败登记', () => {
     const pending = listPendingExitExports();
     expect(pending).toHaveLength(1);
     expect(pending[0]!.message).toBe('第二次');
+  });
+});
+
+describe('待重解合并冲突登记', () => {
+  const bundle = {
+    version: 1 as const,
+    bookId: 'b1',
+    instanceId: 'dev-b',
+    generatedAt: 1,
+    changes: [],
+    entities: { nodes: [], edges: [], attrs: [] },
+  };
+
+  it('按书登记整包，可按书过滤读回', () => {
+    registerPendingMerge({ bookId: 'b1', kind: 'import', bundle });
+    registerPendingMerge({ bookId: 'b2', kind: 'download', bundle: { ...bundle, bookId: 'b2' } });
+
+    expect(listPendingMerges()).toHaveLength(2);
+    const onlyB1 = listPendingMerges('b1');
+    expect(onlyB1).toHaveLength(1);
+    expect(onlyB1[0]!.kind).toBe('import');
+    expect(onlyB1[0]!.bundle.bookId).toBe('b1');
+  });
+
+  it('同书登记去重，保留最新整包；清除后不再列出', () => {
+    registerPendingMerge({ bookId: 'b1', kind: 'import', bundle });
+    registerPendingMerge({ bookId: 'b1', kind: 'download', bundle });
+
+    const pending = listPendingMerges('b1');
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.kind).toBe('download');
+
+    clearPendingMerge('b1');
+    expect(listPendingMerges('b1')).toEqual([]);
   });
 });

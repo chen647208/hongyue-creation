@@ -38,7 +38,10 @@
       "world": "世界观",
       "plan": "写作计划",
       "group": "分组",
-      "reference": "引用"
+      "reference": "引用",
+      "branchScene": "分支场景",
+      "picturePage": "绘本页",
+      "translationPair": "对照段落"
     },
     "references": {
       "title": "参考文献",
@@ -70,7 +73,10 @@
       "kind": "类型",
       "title": "名称",
       "summary": "摘要",
-      "detail": "详情"
+      "detail": "详情",
+      "source": "原文",
+      "target": "译文",
+      "confirmed": "已确认"
     },
     "export": {
       "label": "导出表格",

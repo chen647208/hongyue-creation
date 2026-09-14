@@ -9,6 +9,14 @@
 
 /** 构建管线出口（docs/design/07）：profile + select/transform/render。 */
 export {
+  type AlignmentStats,
+  alignmentStats,
+  alignParagraphs,
+  setPairConfirmed,
+  setPairTarget,
+  splitParagraphs,
+} from './alignment.js';
+export {
   type BranchChoice,
   type BranchIssue,
   type BranchIssueKind,
@@ -35,6 +43,14 @@ export {
   buildEpubFiles,
   htmlToDocxParagraphs,
 } from './package.js';
+export {
+  buildPictureBookFiles,
+  buildPictureBookHtml,
+  buildPictureBookText,
+  type PictureSlot,
+  renderPicturePage,
+  resolvePictureSlot,
+} from './picturebook.js';
 export {
   applyMaterialPolicy,
   applyRange,

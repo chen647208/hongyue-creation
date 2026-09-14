@@ -9,6 +9,7 @@
 
 import { buildDocxFiles, buildEpubFiles, buildOdtFiles, type BuildProfile,clampHeadingLevel, COMPILE_DEFAULTS, referenceEntities,roundtripProfile, runBuild } from '@core/build';
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '@core/entities';
+import { builtinRegistry } from '@core/types-registry';
 import { Bot, Brain, Cpu, Feather, type LucideIcon,Server } from 'lucide-react';
 
 import { i18n } from '@/i18n';
@@ -78,7 +79,8 @@ export const getPreviousChapterSummaryIds = (chapters: Chapter[], currentChapter
   );
 };
 
-/** Project.chapters → 构建管线实体视图（导出与统计共用，单一口径）。 */export function projectToBuildEntities(project: Project): { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] } {
+/** Project.chapters → 构建管线实体视图（导出与统计共用，单一口径）。 */
+export function projectToBuildEntities(project: Project): { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] } {
   const nodes: NodeEntity[] = project.chapters.map((c) => ({
     id: c.id,
     bookId: project.id,
@@ -89,6 +91,31 @@ export const getPreviousChapterSummaryIds = (chapters: Chapter[], currentChapter
     updatedAt: 0,
     erased: false,
   }));
+  // 泛用分组/卷投影为 novel.part 节点：排序落在其首个成员章节之前，供类型级分卷识别。
+  const groupNodes: NodeEntity[] = (project.groups ?? []).map((group) => ({
+    id: group.id,
+    bookId: project.id,
+    type: 'novel.part',
+    title: group.label,
+    body: '',
+    createdAt: 0,
+    updatedAt: 0,
+    erased: false,
+  }));
+  const groupAttrs: AttributeEntity[] = (project.groups ?? []).map((group, position) => {
+    const memberOrders = project.chapters.filter((c) => c.groupId === group.id).map((c) => c.order);
+    const order = memberOrders.length > 0 ? Math.min(...memberOrders) - 0.5 : group.order;
+    return {
+      id: `attr-order-${group.id}`,
+      nodeId: group.id,
+      type: 'label',
+      name: 'order',
+      value: String(order),
+      inheritable: false,
+      position,
+      erased: false,
+    };
+  });
   const attrs: AttributeEntity[] = project.chapters.flatMap((c) => {
     const list: AttributeEntity[] = [{
       id: `attr-order-${c.id}`,
@@ -116,7 +143,23 @@ export const getPreviousChapterSummaryIds = (chapters: Chapter[], currentChapter
   });
   // 来源条目投影为 meta.reference 节点：正文 [@key] 经编译管线解析为编号与文末表。
   const sources = referenceEntities(project.references ?? [], project.id);
-  return { nodes: [...nodes, ...sources.nodes], attrs: [...attrs, ...sources.attrs], edges: [] };
+  return {
+    nodes: [...nodes, ...groupNodes, ...sources.nodes],
+    attrs: [...attrs, ...groupAttrs, ...sources.attrs],
+    edges: [],
+  };
+}
+
+/** 导出对话框可分卷的类型候选：作品实际存在的正文节点类型（去掉来源与书根）。 */
+export function listBuildContentTypes(project: Project): Array<{ type: string; label: string }> {
+  const seen = new Set<string>();
+  for (const node of projectToBuildEntities(project).nodes) {
+    if (node.type === 'novel.book' || node.type.startsWith('meta.')) continue;
+    seen.add(node.type);
+  }
+  return [...seen]
+    .sort()
+    .map((type) => ({ type, label: builtinRegistry.get(type)?.label ?? type }));
 }
 
 const escapeHtml = (text: string) =>
@@ -132,7 +175,12 @@ const escapeHtml = (text: string) =>
  */
 export const applyExportCompileOptions = (profile: BuildProfile, options: ExportCompileOptions): BuildProfile => {
   const next = roundtripProfile(profile);
-  next.selection = { ...next.selection, materialPolicy: options.materialPolicy };
+  // 类型级分卷：把所选分卷类型并入参与构建的类型，否则对应节点不会进入选段。
+  const includeTypes = [...next.selection.includeTypes];
+  for (const type of options.volumeTypes) {
+    if (!includeTypes.includes(type)) includeTypes.push(type);
+  }
+  next.selection = { ...next.selection, includeTypes, materialPolicy: options.materialPolicy };
   const from = options.rangeFrom ?? undefined;
   const to = options.rangeTo ?? undefined;
   next.selection.range = from !== undefined || to !== undefined ? { from, to } : undefined;
@@ -150,6 +198,7 @@ export const applyExportCompileOptions = (profile: BuildProfile, options: Export
       maxDepth: tocDepth,
     },
     volumeIds: options.volumeIds,
+    volumeTypes: options.volumeTypes,
     frontMatter: options.frontMatterIds,
     backMatter: options.backMatterIds,
   };

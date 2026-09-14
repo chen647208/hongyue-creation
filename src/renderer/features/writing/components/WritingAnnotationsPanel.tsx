@@ -13,11 +13,12 @@
  */
 
 import { MessageSquarePlus } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { dialogService } from '@/shared/services/dialogService';
 import { Button } from '@/shared/ui/Button';
+import { cn } from '@/shared/utils/cn';
 
 import type { ChapterAnnotation } from '../../../../shared/types';
 import { resolveAnnotation } from '../../../editor/annotations';
@@ -28,6 +29,7 @@ const WritingAnnotationsPanel: React.FC<WritingAnnotationsPanelProps> = ({
   activeChapterId,
   annotations,
   blockTexts,
+  activeAnnotationId,
   onJump,
   onAddFromSelection,
   onReply,
@@ -41,6 +43,13 @@ const WritingAnnotationsPanel: React.FC<WritingAnnotationsPanelProps> = ({
   const [replyText, setReplyText] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const threadRefs = useRef(new Map<string, HTMLLIElement>());
+
+  // 正文高亮点击后，把对应线程滚入视野（未解决线程已在列表中）。
+  useEffect(() => {
+    if (!activeAnnotationId) return;
+    threadRefs.current.get(activeAnnotationId)?.scrollIntoView({ block: 'nearest' });
+  }, [activeAnnotationId]);
 
   const unresolved = annotations.filter((a) => !a.resolved);
   const resolved = annotations.filter((a) => a.resolved);
@@ -60,8 +69,20 @@ const WritingAnnotationsPanel: React.FC<WritingAnnotationsPanelProps> = ({
   const renderThread = (annotation: ChapterAnnotation) => {
     const resolvedAnchor = resolveAnnotation(annotation, blockTexts);
     const orphaned = resolvedAnchor.status === 'orphaned';
+    const active = annotation.id === activeAnnotationId;
     return (
-      <li key={annotation.id} className="rounded border border-border/60 bg-muted/20 p-2 text-xs">
+      <li
+        key={annotation.id}
+        ref={(element) => {
+          if (element) threadRefs.current.set(annotation.id, element);
+          else threadRefs.current.delete(annotation.id);
+        }}
+        aria-current={active ? 'true' : undefined}
+        className={cn(
+          'rounded border border-border/60 bg-muted/20 p-2 text-xs',
+          active && 'border-primary/50 ring-2 ring-primary/40',
+        )}
+      >
         <div className="flex items-start justify-between gap-2">
           <button
             type="button"

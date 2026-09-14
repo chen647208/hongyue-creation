@@ -69,6 +69,7 @@ const NOVEL_TEMPLATES: TypeTemplate[] = [
       { key: 'history', label: 'AI 生成历史', type: 'json' },
       { key: 'snapshots', label: '编辑快照', type: 'json' },
       { key: 'annotations', label: '行内批注', labelEn: 'Inline annotations', type: 'json' },
+      { key: 'revisionReview', label: '修订对比中间态', labelEn: 'Revision review state', type: 'json' },
     ],
     views: ['outline', 'corkboard', 'table'],
     statusLabels: 'status',
@@ -381,6 +382,35 @@ const META_TEMPLATES: TypeTemplate[] = [
     views: ['table'],
   },
   {
+    id: 'branch.scene',
+    label: '分支场景',
+    labelEn: 'Branch Scene',
+    icon: 'git-branch',
+    category: 'meta',
+    tagKind: 'custom',
+    fields: [
+      { key: 'choices', label: '选择项', labelEn: 'Choices', type: 'json' },
+      { key: 'ending', label: '结局', labelEn: 'Ending', type: 'boolean' },
+      { key: 'synopsis', label: '梗概', type: 'richtext' },
+      { key: 'order', label: '顺序', type: 'number' },
+    ],
+    views: ['table', 'graph'],
+    statusLabels: 'status',
+  },
+  {
+    id: 'branch.variable',
+    label: '分支变量',
+    labelEn: 'Branch Variable',
+    icon: 'variable',
+    category: 'meta',
+    fields: [
+      { key: 'name', label: '变量名', labelEn: 'Name', type: 'text' },
+      { key: 'type', label: '类型', labelEn: 'Type', type: 'enum', enum: ['number', 'boolean', 'string'] },
+      { key: 'initial', label: '初值', labelEn: 'Initial', type: 'number' },
+    ],
+    views: ['table'],
+  },
+  {
     id: 'meta.prompt-card',
     label: '提示词卡',
     labelEn: 'Prompt Card',
@@ -485,10 +515,46 @@ const SCRIPT_TEMPLATES: TypeTemplate[] = [
   },
 ];
 
+const PICTURE_BOOK_TEMPLATES: TypeTemplate[] = [
+  {
+    id: 'picture.page',
+    label: '绘本页',
+    labelEn: 'Picture Book Page',
+    icon: 'image',
+    category: 'novel',
+    fields: [
+      { key: 'image', label: '图位', labelEn: 'Image slot', type: 'image' },
+      { key: 'imageAlt', label: '图位说明', labelEn: 'Image alt', type: 'text' },
+      { key: 'caption', label: '图注', labelEn: 'Caption', type: 'text' },
+      { key: 'order', label: '页序', labelEn: 'Page order', type: 'number' },
+      { key: 'status', label: '状态', type: 'enum', enum: ['draft', 'done'] },
+    ],
+    views: ['corkboard', 'table'],
+    statusLabels: 'status',
+    dslHint: { headingLevel: 3 },
+  },
+  {
+    id: 'poem.poem',
+    label: '诗',
+    labelEn: 'Poem',
+    icon: 'feather',
+    category: 'novel',
+    fields: [
+      { key: 'verse', label: '分行正文', labelEn: 'Verse body', type: 'boolean' },
+      { key: 'order', label: '顺序', type: 'number' },
+      { key: 'status', label: '状态', type: 'enum', enum: ['draft', 'done'] },
+    ],
+    views: ['outline', 'table'],
+    statusLabels: 'status',
+    dslHint: { headingLevel: 2 },
+  },
+];
+
 export const BUILTIN_TEMPLATES: readonly TypeTemplate[] = [
   ...NOVEL_TEMPLATES,
   ...CARD_TEMPLATES,
   ...WORLD_TEMPLATES,
   ...META_TEMPLATES,
   ...SCRIPT_TEMPLATES,
+  ...PICTURE_BOOK_TEMPLATES,
 ];

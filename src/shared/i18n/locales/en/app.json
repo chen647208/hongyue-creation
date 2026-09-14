@@ -228,7 +228,9 @@
     "downloadFailed": "Download failed",
     "transportHint": "Transport: {{backend}}",
     "transportMissing": "Configure and save a transport under Settings → Sync transport first.",
-    "transportDesktopOnly": "Sync transport is available on desktop only."
+    "transportDesktopOnly": "Sync transport is available on desktop only.",
+    "pendingMergesTitle": "Pending conflicts",
+    "pendingMergeResolve": "Resolve"
   },
   "protected": {
     "title": "Protected Session",

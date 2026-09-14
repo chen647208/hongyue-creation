@@ -228,7 +228,9 @@
     "downloadFailed": "下载失败",
     "transportHint": "当前传输：{{backend}}",
     "transportMissing": "请先在 设置 → 同步传输 中配置并保存传输方式。",
-    "transportDesktopOnly": "同步传输仅在桌面端可用。"
+    "transportDesktopOnly": "同步传输仅在桌面端可用。",
+    "pendingMergesTitle": "待处理冲突",
+    "pendingMergeResolve": "重新解决"
   },
   "protected": {
     "title": "受保护会话",

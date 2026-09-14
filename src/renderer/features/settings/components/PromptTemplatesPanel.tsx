@@ -41,6 +41,7 @@ const PromptTemplatesPanel: React.FC<PromptTemplatesPanelProps> = ({
               className="h-8 w-auto shrink-0 text-xs"
               value={prompt.category}
               onChange={(e) => updatePrompt(prompt.id, { category: e.target.value as PromptTemplate['category'] })}
+              aria-label={t('prompts.categoryLabel')}
             >
               <option value="inspiration">{t('prompts.category.inspiration')}</option>
               <option value="character">{t('prompts.category.character')}</option>

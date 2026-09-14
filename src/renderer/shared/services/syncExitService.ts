@@ -13,6 +13,7 @@
  * 复用 buildSyncBundle + 传输层，不新造导出格式。依赖以参数注入，便于单测。
  */
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
+import { EXIT_EXPORT_UPLOAD_TIMEOUT_MS } from '@shared/constants/sync';
 import type { SyncTransportConfig } from '@shared/types';
 
 import { localStore } from './localStore';
@@ -24,14 +25,20 @@ import {
   type PendingExitExport,
 } from './syncRecoveryService';
 import { uploadSyncBundle } from './syncService';
-import { isTransportReady, loadSyncTransportConfig } from './syncTransportService';
+import { isTransportReady, loadSyncTransportConfig, withTimeout } from './syncTransportService';
 
 export interface ExitExportConfig {
   enabled: boolean;
+  /** 参与退出导出的书 id；缺席（undefined）即全部书，空数组即不导出任何书。 */
+  bookIds?: string[];
 }
 
 export function defaultExitExportConfig(): ExitExportConfig {
   return { enabled: false };
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 export function loadExitExportConfig(): ExitExportConfig {
@@ -39,9 +46,10 @@ export function loadExitExportConfig(): ExitExportConfig {
   if (!raw) return defaultExitExportConfig();
   try {
     const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed !== null && (parsed as { enabled?: unknown }).enabled === true
-      ? { enabled: true }
-      : defaultExitExportConfig();
+    if (typeof parsed !== 'object' || parsed === null) return defaultExitExportConfig();
+    const value = parsed as { enabled?: unknown; bookIds?: unknown };
+    if (value.enabled !== true) return defaultExitExportConfig();
+    return { enabled: true, bookIds: isStringArray(value.bookIds) ? value.bookIds : undefined };
   } catch {
     return defaultExitExportConfig();
   }
@@ -90,9 +98,11 @@ function messageOf(error: unknown): string {
  */
 export async function runExitExport(deps: ExitExportDeps): Promise<ExitExportSummary> {
   const summary: ExitExportSummary = { total: 0, succeeded: 0, failed: [] };
-  if (!deps.loadConfig().enabled) return summary;
+  const config = deps.loadConfig();
+  if (!config.enabled) return summary;
 
-  const projects = deps.listProjects();
+  const selected = config.bookIds !== undefined ? new Set(config.bookIds) : null;
+  const projects = selected ? deps.listProjects().filter((project) => selected.has(project.id)) : deps.listProjects();
   summary.total = projects.length;
   const transport = deps.loadTransport();
 
@@ -162,7 +172,11 @@ export function createExitExportDeps(listProjects: () => ExitExportProject[]): E
     listProjects,
     loadConfig: loadExitExportConfig,
     loadTransport: loadSyncTransportConfig,
-    upload: (bookId, config) => uploadSyncBundle(bookId, config, { maxAttempts: 1 }),
+    upload: (bookId, config) => withTimeout(
+      uploadSyncBundle(bookId, config, { maxAttempts: 1 }),
+      EXIT_EXPORT_UPLOAD_TIMEOUT_MS,
+      `退出导出上传超时（${EXIT_EXPORT_UPLOAD_TIMEOUT_MS} 毫秒）`,
+    ),
     record: appendSyncRecoveryRecord,
     markFailed: markExitExportFailed,
     markSucceeded: clearExitExportFailure,

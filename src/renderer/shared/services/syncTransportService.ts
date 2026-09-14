@@ -13,7 +13,7 @@
  * 收发一律经主进程 IPC（renderer 不直连网络/文件系统）。
  */
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
-import type { SyncTransportConfig, SyncTransportTestResult } from '@shared/types';
+import type { SyncTransportConfig, SyncTransportObject, SyncTransportTestResult } from '@shared/types';
 
 import { localStore } from './localStore';
 
@@ -119,4 +119,37 @@ export async function getSyncObject(
 ): Promise<string | null> {
   const target = api();
   return retryAsync(() => target.sync.get(config, key), options);
+}
+
+/** 列出传输后端上的对象（远端目录查看），失败按 retry 选项重试。 */
+export async function listSyncObjects(
+  config: SyncTransportConfig,
+  prefix?: string,
+  options?: RetryOptions,
+): Promise<SyncTransportObject[]> {
+  const target = api();
+  return retryAsync(() => target.sync.list(config, prefix), options);
+}
+
+/** 删除传输后端上的对象（远端目录清理），失败按 retry 选项重试。 */
+export async function removeSyncObject(
+  config: SyncTransportConfig,
+  key: string,
+  options?: RetryOptions,
+): Promise<void> {
+  const target = api();
+  await retryAsync(() => target.sync.remove(config, key), options);
+}
+
+/** 给任意 Promise 套超时：超时抛可读错误，原 Promise 继续但结果被忽略。 */
+export async function withTimeout<T>(run: Promise<T>, timeoutMs: number, message = '操作超时'): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  try {
+    return await Promise.race([run, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }

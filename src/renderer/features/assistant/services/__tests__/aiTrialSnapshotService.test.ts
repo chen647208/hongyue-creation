@@ -58,4 +58,24 @@ describe('AI 试错快照', () => {
     service.clear();
     expect(service.list()).toHaveLength(0);
   });
+
+  it('工具事务级：基线之外每次写工具各落一步，可回滚任意一步', () => {
+    service.begin({ sessionId: 's1', bookId: 'b1', label: '会话基线', chapters: [chapter('c1', 'v0')] });
+    service.begin({ sessionId: 's1', bookId: 'b1', label: 'core.text.continue', chapters: [chapter('c1', 'v1')] });
+    service.begin({ sessionId: 's1', bookId: 'b1', label: 'core.text.rewrite', chapters: [chapter('c1', 'v2')] });
+    const list = service.list('s1');
+    expect(list.map((entry) => entry.step)).toEqual([0, 1, 2]);
+    expect(list.map((entry) => entry.label)).toEqual(['会话基线', 'core.text.continue', 'core.text.rewrite']);
+    expect(service.rollback(list[1]?.id ?? '')?.[0]?.content).toBe('v1');
+    expect(service.rollback(list[2]?.id ?? '')?.[0]?.content).toBe('v2');
+  });
+
+  it('latestForBook 按书取最近一步，缺书 id 时取全局最近', () => {
+    service.begin({ sessionId: 's1', bookId: 'b1', label: 'b1-1', chapters: [] });
+    service.begin({ sessionId: 's2', bookId: 'b2', label: 'b2-1', chapters: [] });
+    service.begin({ sessionId: 's3', bookId: 'b1', label: 'b1-2', chapters: [] });
+    expect(service.latestForBook('b1')?.label).toBe('b1-2');
+    expect(service.latestForBook('b2')?.label).toBe('b2-1');
+    expect(service.latestForBook()?.label).toBe('b1-2');
+  });
 });

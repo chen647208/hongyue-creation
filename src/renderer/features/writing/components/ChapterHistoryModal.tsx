@@ -8,8 +8,8 @@
  */
 
 import type { RevisionEntity } from '@core/entities';
-import { Bot, Camera, Check, ChevronLeft, Copy, History, Redo2, RotateCcw, Trash2, X } from 'lucide-react';
-import React, { useEffect, useMemo, useState } from 'react';
+import { Bot, Camera, Check, ChevronDown, ChevronLeft, ChevronUp, Copy, History, Redo2, RotateCcw, Trash2, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { appendSnapshot, createSnapshot, listSnapshots, removeSnapshot } from '@/shared/services/chapterSnapshotService';
@@ -25,8 +25,11 @@ import type { Chapter } from '../../../../shared/types';
 import {
   changeHunks,
   diffChars,
+  fromRevisionReviewState,
   mergeRevisionDecisions,
   type RevisionDecision,
+  stepChangeIndex,
+  toRevisionReviewState,
   uniformDecisions,
 } from '../../../editor/revisionDiff';
 import { diffLines } from '../services/historyDiff';
@@ -67,6 +70,10 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
   // 修订对比：选定版本为基线，逐处接受/拒绝后写回正文（docs/design/38 §2.1）
   const [review, setReview] = useState<ReviewBaseline | null>(null);
   const [decisions, setDecisions] = useState<Record<string, RevisionDecision>>({});
+  // 逐处导航的当前改动下标（0 基，越界由 clamp 处理）
+  const [activeChangeIndex, setActiveChangeIndex] = useState(0);
+  const changeRefs = useRef(new Map<string, HTMLLIElement>());
+  const hydratedChapterRef = useRef<string | null>(null);
 
   const reviewHunks = useMemo(
     () => (review ? diffChars(review.text, chapter?.content ?? '') : []),
@@ -75,13 +82,37 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
   const reviewChanges = useMemo(() => changeHunks(reviewHunks), [reviewHunks]);
   const reviewMerged = useMemo(() => mergeRevisionDecisions(reviewHunks, decisions), [reviewHunks, decisions]);
 
+  /** 把中间态写回章节侧车字段；缺 onUpdateChapter 时只留会话内（旧调用方）。 */
+  const persistReview = (state: { label: string; text: string; decisions: Record<string, RevisionDecision> } | null) => {
+    if (!onUpdateChapter || !chapter) return;
+    const next: Chapter = { ...chapter };
+    if (state) next.revisionReview = toRevisionReviewState(state.label, state.text, state.decisions);
+    else delete next.revisionReview;
+    onUpdateChapter(next);
+  };
+
   const startReview = (label: string, text: string) => {
     setDecisions({});
     setReview({ label, text });
+    setActiveChangeIndex(0);
+    persistReview({ label, text, decisions: {} });
   };
   const stopReview = () => {
     setReview(null);
     setDecisions({});
+    persistReview(null);
+  };
+  const decideHunk = (hunkId: string, decision: RevisionDecision) => {
+    if (!review) return;
+    const next = { ...decisions, [hunkId]: decision };
+    setDecisions(next);
+    persistReview({ label: review.label, text: review.text, decisions: next });
+  };
+  const decideAll = (decision: RevisionDecision) => {
+    if (!review) return;
+    const next = Object.fromEntries(uniformDecisions(reviewHunks, decision)) as Record<string, RevisionDecision>;
+    setDecisions(next);
+    persistReview({ label: review.label, text: review.text, decisions: next });
   };
 
   // 修订记录按需加载：节点 id 即章节 id（bridge 平铺时原样透传）；
@@ -106,13 +137,55 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
     };
   }, [isOpen, chapter, tab]);
 
-  // 关闭后丢弃修订对比状态，重开从列表进入
+  // 打开时从侧车字段恢复进行中的对比（重开页面可续审）；换章或关闭即重置。
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || !chapter) {
+      hydratedChapterRef.current = null;
+      setReview(null);
+      setDecisions({});
+      setActiveChangeIndex(0);
+      return;
+    }
+    if (hydratedChapterRef.current === chapter.id) return;
+    hydratedChapterRef.current = chapter.id;
+    const restored = fromRevisionReviewState(chapter.revisionReview);
+    if (restored) {
+      setReview({ label: restored.label, text: restored.text });
+      setDecisions(restored.decisions);
+    } else {
       setReview(null);
       setDecisions({});
     }
-  }, [isOpen]);
+    setActiveChangeIndex(0);
+  }, [isOpen, chapter]);
+
+  // 逐处导航：进入对比或改动数变化时回到第一处。
+  useEffect(() => {
+    setActiveChangeIndex(0);
+  }, [review, reviewChanges.length]);
+
+  // 键盘导航：Alt+↑/Alt+↓ 切换上一处/下一处（正文输入框聚焦时同样可用）。
+  useEffect(() => {
+    if (!review || reviewChanges.length === 0) return;
+    const handler = (event: KeyboardEvent) => {
+      if (!event.altKey) return;
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setActiveChangeIndex((index) => stepChangeIndex(index, reviewChanges.length, -1));
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setActiveChangeIndex((index) => stepChangeIndex(index, reviewChanges.length, 1));
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [review, reviewChanges.length]);
+
+  // 当前改动滚入视野。
+  useEffect(() => {
+    const active = reviewChanges[activeChangeIndex];
+    if (active) changeRefs.current.get(active.id)?.scrollIntoView({ block: 'nearest' });
+  }, [activeChangeIndex, reviewChanges]);
 
   if (!isOpen || !chapter) {
     return null;
@@ -128,23 +201,24 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
   };
   const fallbackSourceLabel = { text: t('chapterHistory.sourceAuto'), cls: DEFAULT_SOURCE_CLS };
 
-  const handleRestoreSnapshot = (content: string) => {
+  const applyContentWithSnapshot = (content: string) => {
     if (onUpdateChapter) {
-      const withSnapshot = appendSnapshot(chapter, createSnapshot(chapter.content ?? '', 'before-rollback'));
-      onUpdateChapter({ ...withSnapshot, content });
+      // 改动前落 before-rollback 快照；应用后结束对比，清掉侧车中间态
+      const next: Chapter = { ...appendSnapshot(chapter, createSnapshot(chapter.content ?? '', 'before-rollback')), content };
+      delete next.revisionReview;
+      onUpdateChapter(next);
     } else {
       onApplyContent(content);
     }
+  };
+
+  const handleRestoreSnapshot = (content: string) => {
+    applyContentWithSnapshot(content);
     onClose();
   };
 
   const handleApplyReview = () => {
-    if (onUpdateChapter) {
-      const withSnapshot = appendSnapshot(chapter, createSnapshot(chapter.content ?? '', 'before-rollback'));
-      onUpdateChapter({ ...withSnapshot, content: reviewMerged });
-    } else {
-      onApplyContent(reviewMerged);
-    }
+    applyContentWithSnapshot(reviewMerged);
     dialogService.alert(t('chapterHistory.reviewApplied'));
     onClose();
   };
@@ -158,25 +232,41 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
         <div className="text-xs text-muted-foreground">
           {t('chapterHistory.reviewCharSync', { from: currentCharCount, to: mergedCharCount })}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDecisions(Object.fromEntries(uniformDecisions(reviewHunks, 'accept')))}
-          >
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 px-1" title={t('chapterHistory.reviewShortcutHint')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              onClick={() => setActiveChangeIndex((index) => stepChangeIndex(index, reviewChanges.length, -1))}
+              disabled={activeChangeIndex <= 0}
+              title={t('chapterHistory.reviewPrev')}
+              aria-label={t('chapterHistory.reviewPrev')}
+            >
+              <ChevronUp className="size-3.5" />
+            </Button>
+            <span className="min-w-[56px] text-center text-2xs tabular-nums text-muted-foreground">
+              {t('chapterHistory.reviewProgress', { current: reviewChanges.length ? activeChangeIndex + 1 : 0, total: reviewChanges.length })}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              onClick={() => setActiveChangeIndex((index) => stepChangeIndex(index, reviewChanges.length, 1))}
+              disabled={activeChangeIndex >= reviewChanges.length - 1}
+              title={t('chapterHistory.reviewNext')}
+              aria-label={t('chapterHistory.reviewNext')}
+            >
+              <ChevronDown className="size-3.5" />
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => decideAll('accept')}>
             <Check className="size-3.5" /> {t('chapterHistory.reviewAcceptAll')}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDecisions(Object.fromEntries(uniformDecisions(reviewHunks, 'reject')))}
-          >
+          <Button variant="outline" size="sm" onClick={() => decideAll('reject')}>
             <X className="size-3.5" /> {t('chapterHistory.reviewRejectAll')}
           </Button>
-          <Button
-            size="sm"
-            onClick={handleApplyReview}
-          >
+          <Button size="sm" onClick={handleApplyReview}>
             <Redo2 className="size-3.5" /> {t('chapterHistory.reviewApply')}
           </Button>
         </div>
@@ -189,7 +279,17 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
           {reviewChanges.map((hunk, index) => {
             const decision = decisions[hunk.id] ?? 'reject';
             return (
-              <li key={hunk.id} className="rounded-lg border border-border bg-card p-3">
+              <li
+                key={hunk.id}
+                ref={(element) => {
+                  if (element) changeRefs.current.set(hunk.id, element);
+                  else changeRefs.current.delete(hunk.id);
+                }}
+                className={cn(
+                  'rounded-lg border border-border bg-card p-3',
+                  index === activeChangeIndex && 'ring-2 ring-primary/50',
+                )}
+              >
                 <div className="mb-2 text-[10px] uppercase tracking-wide text-muted-foreground">
                   {t('chapterHistory.reviewChangeLabel', { index: index + 1 })}
                 </div>
@@ -222,7 +322,7 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
                     variant={decision === 'accept' ? 'default' : 'outline'}
                     size="sm"
                     className="h-7 px-3 text-xs"
-                    onClick={() => setDecisions((prev) => ({ ...prev, [hunk.id]: 'accept' }))}
+                    onClick={() => decideHunk(hunk.id, 'accept')}
                   >
                     {t('chapterHistory.reviewAccept')}
                   </Button>
@@ -230,7 +330,7 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
                     variant={decision === 'reject' ? 'default' : 'outline'}
                     size="sm"
                     className="h-7 px-3 text-xs"
-                    onClick={() => setDecisions((prev) => ({ ...prev, [hunk.id]: 'reject' }))}
+                    onClick={() => decideHunk(hunk.id, 'reject')}
                   >
                     {t('chapterHistory.reviewReject')}
                   </Button>
@@ -376,7 +476,7 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
                         size="sm"
                         className="shrink-0"
                         onClick={() => {
-                          onApplyContent(rev.body);
+                          applyContentWithSnapshot(rev.body);
                           onClose();
                         }}
                         title={t('chapterHistory.revisionApplyTitle')}
@@ -509,7 +609,7 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
                         variant="default"
                         size="sm"
                         onClick={() => {
-                          onApplyContent(record.generatedContent);
+                          applyContentWithSnapshot(record.generatedContent);
                           onClose();
                         }}
                       >

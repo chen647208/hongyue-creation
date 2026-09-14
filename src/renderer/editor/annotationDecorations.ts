@@ -34,6 +34,21 @@ export interface AnnotationDecorationInput {
 export interface AnnotationDecorationsOptions {
   /** 返回当前待装饰范围；项目数据变化后由宿主 dispatch 空事务触发重算。 */
   getAnnotations: () => readonly AnnotationDecorationInput[];
+  /** 点击高亮时回调批注 id（宿主据此打开/定位左栏线程）；缺省不处理点击。 */
+  onAnnotationClick?: (annotationId: string) => void;
+}
+
+/**
+ * 从点击目标向上找最近的批注高亮，取 `data-annotation-id`。
+ * 目标不含该属性或不在 DOM 上时返回 null；纯函数，便于单测。
+ */
+export function annotationIdFromTarget(target: unknown): string | null {
+  if (!target || typeof target !== 'object') return null;
+  const candidate = target as { closest?: (selector: string) => { getAttribute?: (name: string) => string | null } | null };
+  if (typeof candidate.closest !== 'function') return null;
+  const element = candidate.closest('[data-annotation-id]');
+  const id = element?.getAttribute?.('data-annotation-id') ?? null;
+  return id && id.length > 0 ? id : null;
 }
 
 /** 行内原子节点在纯文本中的显示长度口径（与 blockIndex.blockText 对齐）。 */
@@ -129,14 +144,21 @@ function indexBlocks(doc: ProseMirrorNode): Map<string, { node: ProseMirrorNode;
 export const AnnotationDecorations = Extension.create<AnnotationDecorationsOptions>({
   name: 'annotationDecorations',
   addOptions() {
-    return { getAnnotations: () => [] };
+    return { getAnnotations: () => [], onAnnotationClick: undefined };
   },
   addProseMirrorPlugins() {
     const getAnnotations = this.options.getAnnotations;
+    const onAnnotationClick = this.options.onAnnotationClick;
     return [
       new Plugin({
         key: new PluginKey('annotationDecorations'),
         props: {
+          handleClick(_view, _pos, event) {
+            const id = annotationIdFromTarget(event.target);
+            if (id) onAnnotationClick?.(id);
+            // 不拦截默认行为：高亮处仍可正常放光标/选择
+            return false;
+          },
           decorations(state) {
             const inputs = getAnnotations();
             if (inputs.length === 0) return DecorationSet.empty;

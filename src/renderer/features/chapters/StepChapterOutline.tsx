@@ -138,9 +138,17 @@ const StepChapterOutline: React.FC<StepChapterOutlineProps> = ({ project, onEnte
   });
 
   // 从既有正文提取细纲草稿（与「大纲→细纲」方向互补，确认后才写入）
-  const { extracting, draft, tokens: extractTokens, extract, applyDraft, discardDraft } = useChapterOutlineExtraction({
-    project, activeModel, onUpdate, t,
-  });
+  const {
+    extracting,
+    draft,
+    tokens: extractTokens,
+    batchProgress: extractBatchProgress,
+    hasRemaining,
+    extract,
+    extractRemaining,
+    applyDraft,
+    discardDraft,
+  } = useChapterOutlineExtraction({ project, activeModel, onUpdate, t });
 
   return (
     <div className="mx-auto flex h-full w-full max-w-7xl flex-col gap-5 overflow-hidden p-8">
@@ -235,6 +243,7 @@ const StepChapterOutline: React.FC<StepChapterOutlineProps> = ({ project, onEnte
             value={selectedPromptId}
             onChange={(e) => setSelectedPromptId(e.target.value)}
             className="h-10 w-auto"
+            aria-label={t('steps:common.promptTemplate')}
           >
             {chapterPrompts.map(p => <option key={p.id} value={p.id}>{templateDisplayName(p)}</option>)}
           </Select>
@@ -332,8 +341,11 @@ const StepChapterOutline: React.FC<StepChapterOutlineProps> = ({ project, onEnte
                 drafts={draft}
                 chapters={project.chapters}
                 tokens={extractTokens}
+                batchProgress={extractBatchProgress}
                 onApply={applyDraft}
                 onDiscard={discardDraft}
+                onContinue={hasRemaining ? () => void extractRemaining() : undefined}
+                continueDisabled={extracting || !isModelUsable(activeModel)}
               />
             </div>
           )}
@@ -467,6 +479,7 @@ const ChapterWorldRelationEditor: React.FC<ChapterWorldRelationEditorProps> = ({
               value={chapter.mainLocationId || ''}
               onChange={(e) => onUpdate({ mainLocationId: e.target.value || undefined })}
               className="h-8 text-xs"
+              aria-label={t('steps:chapters.mainLocation')}
             >
               <option value="">{t('steps:chapters.noneOption')}</option>
               {locations.map(location => (
@@ -562,6 +575,7 @@ const ChapterWorldRelationEditor: React.FC<ChapterWorldRelationEditorProps> = ({
                       value={chapter.timelineEventId || ''}
                       onChange={(e) => onUpdate({ timelineEventId: e.target.value || undefined })}
                       className="h-8 text-xs"
+                      aria-label={t('steps:chapters.linkedEvent')}
                     >
                       <option value="">{t('steps:chapters.noneOption')}</option>
                       {timeline.events.map(event => (

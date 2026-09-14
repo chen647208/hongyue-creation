@@ -15,6 +15,7 @@ import {
   formatNoRetrieval,
   quoteAppearsExactly,
   renderCitations,
+  stripSnippetMarkers,
   toCitation,
 } from '../grounding.js';
 
@@ -86,5 +87,12 @@ describe('quoteAppearsExactly（逐字校验）', () => {
     expect(quoteAppearsExactly('星辰之力', '以星辰之力驱动')).toBe(true);
     expect(quoteAppearsExactly('星辰的力量', '以星辰之力驱动')).toBe(false);
     expect(quoteAppearsExactly('', '原文')).toBe(false);
+  });
+
+  it('检索片段：去高亮标记后逐段比对，省略号拼接的窗口也校验', () => {
+    expect(stripSnippetMarkers('他[走了]很久')).toBe('他走了很久');
+    const original = '他走了很久，风停了，星辉落在观星台上。';
+    expect(quoteAppearsExactly('他走了…风停了', original)).toBe(true);
+    expect(quoteAppearsExactly('他跑了…风停了', original)).toBe(false);
   });
 });

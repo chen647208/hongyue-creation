@@ -13,6 +13,7 @@
  * 只落 localStorage 偏好区，不写业务数据；记录上限滚动淘汰。
  */
 import { uuidv7 } from '@core/entities';
+import type { SyncBundle } from '@core/sync';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 
 import { localStore } from './localStore';
@@ -142,4 +143,60 @@ export function clearExitExportFailure(bookId: string): void {
 
 export function clearPendingExitExports(): void {
   localStore.removeItem(STORAGE_KEYS.syncPendingExports);
+}
+
+/** 已登记、等待重新解决的合并冲突：整包留档，重解时无需重新导入。 */
+export interface PendingMergeConflict {
+  id: string;
+  bookId: string;
+  at: number;
+  /** 产生该冲突的入口（导入或下载）。 */
+  kind: SyncRecoveryKind;
+  bundle: SyncBundle;
+}
+
+function isPendingMergeConflict(value: unknown): value is PendingMergeConflict {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.id === 'string' && typeof v.bookId === 'string' && typeof v.at === 'number'
+    && typeof v.kind === 'string' && typeof v.bundle === 'object' && v.bundle !== null;
+}
+
+function readPendingMerges(): PendingMergeConflict[] {
+  const raw = localStore.getItem(STORAGE_KEYS.syncPendingMerges);
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isPendingMergeConflict) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingMerges(merges: PendingMergeConflict[]): void {
+  localStore.setItem(STORAGE_KEYS.syncPendingMerges, JSON.stringify(merges));
+}
+
+/** 列出待重解的合并冲突（最近一条在前）。 */
+export function listPendingMerges(bookId?: string): PendingMergeConflict[] {
+  const all = readPendingMerges().sort((a, b) => b.at - a.at);
+  return bookId ? all.filter((m) => m.bookId === bookId) : all;
+}
+
+/** 登记待重解冲突：按书去重，保留最新整包。 */
+export function registerPendingMerge(input: { bookId: string; kind: SyncRecoveryKind; bundle: SyncBundle }): PendingMergeConflict {
+  const record: PendingMergeConflict = { id: uuidv7(), at: Date.now(), ...input };
+  const rest = readPendingMerges().filter((m) => m.bookId !== input.bookId);
+  writePendingMerges([record, ...rest]);
+  return record;
+}
+
+/** 清除某书的待重解登记（冲突已解决）。 */
+export function clearPendingMerge(bookId: string): void {
+  const next = readPendingMerges().filter((m) => m.bookId !== bookId);
+  writePendingMerges(next);
+}
+
+export function clearPendingMerges(): void {
+  localStore.removeItem(STORAGE_KEYS.syncPendingMerges);
 }

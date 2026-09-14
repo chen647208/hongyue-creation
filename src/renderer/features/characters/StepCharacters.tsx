@@ -264,7 +264,7 @@ const StepCharacters: React.FC<StepCharactersProps> = ({
             <div className="space-y-3">
               <div>
                 <span className="mb-1 block text-2xs uppercase tracking-wider text-muted-foreground">{t('strategy.templateLabel')}</span>
-                <Select value={selectedPromptId} onChange={(e) => setSelectedPromptId(e.target.value)}>
+                <Select value={selectedPromptId} onChange={(e) => setSelectedPromptId(e.target.value)} aria-label={t('strategy.templateLabel')}>
                   {characterPrompts.map(p => <option key={p.id} value={p.id}>{templateDisplayName(p)}</option>)}
                 </Select>
               </div>

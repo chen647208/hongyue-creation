@@ -75,6 +75,41 @@ describe('mergeBundle（LWW 禁用 → 冲突副本）', () => {
     expect(report.skipped[0]).toContain('墓碑');
   });
 
+  it('既有节点新增属性：节点内容未变也补插远端属性', () => {
+    const n = node('n1', '同章', '同一内容');
+    const remoteAttr = attr('a1', 'n1', '远端新增');
+    const remote = snap([n], [remoteAttr]);
+    const bundle = buildBundle({
+      bookId: 'b1',
+      instanceId: 'dev-b',
+      changes: [
+        { changeId: 1, entityName: 'nodes', entityId: 'n1', hash: canonicalHash(n), isErased: false, agentId: 'user', utcDateChanged: 1 },
+        { changeId: 2, entityName: 'attrs', entityId: 'a1', hash: canonicalHash(remoteAttr), isErased: false, agentId: 'user', utcDateChanged: 1 },
+      ],
+      entities: remote,
+    });
+
+    const report = mergeBundle(bundle, localState(snap([n])));
+
+    expect(report.appliedAttrs.map((a) => a.id)).toEqual(['a1']);
+    expect(report.insertAttrs.map((a) => a.id)).toEqual(['a1']);
+    expect(report.applied).toHaveLength(0);
+  });
+
+  it('节点冲突时属性随副本迁移，不再补插到本地原节点', () => {
+    const remoteVersion = node('n1', '第一章', '远端改写的正文');
+    const localVersion = node('n1', '第一章', '本地改写的正文');
+    const remote = snap([remoteVersion], [attr('a1', 'n1', 'remote-status')]);
+    const bundle = buildBundle({ bookId: 'b1', instanceId: 'dev-b', changes: [{ changeId: 1, entityName: 'nodes', entityId: 'n1', hash: canonicalHash(remoteVersion), isErased: false, agentId: 'user', utcDateChanged: 2 }], entities: remote });
+    const local = localState(snap([localVersion], [attr('a1', 'n1', 'local-status')]));
+
+    const report = mergeBundle(bundle, local);
+
+    expect(report.appliedAttrs).toHaveLength(0);
+    expect(report.insertAttrs).toHaveLength(1);
+    expect(report.insertAttrs[0]!.nodeId).toBe(report.conflictCopies[0]!.node.id);
+  });
+
   it('attrs 冲突：报告人工处理，不覆盖', () => {
     const remote = snap([], [attr('a1', 'n1', 'remote')]);
     const bundle = buildBundle({ bookId: 'b1', instanceId: 'dev-b', changes: [{ changeId: 1, entityName: 'attrs', entityId: 'a1', hash: canonicalHash(remote.attrs[0]!), isErased: false, agentId: 'user', utcDateChanged: 1 }], entities: remote });

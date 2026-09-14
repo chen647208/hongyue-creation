@@ -39,7 +39,8 @@
 ## 数据视图
 
 - 入口：世界分区「数据视图」开关卡，组件为 `src/renderer/features/views/MultiViewPanel.tsx`。
-- 数据来源：`buildEntityView.ts` 把任意域拍平为行与关系边——章节（含虚拟章节）、实体（角色/地点/势力/事件）、清单项（知识库/伏笔/计划/分组）、规则与世界观，以及 `Project.extensions` 中的扩展类型。章节正文的 `# @键: 值` 行（`parseKeywordAttributes`）与扩展条目的自有字段都成为行字段，列与公式取数不写死六实体。
+- 数据来源：`buildEntityView.ts` 把任意域拍平为行与关系边——章节（含虚拟章节）、实体（角色/地点/势力/事件）、清单项（知识库/伏笔/计划/分组）、规则与世界观、`Project.branching` 的分支场景、`Project.translation` 的对照段落、`Project.pictureBook` 的绘本页，以及 `Project.extensions` 中的扩展类型。章节正文的 `# @键: 值` 行（`parseKeywordAttributes`）与扩展条目的自有字段都成为行字段，列与公式取数不写死六实体。
+- 分支视图：场景成行、选择项成关系边，完整性问题（孤儿/未定义变量/悬空目标等）写入行详情；`branchView.ts` 的 `projectBranchData` / `validateProjectBranching` / `buildProjectBranchView` 直接读 `Project.branching`，与校验同源。
 - 视图种类：表格（`ViewTable.tsx`，`@tanstack/react-table` 排序与列显隐）、卡片（`ViewCards.tsx`，`@tanstack/react-virtual` 按行虚拟化）、关系图（`ViewGraph.tsx`，按类型着色，边来自角色↔势力↔地点↔事件关联）、大纲（`ViewOutline.tsx`，编号列表）、读者预览（`ViewReader.tsx`，按桌面/平板/手机宽度正文排版）。
 - 拖拽分配：字段区列出所有域的字段，拖入字段区显示该列；类型区按当前数据的域动态生成，拖入即按该类型筛选（原生 HTML5 拖放，无额外依赖）。
 - 布局持久化：视图类型、列、隐藏列、排序、类型筛选、读者设备宽度、内容区高度写入 `views` 表的 `ViewDefinition.config`，经 `genericModelStore` 读写；上次选中视图按作品记在 `localStore` 的 `views.selected`。

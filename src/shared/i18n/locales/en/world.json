@@ -38,7 +38,10 @@
       "world": "World",
       "plan": "Plan",
       "group": "Group",
-      "reference": "Reference"
+      "reference": "Reference",
+      "branchScene": "Branch scene",
+      "picturePage": "Picture page",
+      "translationPair": "Translation pair"
     },
     "references": {
       "title": "References",
@@ -70,7 +73,10 @@
       "kind": "Type",
       "title": "Name",
       "summary": "Summary",
-      "detail": "Detail"
+      "detail": "Detail",
+      "source": "Source",
+      "target": "Translation",
+      "confirmed": "Confirmed"
     },
     "export": {
       "label": "Export table",

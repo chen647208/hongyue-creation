@@ -243,7 +243,7 @@ const ConsistencyPromptManager: React.FC<ConsistencyPromptManagerProps> = ({
                       <Trash2 className="size-4" />
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" className="size-8" onClick={() => setEditingId(editingId === template.id ? null : template.id)}>
+                  <Button variant="ghost" size="icon" className="size-8" onClick={() => setEditingId(editingId === template.id ? null : template.id)} title={t('consistency:pm.toggleTitle')} aria-label={t('consistency:pm.toggleTitle')}>
                     {editingId === template.id ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
                   </Button>
                 </div>
@@ -258,6 +258,7 @@ const ConsistencyPromptManager: React.FC<ConsistencyPromptManagerProps> = ({
                     value={template.category}
                     onChange={(e) => updateTemplate(template.id, { category: e.target.value as ConsistencyCheckPromptCategory })}
                     disabled={template.isDefault}
+                    aria-label={t('consistency:pm.categoryLabel')}
                   >
                     {(['semantic_character', 'semantic_faction', 'semantic_location', 'semantic_timeline', 'semantic_cross', 'similarity_detection'] as ConsistencyCheckPromptCategory[]).map(cat => (
                       <option key={cat} value={cat}>{t(`consistency:promptCategory.${cat}`)}</option>

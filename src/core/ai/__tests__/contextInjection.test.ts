@@ -12,6 +12,7 @@ import { describe, expect,it } from 'vitest';
 import type { Project } from '../../../shared/types';
 import {
   assembleContextInjection,
+  composeContextTarget,
   inferContextTarget,
   planContextInjection,
   renderContextInjection,
@@ -112,6 +113,28 @@ describe('inferContextTarget', () => {
     expect(inferContextTarget(project, '林渊接下来会做什么').entityId).toBe('char1');
     expect(inferContextTarget(project, '苏晚的动机').entityKind).toBe('character');
     expect(inferContextTarget(null, '第2章').chapterId).toBeUndefined();
+  });
+});
+
+describe('composeContextTarget（编辑器真实状态优先）', () => {
+  it('活动章节覆盖文本推断，选中文本命中实体则注入实体', () => {
+    const project = stubProject('');
+    const target = composeContextTarget(project, '帮我续写', {
+      chapterId: 'ch2',
+      selectionText: '林渊沉默地看着苏晚',
+    });
+    expect(target.chapterId).toBe('ch2');
+    expect(target.entityId).toBe('char1');
+    expect(target.entityKind).toBe('character');
+    expect(target.viewName).toBe('writing');
+    expect(target.query).toContain('帮我续写');
+    expect(target.query).toContain('林渊沉默地看着苏晚');
+  });
+
+  it('无编辑器上下文时回落到任务文本推断', () => {
+    const target = composeContextTarget(stubProject(''), '把第2章重写一下');
+    expect(target.chapterId).toBe('ch1');
+    expect(target.viewName).toBeUndefined();
   });
 });
 

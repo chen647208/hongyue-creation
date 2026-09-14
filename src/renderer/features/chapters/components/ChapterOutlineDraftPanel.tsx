@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-/** 从正文提取的细纲草稿预览面板：逐章勾选后确认写入；已有细纲的章节只读跳过。 */
+/** 从正文提取的细纲草稿预览面板：逐条可编辑、勾选后确认写入；已有细纲的章节只读跳过。 */
 import { Check, FileSearch, X } from 'lucide-react';
 import React, { useEffect,useMemo,useState } from 'react';
 
@@ -15,25 +15,34 @@ import { useTranslation } from '@/i18n';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { Checkbox } from '@/shared/ui/Checkbox';
+import { Textarea } from '@/shared/ui/Textarea';
 
 import { type Chapter, type TokenUsage } from '../../../../shared/types';
-import { type OutlineDraft } from '../services/chapterOutline';
+import { applyDraftEdits, type OutlineDraft } from '../services/chapterOutline';
 
 export interface ChapterOutlineDraftPanelProps {
   drafts: OutlineDraft[];
   chapters: Chapter[];
   tokens?: TokenUsage;
-  /** 确认应用选中的草稿 id（只写空白细纲）。 */
-  onApply: (selectedIds: Set<string>) => void;
+  /** 分批提取进度（已完成/总批次）；缺省不显示。 */
+  batchProgress?: { done: number; total: number };
+  /** 确认应用选中的（可能已逐条编辑的）草稿；只写空白细纲。 */
+  onApply: (selectedIds: Set<string>, drafts: OutlineDraft[]) => void;
   onDiscard: () => void;
+  /** 上一轮失败后剩余批次可续提；缺省不显示续提入口。 */
+  onContinue?: () => void;
+  continueDisabled?: boolean;
 }
 
 export const ChapterOutlineDraftPanel: React.FC<ChapterOutlineDraftPanelProps> = ({
   drafts,
   chapters,
   tokens,
+  batchProgress,
   onApply,
   onDiscard,
+  onContinue,
+  continueDisabled,
 }) => {
   const { t } = useTranslation(['steps', 'common']);
   const summaryById = useMemo(
@@ -45,10 +54,16 @@ export const ChapterOutlineDraftPanel: React.FC<ChapterOutlineDraftPanelProps> =
     [drafts, summaryById],
   );
   const [selected, setSelected] = useState<Set<string>>(() => new Set(applicableIds));
+  const [edits, setEdits] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setSelected(new Set(applicableIds));
   }, [applicableIds]);
+
+  // 新一批草稿到达时丢弃上一批的逐条编辑，避免张冠李戴。
+  useEffect(() => {
+    setEdits({});
+  }, [drafts]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -66,12 +81,22 @@ export const ChapterOutlineDraftPanel: React.FC<ChapterOutlineDraftPanelProps> =
           <FileSearch className="size-3.5" /> {t('steps:chapters.draftTitle')}
         </span>
         <div className="flex items-center gap-2">
-          {tokens && tokens.total > 0 && (
+          {batchProgress && batchProgress.total > 1 ? (
+            <span className="text-2xs tabular-nums text-muted-foreground">
+              {t('steps:chapters.extractBatchProgress', { done: batchProgress.done, total: batchProgress.total })}
+            </span>
+          ) : null}
+          {tokens && tokens.total > 0 ? (
             <span className="text-2xs tabular-nums text-muted-foreground">
               {t('steps:chapters.totalLabel')} {tokens.total}
             </span>
-          )}
-          <Button size="sm" onClick={() => onApply(selected)} disabled={selected.size === 0}>
+          ) : null}
+          {onContinue ? (
+            <Button size="sm" variant="outline" onClick={onContinue} disabled={continueDisabled}>
+              <FileSearch className="size-3.5" /> {t('steps:chapters.extractContinue')}
+            </Button>
+          ) : null}
+          <Button size="sm" onClick={() => onApply(selected, applyDraftEdits(drafts, edits))} disabled={selected.size === 0}>
             <Check className="size-3.5" /> {t('steps:chapters.draftApply')}
           </Button>
           <Button size="sm" variant="ghost" onClick={onDiscard}>
@@ -85,6 +110,7 @@ export const ChapterOutlineDraftPanel: React.FC<ChapterOutlineDraftPanelProps> =
       <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
         {drafts.map((d) => {
           const skipped = Boolean(summaryById.get(d.chapterId));
+          const value = edits[d.chapterId] ?? d.summary;
           return (
             <div key={d.chapterId} className="flex gap-2 rounded-md border border-border bg-background/60 p-2.5">
               <Checkbox
@@ -105,7 +131,13 @@ export const ChapterOutlineDraftPanel: React.FC<ChapterOutlineDraftPanelProps> =
                     </span>
                   )}
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{d.summary}</p>
+                <Textarea
+                  value={value}
+                  disabled={skipped}
+                  aria-label={t('steps:chapters.draftEditLabel')}
+                  onChange={(event) => setEdits((prev) => ({ ...prev, [d.chapterId]: event.target.value }))}
+                  className="mt-1 min-h-[56px] resize-y bg-muted/40 text-xs leading-relaxed"
+                />
               </div>
             </div>
           );

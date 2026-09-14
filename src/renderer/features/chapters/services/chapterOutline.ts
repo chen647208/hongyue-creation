@@ -14,8 +14,13 @@ import { uuidv7 } from '@core/entities';
 
 import { roleLabel } from '@/shared/utils/displayLabels';
 
-import { EXTRACT_OUTLINE_PER_CHAPTER_LIMIT,EXTRACT_OUTLINE_SUMMARY_TARGET } from '../../../../shared/constants/chapters';
-import { type Chapter, type Project } from '../../../../shared/types';
+import {
+  EXTRACT_OUTLINE_BATCH_SIZE,
+  EXTRACT_OUTLINE_BATCH_TOKEN_BUDGET,
+  EXTRACT_OUTLINE_PER_CHAPTER_LIMIT,
+  EXTRACT_OUTLINE_SUMMARY_TARGET,
+} from '../../../../shared/constants/chapters';
+import { type Chapter, type Project, type TokenUsage } from '../../../../shared/types';
 
 const CHAPTER_REGEX = /第\s*([0-9一二三四五六七八九十百]+)\s*章[:：]?\s*([^\n]+)([\s\S]*?)(?=第\s*[0-9一二三四五六七八九十百]+\s*章|---|$(?![\s\S]))/gi;
 const EXTRACT_CHAPTER_REGEX = /第\s*([0-9一二三四五六七八九十百千零〇两]+)\s*章\s*[｜|:：]?\s*([^\n]*)\n?([\s\S]*?)(?=第\s*[0-9一二三四五六七八九十百千零〇两]+\s*章|$(?![\s\S]))/gi;
@@ -109,6 +114,17 @@ export interface OutlineDraft {
   summary: string;
 }
 
+/** 把逐条编辑覆盖到草稿文本上：未提供或与原文相同的项原样返回（保持引用稳定）。 */
+export function applyDraftEdits(
+  drafts: readonly OutlineDraft[],
+  edits: Readonly<Record<string, string>>,
+): OutlineDraft[] {
+  return drafts.map((draft) => {
+    const edited = edits[draft.chapterId];
+    return edited === undefined || edited === draft.summary ? draft : { ...draft, summary: edited };
+  });
+}
+
 export interface ExtractionPromptOptions {
   /** 单章正文送模型的截断字符数，默认 EXTRACT_OUTLINE_PER_CHAPTER_LIMIT。 */
   perChapterCharLimit?: number;
@@ -136,6 +152,66 @@ export function buildExtractionPrompt(chapters: Chapter[], options: ExtractionPr
     '细纲：……',
     '---',
   ].join('\n');
+}
+
+export interface ExtractionBatchOptions {
+  /** 每批最多章节数，默认 EXTRACT_OUTLINE_BATCH_SIZE。 */
+  batchSize?: number;
+  /** 每批近似 token 预算，默认 EXTRACT_OUTLINE_BATCH_TOKEN_BUDGET。 */
+  tokenBudget?: number;
+  /** 单章正文截断（与提示词口径一致），默认 EXTRACT_OUTLINE_PER_CHAPTER_LIMIT。 */
+  perChapterCharLimit?: number;
+}
+
+/** 单章送模型的正文字符数（与提示词截断一致），作为 token 近似。 */
+export function estimateExtractionTokens(
+  chapter: Chapter,
+  perChapterCharLimit: number = EXTRACT_OUTLINE_PER_CHAPTER_LIMIT,
+): number {
+  return Math.min((chapter.content ?? '').trim().length, perChapterCharLimit);
+}
+
+/**
+ * 按批大小与 token 预算把有正文的章节分批：保持顺序，批次内不超预算；
+ * 单章即超预算时仍单独成批（不丢章）。空数组表示没有可提取的正文。
+ */
+export function planExtractionBatches(
+  chapters: readonly Chapter[],
+  options: ExtractionBatchOptions = {},
+): Chapter[][] {
+  const batchSize = options.batchSize ?? EXTRACT_OUTLINE_BATCH_SIZE;
+  const budget = options.tokenBudget ?? EXTRACT_OUTLINE_BATCH_TOKEN_BUDGET;
+  const perChapterCharLimit = options.perChapterCharLimit ?? EXTRACT_OUTLINE_PER_CHAPTER_LIMIT;
+  const usable = chapters.filter((c) => (c.content ?? '').trim().length > 0);
+
+  const batches: Chapter[][] = [];
+  let current: Chapter[] = [];
+  let used = 0;
+  for (const chapter of usable) {
+    const cost = estimateExtractionTokens(chapter, perChapterCharLimit);
+    if (current.length > 0 && (current.length >= batchSize || used + cost > budget)) {
+      batches.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(chapter);
+    used += cost;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
+/** 累加两次 token 用量（缓存字段只在任一侧出现时相加，缺席即 0）。 */
+export function addTokenUsage(a: TokenUsage, b: TokenUsage | undefined): TokenUsage {
+  if (!b) return a;
+  const sum: TokenUsage = {
+    prompt: a.prompt + b.prompt,
+    completion: a.completion + b.completion,
+    total: a.total + b.total,
+  };
+  if (a.cacheRead !== undefined || b.cacheRead !== undefined) sum.cacheRead = (a.cacheRead ?? 0) + (b.cacheRead ?? 0);
+  if (a.cacheWrite !== undefined || b.cacheWrite !== undefined) sum.cacheWrite = (a.cacheWrite ?? 0) + (b.cacheWrite ?? 0);
+  return sum;
 }
 
 /**
@@ -175,7 +251,7 @@ export interface ApplyDraftResult {
 }
 
 /** 把草稿写入章节细纲：只写空白细纲，已有细纲的章节一律跳过（不覆盖）。 */
-export function applyOutlineDrafts(chapters: Chapter[], drafts: OutlineDraft[], options: ApplyDraftOptions = {}): ApplyDraftResult {
+export function applyOutlineDrafts(chapters: Chapter[], drafts: readonly OutlineDraft[], options: ApplyDraftOptions = {}): ApplyDraftResult {
   const draftByChapter = new Map(drafts.map((d) => [d.chapterId, d]));
   const appliedIds: string[] = [];
   const skippedExistingIds: string[] = [];

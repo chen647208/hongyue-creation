@@ -12,8 +12,9 @@
  * 复用 EntityViewData，可直接用既有表格/卡片/关系图视图呈现。
  * 只做投影，不执行分支——运行时执行由下游引擎负责。
  */
-import type { BranchScene, BranchVariable } from '@core/build';
+import type { BranchIssue, BranchScene, BranchVariable } from '@core/build';
 import { buildJumpTable, validateBranching } from '@core/build';
+import type { BranchingModel } from '@shared/types';
 
 import type { EntityViewData, ViewColumn, ViewLink, ViewRow } from './types';
 
@@ -70,4 +71,33 @@ export function buildBranchView(
   }
 
   return { columns: BRANCH_VIEW_COLUMNS, rows, links };
+}
+
+/** 真实数据入口：从 Project.branching 取场景、变量与起点。 */
+export interface ProjectBranchData {
+  scenes: BranchScene[];
+  variables: BranchVariable[];
+  startId?: string;
+}
+
+export function projectBranchData(project: { branching?: BranchingModel }): ProjectBranchData {
+  const model = project.branching;
+  const data: ProjectBranchData = {
+    scenes: model?.scenes ?? [],
+    variables: model?.variables ?? [],
+  };
+  if (model?.startId) data.startId = model.startId;
+  return data;
+}
+
+/** 校验 Project 上的分支模型，问题供视图跳转定位。 */
+export function validateProjectBranching(project: { branching?: BranchingModel }): BranchIssue[] {
+  const { scenes, variables, startId } = projectBranchData(project);
+  return validateBranching(scenes, variables, startId);
+}
+
+/** 从 Project 直接投影分支视图（真实数据）。 */
+export function buildProjectBranchView(project: { branching?: BranchingModel }): EntityViewData {
+  const { scenes, variables, startId } = projectBranchData(project);
+  return buildBranchView(scenes, variables, startId);
 }

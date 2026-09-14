@@ -95,6 +95,7 @@
     "namePlaceholder": "Template name",
     "duplicateTitle": "Duplicate template",
     "deleteTitle": "Delete template",
+    "toggleTitle": "Expand or collapse template",
     "categoryLabel": "Category",
     "modesLabel": "Applicable Modes",
     "modeAi": "AI check",

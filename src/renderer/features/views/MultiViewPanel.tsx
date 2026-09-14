@@ -170,6 +170,12 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
         return t('views.kind.group');
       case 'reference':
         return t('views.kind.reference');
+      case 'branch-scene':
+        return t('views.kind.branchScene');
+      case 'picture-page':
+        return t('views.kind.picturePage');
+      case 'translation-pair':
+        return t('views.kind.translationPair');
       default:
         return kind;
     }
@@ -355,7 +361,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
 
   // 任一域都可能是行来源：类型筛选按当前数据的 kind 动态生成，已知类型优先排序。
   const kindOrder = useMemo(() => {
-    const preferred = ['character', 'location', 'faction', 'event', 'chapter', 'knowledge', 'foreshadow', 'rule', 'world', 'plan', 'group'];
+    const preferred = ['character', 'location', 'faction', 'event', 'chapter', 'branch-scene', 'picture-page', 'knowledge', 'foreshadow', 'rule', 'world', 'plan', 'group'];
     const present = [...new Set(data.rows.map((row) => row.kind))];
     return [...preferred.filter((kind) => present.includes(kind)), ...present.filter((kind) => !preferred.includes(kind)).sort()];
   }, [data]);

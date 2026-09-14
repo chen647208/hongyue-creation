@@ -323,6 +323,8 @@
     "label": "AI 试错：{{label}}",
     "rollback": "回到任务前",
     "confirm": "确认回滚",
-    "cancel": "取消"
+    "cancel": "取消",
+    "pickStep": "选择回滚步",
+    "step": "第 {{n}} 步：{{label}}"
   }
 }

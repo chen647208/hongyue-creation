@@ -127,8 +127,25 @@ export function describeRetrieval(query: string, hits: readonly CitationHitLike[
   return { query, found: true, citations, text: renderCitations(query, citations) };
 }
 
-/** 逐字校验：引用片段必须是原文的连续子串（含空白与标点）。空引用视为未命中。 */
+/** FTS5 snippet 的高亮括号标记（见 shared/sql/catalog.ts 的 snippet(..., '[', ']', ...)）。 */
+const SNIPPET_HIGHLIGHT = /[[\]]/g;
+
+/** 去掉检索片段的高亮标记，得到可逐字比对的原文字面。 */
+export function stripSnippetMarkers(snippet: string): string {
+  return snippet.replace(SNIPPET_HIGHLIGHT, '');
+}
+
+/**
+ * 逐字校验：引用片段必须是原文的连续子串（含空白与标点）。
+ * 检索片段可能用省略号拼接不连续窗口：按省略号切分后，每一段都须在原文中连续出现。
+ * 空引用视为未命中。
+ */
 export function quoteAppearsExactly(quote: string, original: string): boolean {
-  if (!quote) return false;
-  return original.includes(quote);
+  if (!quote || !original) return false;
+  const segments = quote
+    .split(/…|\.\.\./)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  if (segments.length === 0) return false;
+  return segments.every((segment) => original.includes(segment));
 }

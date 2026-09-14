@@ -44,18 +44,12 @@ type PanelDebt = Record<string, number>;
 /** 结构页（大纲/细纲编辑器）既有欠账。 */
 const STRUCTURE_KNOWN_DEBT: PanelDebt = {
   'aria-input-field-name': 1,
-  'button-name': 2,
-  'color-contrast': 2,
+  'color-contrast': 1,
   'scrollable-region-focusable': 1,
 };
 
 /** 设置面板既有欠账（测于默认的模型提供商页签，各页签共用为上界）。 */
-const SETTINGS_KNOWN_DEBT: PanelDebt = {
-  'aria-toggle-field-name': 1,
-  'button-name': 2,
-  'color-contrast': 5,
-  label: 1,
-};
+const SETTINGS_KNOWN_DEBT: PanelDebt = {};
 
 /** 设置页签标签（中英双语，供键盘遍历与逐页审计）。 */
 const SETTINGS_TABS: Array<{ zh: string; en: string }> = [
@@ -194,17 +188,19 @@ test('键盘可完成建书→工作台→分区→设置→弹层全链路', as
       await page.keyboard.press('Enter');
     }
 
-    // 建书：聚焦「新建书籍」按钮并回车打开模态
+    // 建书：非首启走新建模态（键盘打开并提交）；首启向导跳过会直接进入工作台
     const newBook = page.getByRole('button', { name: /新建书籍|New Book/ }).first();
-    await newBook.focus();
-    await page.keyboard.press('Enter');
+    if (await newBook.isVisible({ timeout: 10_000 }).catch(() => false)) {
+      await newBook.focus();
+      await page.keyboard.press('Enter');
 
-    // 表单标签关联：标题输入框可被键盘聚焦，输入后回车提交
-    const title = page.getByLabel(/书籍标题|Book Title|Title/).first();
-    await expect(title).toBeVisible({ timeout: 15_000 });
-    await title.focus();
-    await title.fill('键盘路径测试书');
-    await page.keyboard.press('Enter');
+      // 表单标签关联：标题输入框可被键盘聚焦，输入后回车提交
+      const title = page.getByLabel(/书籍标题|Book Title|Title/).first();
+      await expect(title).toBeVisible({ timeout: 15_000 });
+      await title.focus();
+      await title.fill('键盘路径测试书');
+      await page.keyboard.press('Enter');
+    }
 
     // 手写豁免（无模型时）
     const handwrite = page.getByRole('button', { name: /先手写看看|Write by hand/ });

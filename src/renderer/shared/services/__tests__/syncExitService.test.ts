@@ -64,6 +64,13 @@ describe('退出导出配置', () => {
     window.localStorage.setItem('sync.exitExport', '{broken');
     expect(loadExitExportConfig()).toEqual(defaultExitExportConfig());
   });
+
+  it('书籍筛选随配置保存并读回', () => {
+    saveExitExportConfig({ enabled: true, bookIds: ['b1'] });
+    expect(loadExitExportConfig()).toEqual({ enabled: true, bookIds: ['b1'] });
+    saveExitExportConfig({ enabled: true });
+    expect(loadExitExportConfig().bookIds).toBeUndefined();
+  });
 });
 
 describe('runExitExport', () => {
@@ -107,6 +114,33 @@ describe('runExitExport', () => {
     expect(summary.failed).toHaveLength(1);
     expect(failed.get('b1')).toBe('磁盘只读');
     expect(records.find((r) => r.bookId === 'b1')!.outcome).toBe('failed');
+  });
+
+  it('按书筛选：只导出选中的书', async () => {
+    const { deps, upload } = makeDeps({ loadConfig: () => ({ enabled: true, bookIds: ['b2'] }) });
+    const summary = await runExitExport(deps);
+    expect(summary.total).toBe(1);
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect((upload as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe('b2');
+  });
+
+  it('选中书为空数组：不导出任何书', async () => {
+    const { deps, upload } = makeDeps({ loadConfig: () => ({ enabled: true, bookIds: [] }) });
+    const summary = await runExitExport(deps);
+    expect(summary).toEqual({ total: 0, succeeded: 0, failed: [] });
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it('单本上传超时按失败登记，不静默', async () => {
+    const { deps, failed, records } = makeDeps();
+    (deps.upload as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('退出导出上传超时（30000 毫秒）'));
+
+    const summary = await runExitExport(deps);
+
+    expect(summary.succeeded).toBe(0);
+    expect(summary.failed).toHaveLength(2);
+    expect(failed.get('b1')).toContain('超时');
+    expect(records.every((r) => r.outcome === 'failed')).toBe(true);
   });
 });
 

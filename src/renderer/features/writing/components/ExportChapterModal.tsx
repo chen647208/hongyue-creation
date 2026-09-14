@@ -25,7 +25,7 @@ import { cn } from '@/shared/utils/cn';
 import type { Chapter, Project } from '../../../../shared/types';
 import { computeChapterStats } from '../services/writingStatsService';
 import type { ExportCompileOptions,ExportFormat } from '../types';
-import { buildExportContent } from '../utils';
+import { buildExportContent, listBuildContentTypes } from '../utils';
 
 interface ExportChapterModalProps {
   isOpen: boolean;
@@ -104,6 +104,46 @@ const MatterPicker: React.FC<{
   );
 };
 
+/** 类型多选：把某一类节点整体指派为分卷标题。 */
+const TypePicker: React.FC<{
+  label: string;
+  hint: string;
+  options: Array<{ type: string; label: string }>;
+  selectedTypes: string[];
+  onToggle: (type: string) => void;
+}> = ({ label, hint, options, selectedTypes, onToggle }) => {
+  const selected = new Set(selectedTypes);
+  return (
+    <div className="flex items-start gap-2">
+      <span className="w-12 shrink-0 pt-0.5 text-xs text-muted-foreground">{label}</span>
+      {options.length === 0 ? (
+        <span className="pt-0.5 text-xs text-muted-foreground">{hint}</span>
+      ) : (
+        <div className="flex max-h-20 flex-1 flex-wrap gap-1 overflow-y-auto">
+          {options.map((option) => {
+            const on = selected.has(option.type);
+            return (
+              <button
+                key={option.type}
+                type="button"
+                aria-pressed={on}
+                title={option.type}
+                onClick={() => onToggle(option.type)}
+                className={cn(
+                  'rounded-full border px-2 py-0.5 text-2xs transition-colors',
+                  on ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent/40',
+                )}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const toggleId = (ids: string[], id: string): string[] => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
 
 const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
@@ -131,6 +171,7 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
   const sortedChapters = [...chapters].sort((a, b) => a.order - b.order);
   // 角色选择器候选项限定为本次导出选中的章节（未选中的不会出现在产物里）。
   const selectableChapters = sortedChapters.filter((chapter) => selectedChapterIds.has(chapter.id));
+  const volumeTypeOptions = useMemo(() => listBuildContentTypes(project), [project]);
   const [showPreview, setShowPreview] = useState(false);
   const [profileName, setProfileName] = useState('');
   const profiles = buildProfileRegistry.list();
@@ -269,6 +310,13 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
 
         <div className="shrink-0 space-y-1.5 border-b border-border px-6 py-2">
           <div className="text-xs font-medium text-muted-foreground">{t('export.compileSection')}</div>
+          <TypePicker
+            label={t('export.volumeTypeLabel')}
+            hint={t('export.matterEmpty')}
+            options={volumeTypeOptions}
+            selectedTypes={exportCompile.volumeTypes}
+            onToggle={(type) => onExportCompileChange({ volumeTypes: toggleId(exportCompile.volumeTypes, type) })}
+          />
           <MatterPicker
             label={t('export.volumeLabel')}
             hint={t('export.matterEmpty')}

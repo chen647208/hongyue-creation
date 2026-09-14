@@ -10,7 +10,7 @@
 /** 双轴时间线：张力曲线、多轨叙事、故事时间；可拖拽/裁剪/换轨/拆分/标记/吸附/缩放。 */
 import { uuidv7 } from '@core/entities';
 import type { Chapter, Project } from '@shared/types';
-import { AlertTriangle, ArrowDown, ArrowUp, Check, Flag, GitMerge, LayoutGrid, Plus, Redo2, Scissors, Search, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, Check, Flag, GitMerge, LayoutGrid, MoveHorizontal, Plus, Redo2, Replace, Scissors, Search, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useTranslation } from '@/i18n';
@@ -22,7 +22,7 @@ import { cn } from '@/shared/utils/cn';
 import { commitDraftMatrix, moveInDraftMatrix, projectDraftMatrix } from './draftMatrix';
 import { checkTimelineConsistency, type TimelineIssue } from './timelineConsistency';
 import { buildTimelineModel, MIN_CLIP_DURATION, reorderChapters, snapTo, splitChapter, type TimelineClip } from './timelineModel';
-import { insertClip, type InsertMode, slideClip, type TimelineOperationKind } from './timelineOperations';
+import { insertClip, type InsertMode, overwriteClip, ROLL_STEP, rollBoundary, slideClip, type TimelineOperationKind } from './timelineOperations';
 import { useTimelineHistory } from './useTimelineHistory';
 
 interface DualAxisTimelineProps {
@@ -40,7 +40,7 @@ const PADDING = 16;
 const TENSION_TOP = RULER_HEIGHT;
 const TRACKS_TOP = RULER_HEIGHT + TENSION_HEIGHT + TRACK_GAP;
 
-type DragMode = 'move' | 'resize' | 'tension';
+type DragMode = 'move' | 'resize' | 'roll' | 'tension';
 
 interface DragState {
   mode: DragMode;
@@ -149,6 +149,9 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
     }
     if (state.mode === 'resize') {
       recordChapters('slide', t('dual.opSlide'), slideClip(project.chapters, chapterId, state.value));
+    } else if (state.mode === 'roll') {
+      const delta = state.value - (chapter.duration ?? 1);
+      recordChapters('roll', t('dual.opRoll'), rollBoundary(project.chapters, chapterId, delta));
     } else if (state.mode === 'tension') {
       onUpdate({ chapters: project.chapters.map((c) => (c.id === chapterId ? { ...c, tension: state.value } : c)) });
     } else {
@@ -213,6 +216,46 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
 
   const toggleSelect = (clipId: string) => {
     setSelected((prev) => (prev.includes(clipId) ? prev.filter((id) => id !== clipId) : [...prev, clipId]));
+  };
+
+  const selectedChapterIds = useMemo(
+    () => selected
+      .filter((id) => id.startsWith('chapter:'))
+      .map((id) => id.replace('chapter:', ''))
+      .filter((id) => chaptersById.has(id)),
+    [selected, chaptersById],
+  );
+
+  const canRoll = useMemo(() => {
+    const chapterId = selectedChapterIds[0];
+    if (!chapterId) return false;
+    const current = chaptersById.get(chapterId);
+    if (!current) return false;
+    const trackKey = current.trackId ?? null;
+    const siblings = [...project.chapters]
+      .filter((chapter) => (chapter.trackId ?? null) === trackKey)
+      .sort((a, b) => a.order - b.order);
+    const index = siblings.findIndex((chapter) => chapter.id === chapterId);
+    return index >= 0 && index < siblings.length - 1;
+  }, [selectedChapterIds, chaptersById, project.chapters]);
+
+  // 卷动：同时调整选中片段与其同轨后继的边界，总时长不变
+  const rollSelected = () => {
+    const chapterId = selectedChapterIds[0];
+    if (!chapterId) return;
+    recordChapters('roll', t('dual.opRoll'), rollBoundary(project.chapters, chapterId, ROLL_STEP));
+  };
+
+  // 覆盖正文：首个选中片段为源，其余选中片段为目标（保留目标位置与其它字段，只替换正文）
+  const overwriteSelected = () => {
+    const [sourceId, ...targetIds] = selectedChapterIds;
+    const source = sourceId ? chaptersById.get(sourceId) : undefined;
+    if (!source || targetIds.length === 0) return;
+    const next = targetIds.reduce(
+      (chapters, targetId) => overwriteClip(chapters, targetId, source.content ?? ''),
+      project.chapters,
+    );
+    recordChapters('overwrite', t('dual.opOverwrite'), next);
   };
 
   /** 插入片段：有选中片段时相对其落位，否则追加到末尾；语义由 insertMode 决定。 */
@@ -298,6 +341,8 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
             <option value="overwrite">{t('dual.modeOverwrite')}</option>
           </Select>
           <Button size="sm" variant="outline" onClick={insertSegment}><Plus className="size-3.5" />{t('dual.insertClip')}</Button>
+          <Button size="sm" variant="outline" disabled={!canRoll} onClick={rollSelected} title={t('dual.rollHint')}><MoveHorizontal className="size-3.5" />{t('dual.roll')}</Button>
+          <Button size="sm" variant="outline" disabled={selectedChapterIds.length < 2} onClick={overwriteSelected} title={t('dual.overwriteHint')}><Replace className="size-3.5" />{t('dual.overwriteClip')}</Button>
           <Button size="sm" variant={showMatrix ? 'default' : 'outline'} onClick={() => setShowMatrix((value) => !value)}><LayoutGrid className="size-3.5" />{t('dual.matrix')}</Button>
         </div>
       </CardHeader>
@@ -501,13 +546,16 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
                           onPointerDown={(event) => {
                             event.stopPropagation();
                             event.currentTarget.setPointerCapture(event.pointerId);
-                            dragOrigin.current = { clipId: clip.id, mode: 'resize', base: clip.duration };
-                            setDrag({ mode: 'resize', clipId: clip.id, value: clip.duration });
+                            // 按住 Alt 拖动右缘即卷动：同时调整本片段与同轨后继的边界
+                            const mode: DragMode = event.altKey ? 'roll' : 'resize';
+                            dragOrigin.current = { clipId: clip.id, mode, base: clip.duration };
+                            setDrag({ mode, clipId: clip.id, value: clip.duration });
                           }}
                           onPointerMove={(event) => {
-                            if (dragOrigin.current?.clipId !== clip.id || dragOrigin.current.mode !== 'resize') return;
+                            const mode = dragOrigin.current?.mode;
+                            if (dragOrigin.current?.clipId !== clip.id || (mode !== 'resize' && mode !== 'roll')) return;
                             const value = Math.max(MIN_CLIP_DURATION, dragOrigin.current.base + (pointFromEvent(event).x - PADDING) / zoom - clip.start);
-                            setDrag({ mode: 'resize', clipId: clip.id, value });
+                            setDrag({ mode, clipId: clip.id, value });
                           }}
                           onPointerUp={(event) => {
                             event.stopPropagation();

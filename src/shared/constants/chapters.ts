@@ -40,6 +40,16 @@ export const EXTRACT_OUTLINE_PER_CHAPTER_LIMIT = 6000;
 /** 从正文提取细纲：每章细纲目标字数（提示词用） */
 export const EXTRACT_OUTLINE_SUMMARY_TARGET = 150;
 
+/** 从正文提取细纲：单次请求最多送几章（章多时分批，避免超上下文） */
+export const EXTRACT_OUTLINE_BATCH_SIZE = 8;
+
+/**
+ * 从正文提取细纲：单次请求的近似 token 预算。
+ * 用送模型的正文字符数近似 token（CJK 约 1 字符 1 token，为安全上界）；
+ * 单章即超预算时仍单独成批，保证每章都能送到。
+ */
+export const EXTRACT_OUTLINE_BATCH_TOKEN_BUDGET = 24000;
+
 /** 助手附件内容截断（字符，超长标注已截断） */
 export const ATTACHMENT_TRUNCATE = 15000;
 

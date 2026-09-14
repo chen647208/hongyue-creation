@@ -160,6 +160,7 @@ const CardPromptSettingsPanel: React.FC<CardPromptSettingsPanelProps> = ({
                   value={template.category}
                   onChange={(e) => updateCardPrompt(template.id, { category: e.target.value as CardPromptCategory })}
                   disabled={template.isDefault}
+                  aria-label={t('cardPrompts.categoryLabel')}
                 >
                   <option value="card-character">{t('cardPrompts.category.character')}</option>
                   <option value="card-location">{t('cardPrompts.category.location')}</option>

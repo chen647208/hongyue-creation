@@ -63,6 +63,7 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
           <span
             role="radio"
             aria-checked={active}
+            aria-label={t('models.setActiveLabel')}
             tabIndex={0}
             onClick={onSetActive}
             onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onSetActive(); } }}
@@ -100,8 +101,9 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-4">
           <div>
-            <label className={fieldLabel}>{t('models.channelLabel')}</label>
+            <label className={fieldLabel} htmlFor={`provider-channel-${model.id}`}>{t('models.channelLabel')}</label>
             <Select
+              id={`provider-channel-${model.id}`}
               value={channelValueFor(model)}
               onChange={(e) => { const preset = findProviderPreset(e.target.value); if (preset) onUpdate(channelPatch(preset, model)); }}
             >
@@ -116,8 +118,8 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
             <p className={hintText}>{(() => { const p = findProviderPreset(channelValueFor(model)); return p ? dt(p.descriptionKey) : ''; })()}</p>
           </div>
           <div>
-            <label className={fieldLabel}>{t('models.modelNameLabel')}</label>
-            <Select value={model.modelName} onChange={(e) => onUpdate({ modelName: e.target.value })} disabled={listLoading} className="font-mono">
+            <label className={fieldLabel} htmlFor={`provider-model-name-${model.id}`}>{t('models.modelNameLabel')}</label>
+            <Select id={`provider-model-name-${model.id}`} value={model.modelName} onChange={(e) => onUpdate({ modelName: e.target.value })} disabled={listLoading} className="font-mono">
               <option value="">{t('models.selectModelPlaceholder')}</option>
               {model.availableModels && model.availableModels.length > 0 ? (
                 model.availableModels.map((n) => <option key={n} value={n}>{n}</option>)
@@ -203,7 +205,7 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
                 {model.temperature !== undefined ? model.temperature.toFixed(1) : '0.7'}
               </span>
             </div>
-            <input type="range" min="0.0" max="2.0" step="0.1" className="w-full accent-primary" value={model.temperature ?? 0.7} onChange={(e) => onUpdate({ temperature: parseFloat(e.target.value) })} />
+            <input type="range" min="0.0" max="2.0" step="0.1" className="w-full accent-primary" value={model.temperature ?? 0.7} onChange={(e) => onUpdate({ temperature: parseFloat(e.target.value) })} aria-label={t('models.temperatureLabel')} />
             <p className="text-xs text-muted-foreground">{t('models.temperatureHint')}</p>
             <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
               <Checkbox

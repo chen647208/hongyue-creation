@@ -7,6 +7,10 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import type { RevisionDecision, RevisionReviewState } from '../../shared/types';
+
+export type { RevisionDecision };
+
 /**
  * 修订差异（纯函数，docs/design/38 §2.1）：选定版本（基线）与当前正文的字符级差异。
  *
@@ -25,9 +29,6 @@
 
 /** 差异块类型：未变 / 当前新增 / 基线删除 / 替换。 */
 export type RevisionHunkType = 'equal' | 'insert' | 'delete' | 'replace';
-
-/** 逐处处理决定：接受=采用基线该段；拒绝=保留当前该段。 */
-export type RevisionDecision = 'accept' | 'reject';
 
 /** 一处字符级差异（equal 为上下文，其余为可处理改动）。 */
 export interface RevisionHunk {
@@ -229,4 +230,35 @@ export function uniformDecisions(
 /** 改动处计数（供 UI 展示）。 */
 export function countChanges(hunks: readonly RevisionHunk[]): number {
   return changeHunks(hunks).length;
+}
+
+/** 逐处导航：下标按 delta 移动并夹在 [0, total-1]；无改动处返回 0。 */
+export function stepChangeIndex(current: number, total: number, delta: number): number {
+  if (total <= 0) return 0;
+  return Math.max(0, Math.min(total - 1, current + delta));
+}
+
+/** 界面状态 → 可持久化侧车字段：非法决定丢弃，保留标签与基线文本。 */
+export function toRevisionReviewState(
+  label: string,
+  baseline: string,
+  decisions: Readonly<Record<string, RevisionDecision>>,
+): RevisionReviewState {
+  const clean: Record<string, RevisionDecision> = {};
+  for (const [id, decision] of Object.entries(decisions)) {
+    if (decision === 'accept' || decision === 'reject') clean[id] = decision;
+  }
+  return { label, baseline, decisions: clean };
+}
+
+/** 侧车字段 → 界面状态；结构不完整（无基线文本）返回 null，调用方按无对比处理。 */
+export function fromRevisionReviewState(
+  state: RevisionReviewState | undefined,
+): { label: string; text: string; decisions: Record<string, RevisionDecision> } | null {
+  if (!state || typeof state.baseline !== 'string') return null;
+  const decisions: Record<string, RevisionDecision> = {};
+  for (const [id, decision] of Object.entries(state.decisions ?? {})) {
+    if (decision === 'accept' || decision === 'reject') decisions[id] = decision;
+  }
+  return { label: state.label ?? '', text: state.baseline, decisions };
 }

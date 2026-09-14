@@ -50,6 +50,7 @@ function optionsFromProfile(profile: BuildProfile | undefined): ExportCompileOpt
     rangeFrom: profile?.selection.range?.from ?? null,
     rangeTo: profile?.selection.range?.to ?? null,
     volumeIds: profile?.compile?.volumeIds ?? [],
+    volumeTypes: profile?.compile?.volumeTypes ?? [],
     frontMatterIds: profile?.compile?.frontMatter ?? [],
     backMatterIds: profile?.compile?.backMatter ?? [],
   };

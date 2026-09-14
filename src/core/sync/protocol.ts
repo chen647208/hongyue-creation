@@ -73,6 +73,8 @@ export interface MergeReport {
   applied: NodeEntity[];
   conflictCopies: ConflictCopy[];
   skipped: string[];
+  /** 既有节点上补插的新增属性（本地缺失、远端新增）。 */
+  appliedAttrs: AttributeEntity[];
   /** attrs/edges 冲突：无法自动合并，需人工处理 */
   manual: Array<{ entityName: string; entityId: string; reason: string }>;
 }
@@ -149,14 +151,18 @@ export function mergeBundle(bundle: SyncBundle, local: LocalEntityState): MergeR
     localAttrsByNode.set(a.nodeId, list);
   }
 
-  const report: MergeReport = { applied: [], conflictCopies: [], skipped: [], manual: [] };
+  const report: MergeReport = { applied: [], conflictCopies: [], skipped: [], appliedAttrs: [], manual: [] };
   const insertNodes: NodeEntity[] = [];
   const insertAttrs: AttributeEntity[] = [];
   const insertEdges: EdgeEntity[] = [];
 
   const remoteNodeChanges = new Map<string, SyncChange>();
+  const erasedNodeIds = new Set<string>();
   for (const change of bundle.changes) {
-    if (change.entityName === 'nodes') remoteNodeChanges.set(change.entityId, change);
+    if (change.entityName === 'nodes') {
+      remoteNodeChanges.set(change.entityId, change);
+      if (change.isErased) erasedNodeIds.add(change.entityId);
+    }
   }
 
   const remoteNodeById = new Map(bundle.entities.nodes.map((n) => [n.id, n]));
@@ -194,6 +200,23 @@ export function mergeBundle(bundle: SyncBundle, local: LocalEntityState): MergeR
     insertNodes.push(copy.node);
     insertAttrs.push(...copy.attrs);
     report.conflictCopies.push({ sourceId: copy.sourceId, node: copy.node, attrs: copy.attrs });
+  }
+
+  // 既有节点的新增属性补插：本地已有该节点、远端属性本地缺失 → 插入（节点未改也要迁属性）。
+  const localAttrIds = new Set(local.entities.attrs.map((a) => a.id));
+  const localNodeIds = new Set(local.entities.nodes.filter((n) => !n.erased).map((n) => n.id));
+  const insertedNodeIds = new Set(insertNodes.map((n) => n.id));
+  const conflictSourceIds = new Set(report.conflictCopies.map((c) => c.sourceId));
+  const scheduledAttrIds = new Set(insertAttrs.map((a) => a.id));
+  for (const remoteAttr of bundle.entities.attrs) {
+    if (remoteAttr.erased) continue;
+    if (localAttrIds.has(remoteAttr.id) || scheduledAttrIds.has(remoteAttr.id)) continue;
+    // 冲突节点的远端属性已作为副本随迁，不再补插到本地原节点上
+    if (conflictSourceIds.has(remoteAttr.nodeId) || erasedNodeIds.has(remoteAttr.nodeId)) continue;
+    if (!localNodeIds.has(remoteAttr.nodeId) && !insertedNodeIds.has(remoteAttr.nodeId)) continue;
+    insertAttrs.push(remoteAttr);
+    scheduledAttrIds.add(remoteAttr.id);
+    report.appliedAttrs.push(remoteAttr);
   }
 
   // attrs 冲突：无法独立成副本，报告人工

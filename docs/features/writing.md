@@ -52,8 +52,17 @@
   （`buildExportPackage` → 主进程 STORE zip，`core/build/package.ts` 与 `core/build/odt.ts`
   只产出文件集）。ODT 为最小 ODF：mimetype 首项无压缩 + manifest + content + styles，
   标题按 `BuildHeadings.level` 写入 `text:outline-level`。
-- 导出弹窗的「编译编排」提供分卷/前言/后置节点选择器，以及素材口径、目录开关与深度、
-  标题层级、章节范围；这些覆盖项叠加在所选档案之上，预览与落盘同源。
+- 导出弹窗的「编译编排」提供分卷/前言/后置节点选择器、分卷类型多选、素材口径、目录开关
+  与深度、标题层级、章节范围；这些覆盖项叠加在所选档案之上，预览与落盘同源。
+- 类型级分卷：分卷类型多选写入 `compile.volumeTypes`，命中类型模板的节点整体产出分卷标题；
+  `Project.groups` 在构建实体中投影为 `novel.part` 节点，排序落于其首个成员章节之前。
+- 交叉引用：正文 `((#<目标>))` 与 `((#<目标>|<模板>))`（`%N` 编号、`%T` 标题或图注）在编译期
+  按结构重算编号；图表以 `# @figure: <标签> | <图注>` 声明并按正文出现顺序连续编号，
+  失链写 `【失链引用：<目标>】`。
+- 诗歌分行：节点类型为 `poem.*` 或正文含 `# @verse: true` 时按分行正文渲染，md 两空格硬换行、
+  txt 逐行、html 节内 `<br>`、ODT `text:line-break`，空行分节。
+- 绘本：`Project.pictureBook` 的页结构与图位经 `core/build/picturebook.ts` 导出图文页
+  （HTML/ODT/DOCX/ePub）；图位缺席的页渲染占位块，页数不变。
 - 统计面板的 `builtCharCount` 与导出同源（`runBuild` 单一口径）。
 - Profile 支持 JSON/YAML 双序列化（`serializeProfileYaml`/`parseProfileYaml`），
   `.yml` 可 diff 可分享。

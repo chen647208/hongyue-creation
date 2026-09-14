@@ -10,7 +10,7 @@
 import type { Chapter, ChapterSnapshot } from '@shared/types';
 import { describe, expect, it } from 'vitest';
 
-import { diffSnapshotSegments, hasSnapshotChanges, rollbackSegments, rollbackWhole } from '../snapshotRollback';
+import { applyContentWithPreSnapshot, diffSnapshotSegments, hasSnapshotChanges, rollbackSegments, rollbackWhole } from '../snapshotRollback';
 
 function chapter(content: string): Chapter {
   return { id: 'c1', title: '章', summary: '', content, order: 0 };
@@ -62,5 +62,19 @@ describe('快照回滚', () => {
     const none = rollbackSegments(current, snapshot('A\nB\nC'), [], 100);
     expect(none.content).toBe('A\nX\nC');
     expect(none.snapshots).toHaveLength(1);
+  });
+
+  it('应用任意内容前自动再快照（修订应用 / AI 重放共用）', () => {
+    const result = applyContentWithPreSnapshot(chapter('当前正文'), '历史内容', 100);
+    expect(result.content).toBe('历史内容');
+    expect(result.snapshots).toHaveLength(1);
+    expect(result.snapshots?.[0]?.source).toBe('before-rollback');
+    expect(result.snapshots?.[0]?.content).toBe('当前正文');
+  });
+
+  it('无 onUpdateChapter 的调用方仍可回滚（纯函数保留快照）', () => {
+    const first = applyContentWithPreSnapshot(chapter('原文'), '改后', 1);
+    const second = applyContentWithPreSnapshot(first, '再改', 2);
+    expect(second.snapshots?.map((s) => s.content)).toEqual(['原文', '改后']);
   });
 });

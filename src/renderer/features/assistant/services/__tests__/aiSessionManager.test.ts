@@ -11,9 +11,12 @@ import { ApprovalBroker, SkillCatalog, ToolRegistry } from '@core/ai';
 import { EventBus } from '@core/plugin';
 import { beforeEach,describe, expect, it, vi } from 'vitest';
 
-const { mockComplete } = vi.hoisted(() => ({ mockComplete: vi.fn() }));
+const { mockComplete, mockSearch } = vi.hoisted(() => ({ mockComplete: vi.fn(), mockSearch: vi.fn() }));
 vi.mock('@/shared/services/ai/gatewayClient.js', () => ({
   aiGatewayClient: { complete: mockComplete, stream: vi.fn() },
+}));
+vi.mock('@/shared/services/repository/index.js', () => ({
+  repository: { search: mockSearch },
 }));
 
 import type { ModelConfig, Project } from '../../../../../shared/types';
@@ -175,6 +178,37 @@ describe('AiSessionManager', () => {
     expect(manager.getEvents(idB).at(-1)?.t).toBe('session.end');
     // 会话结束后技能 scope 卸载
     expect(catalog.getActive(idA)).toBeNull();
+  });
+
+  it('全文检索片段与正文逐字校验：不一致的命中不注入并标出', async () => {
+    const { PromptAssembler } = await import('@core/ai');
+    const manager = new AiSessionManager({
+      assembler: new PromptAssembler(),
+      registry: new ToolRegistry(),
+      catalog: new SkillCatalog(),
+      broker: new ApprovalBroker(),
+      events: new EventBus(),
+    });
+    const richProject = {
+      id: 'b1',
+      title: '书',
+      chapters: [
+        { id: 'ch1', order: 0, title: '雨夜', content: '雨夜的风' },
+        { id: 'ch2', order: 1, title: '黎明', content: '黎明将至' },
+      ],
+      knowledge: [],
+    } as unknown as Project;
+    mockSearch.mockResolvedValue([
+      { scope: 'chapter', id: 'ch1', title: '雨夜', snippet: '[雨]夜的风', rank: 0 },
+      { scope: 'chapter', id: 'ch2', title: '黎明', snippet: '伪造的片段', rank: 1 },
+    ]);
+    mockComplete.mockResolvedValue({ content: '{"reply":"r"}', model: 'test' });
+
+    await manager.run({ bookId: 'b1', task: '查找雨夜相关', project: richProject, model });
+
+    const injection = manager.getLastInjection()!;
+    expect(injection.entries.some((e) => e.id === 'search:chapter:ch1')).toBe(true);
+    expect(injection.dropped.some((d) => d.reason === 'quote-mismatch')).toBe(true);
   });
 
   it('无历史时 history section 缺席', async () => {

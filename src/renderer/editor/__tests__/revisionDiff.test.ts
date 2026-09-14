@@ -13,7 +13,10 @@ import {
   changeHunks,
   countChanges,
   diffChars,
+  fromRevisionReviewState,
   mergeRevisionDecisions,
+  stepChangeIndex,
+  toRevisionReviewState,
   uniformDecisions,
 } from '../revisionDiff';
 
@@ -89,5 +92,54 @@ describe('mergeRevisionDecisions', () => {
   it('接受表也可用 Map 传入', () => {
     const map = uniformDecisions(hunks, 'accept');
     expect(mergeRevisionDecisions(hunks, map)).toBe(baseline);
+  });
+});
+
+describe('修订对比中间态持久化', () => {
+  it('打包丢弃非法决定，保留标签与基线', () => {
+    const state = toRevisionReviewState('快照 12:00', '基线', {
+      h0: 'accept',
+      h1: 'reject',
+      // 非法值不应进入侧车字段
+      h2: 'later' as never,
+    });
+    expect(state).toEqual({ label: '快照 12:00', baseline: '基线', decisions: { h0: 'accept', h1: 'reject' } });
+  });
+
+  it('还原中间态并过滤非法决定', () => {
+    const restored = fromRevisionReviewState({
+      label: '#3',
+      baseline: '旧文',
+      decisions: { h0: 'reject', h1: 'x' as never },
+    });
+    expect(restored).toEqual({ label: '#3', text: '旧文', decisions: { h0: 'reject' } });
+  });
+
+  it('缺字段返回 null，空基线仍算有效对比', () => {
+    expect(fromRevisionReviewState(undefined)).toBeNull();
+    expect(fromRevisionReviewState({ label: '', baseline: '', decisions: {} })).toEqual({
+      label: '',
+      text: '',
+      decisions: {},
+    });
+  });
+
+  it('逐处导航下标夹在有效范围', () => {
+    expect(stepChangeIndex(0, 5, -1)).toBe(0);
+    expect(stepChangeIndex(0, 5, 1)).toBe(1);
+    expect(stepChangeIndex(4, 5, 1)).toBe(4);
+    expect(stepChangeIndex(3, 5, 1)).toBe(4);
+    expect(stepChangeIndex(0, 0, 1)).toBe(0);
+  });
+
+  it('往返后合并结果一致（跨会话续审）', () => {
+    const baseline = '他走进屋子。';
+    const current = '他慢慢地走进屋子，四下张望。';
+    const hunks = diffChars(baseline, current);
+    const decisions = uniformDecisions(hunks, 'accept');
+    const state = toRevisionReviewState('快照', baseline, Object.fromEntries(decisions));
+    const restored = fromRevisionReviewState(state);
+    expect(restored).not.toBeNull();
+    expect(mergeRevisionDecisions(hunks, restored!.decisions)).toBe(baseline);
   });
 });

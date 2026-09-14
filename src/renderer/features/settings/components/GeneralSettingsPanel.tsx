@@ -139,16 +139,16 @@ const GeneralSettingsPanel: React.FC<GeneralSettingsPanelProps> = ({
         <CardContent className="space-y-6">
           <div className="grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>{t('general.uiFontLabel')}</Label>
-              <Select value={uiFont} onChange={(e) => store.setUiFont(e.target.value)}>
+              <Label htmlFor="settings-ui-font">{t('general.uiFontLabel')}</Label>
+              <Select id="settings-ui-font" value={uiFont} onChange={(e) => store.setUiFont(e.target.value)}>
                 {fontPresets.map((p) => (
                   <option key={p.id} value={p.id}>{p.name[lang]} · {p.license[lang]}</option>
                 ))}
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>{t('general.editorFontLabel')}</Label>
-              <Select value={editorFont} onChange={(e) => store.setEditorFont(e.target.value)}>
+              <Label htmlFor="settings-editor-font">{t('general.editorFontLabel')}</Label>
+              <Select id="settings-editor-font" value={editorFont} onChange={(e) => store.setEditorFont(e.target.value)}>
                 {fontPresets.map((p) => (
                   <option key={p.id} value={p.id}>{p.name[lang]} · {p.license[lang]}</option>
                 ))}
@@ -168,8 +168,9 @@ const GeneralSettingsPanel: React.FC<GeneralSettingsPanelProps> = ({
 
           <div className="grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <Label>{t('general.uiFontSizeLabel', { size: uiFontSize })}</Label>
+              <Label htmlFor="settings-ui-font-size">{t('general.uiFontSizeLabel', { size: uiFontSize })}</Label>
               <input
+                id="settings-ui-font-size"
                 type="range"
                 min={11}
                 max={20}
@@ -180,8 +181,9 @@ const GeneralSettingsPanel: React.FC<GeneralSettingsPanelProps> = ({
               />
             </div>
             <div className="space-y-2">
-              <Label>{t('general.editorFontSizeLabel', { size: editorFontSize })}</Label>
+              <Label htmlFor="settings-editor-font-size">{t('general.editorFontSizeLabel', { size: editorFontSize })}</Label>
               <input
+                id="settings-editor-font-size"
                 type="range"
                 min={13}
                 max={26}
@@ -192,8 +194,9 @@ const GeneralSettingsPanel: React.FC<GeneralSettingsPanelProps> = ({
               />
             </div>
             <div className="space-y-2">
-              <Label>{t('general.lineHeightLabel', { height: editorLineHeight.toFixed(1) })}</Label>
+              <Label htmlFor="settings-editor-line-height">{t('general.lineHeightLabel', { height: editorLineHeight.toFixed(1) })}</Label>
               <input
+                id="settings-editor-line-height"
                 type="range"
                 min={1.4}
                 max={2.6}

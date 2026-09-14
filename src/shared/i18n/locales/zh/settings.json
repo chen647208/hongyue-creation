@@ -134,6 +134,7 @@
     "availablePlaceholders": "可用占位符: {content}, {title}, {summary}",
     "deleteTemplate": "删除此模板",
     "addTemplate": "新增自定义提示词模板",
+    "categoryLabel": "分类",
     "category": {
       "inspiration": "灵感",
       "character": "角色",
@@ -175,6 +176,7 @@
   "models": {
     "namePlaceholder": "给模型起个名字...",
     "activeBadge": "当前",
+    "setActiveLabel": "设为当前模型",
     "deploymentLocal": "本地",
     "deploymentCloud": "云端",
     "deleteTitle": "删除该模型",
@@ -632,6 +634,16 @@
     "testFail": "连接失败：{{error}}",
     "exitExportLabel": "退出时导出同步包",
     "exitExportHint": "应用退出时把每本书的同步包上传到上面的传输目标；失败会记录并在下次启动提醒。",
+    "exitExportBooks": "参与退出导出的书籍",
+    "exitExportAllBooks": "全部书籍",
+    "exitExportNoBooks": "当前没有书籍。",
+    "remoteShow": "查看远端目录",
+    "remoteHide": "收起远端目录",
+    "remoteLoading": "读取中…",
+    "remoteEmpty": "远端暂无同步包。",
+    "remoteFailed": "读取失败：{{error}}",
+    "remoteRemove": "删除",
+    "remoteRemoveConfirm": "确定删除远端对象 {{key}}？此操作不可撤销。",
     "desktopOnly": "同步传输仅在桌面端可用。"
   }
 }

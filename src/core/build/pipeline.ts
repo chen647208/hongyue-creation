@@ -15,6 +15,8 @@
  */
 import { stripBlockAnchors } from '../dsl/anchor';
 import { collectBlockTexts, resolveBlockRefs } from '../dsl/blockRef';
+import type { CrossRefTarget } from '../dsl/crossRef';
+import { parseFigureDeclarations, resolveCrossRefs } from '../dsl/crossRef';
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '../entities';
 import type { BuildProfile, MaterialPolicy } from './profile.js';
 import { clampHeadingLevel, COMPILE_DEFAULTS,typeMatches } from './profile.js';
@@ -136,6 +138,7 @@ export type DocBlock =
   | { kind: 'toc'; title: string; level?: number; entries: TocEntry[] }
   | { kind: 'separator'; text: string }
   | { kind: 'paragraph'; text: string }
+  | { kind: 'verse'; lines: string[] }
   | { kind: 'bibliography'; title: string; entries: string[] }
   | { kind: 'footnotes'; title: string; entries: string[] };
 
@@ -168,21 +171,59 @@ function resolveRefs(body: string, titleById: Map<string, string>): string {
     .replace(/@([\w\u4e00-\u9fff-]+)/g, (_m, name) => titleById.get(String(name)) ?? `@${String(name)}`);
 }
 
-/** 单节点正文段：剥块锚 → 展开块引用/嵌入 → 拆段去标签。 */
+/** 交叉引用模板占位符替换（与 @core/dsl/crossRef 同口径）。 */
+function applyCrossRefTemplate(template: string, target: CrossRefTarget): string {
+  return template.replace(/%N/g, String(target.number)).replace(/%T/g, target.title).trim();
+}
+
+/** 图表声明行替换为图注：`# @figure: 标签 | 图注` → `图 N：图注`；无图注即删除。 */
+function substituteFigureCaptions(text: string, targets: ReadonlyMap<string, CrossRefTarget>): string {
+  if (!text.includes('@figure')) return text;
+  return text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => {
+      const decl = parseFigureDeclarations(line)[0];
+      if (!decl) return line;
+      const target = targets.get(decl.label);
+      if (!target || !decl.caption) return '';
+      return applyCrossRefTemplate('图 %N', target) + `：${decl.caption}`;
+    })
+    .join('\n');
+}
+
+/**
+ * 单节点正文预处理：剥块锚 → 展开块引用/嵌入 → 交叉引用编号 → 引文编号。
+ * 引文编号在块引用展开后解析，保证被引块内的引文同样编号。
+ */
+function prepareBody(
+  node: SelectedNode,
+  titleById: Map<string, string>,
+  blockTexts: Map<string, string>,
+  content: BuildProfile['transform']['content'],
+  inline: InlineReferences | undefined,
+  crossTargets: ReadonlyMap<string, CrossRefTarget>,
+): string {
+  // 块锚是编辑器元数据，不进成稿：编译/导出前先剥离。
+  // 引用/嵌入统一展开为被引块文本；失链写标记，成环截断（口径见 @core/dsl/blockRef）。
+  const source = stripBlockAnchors(node.body);
+  const withFigures = substituteFigureCaptions(source, crossTargets);
+  const withNodeRefs = content.resolveRefs === 'displayName' ? resolveRefs(withFigures, titleById) : withFigures;
+  const withBlockRefs = resolveBlockRefs(withNodeRefs, blockTexts);
+  const withCrossRefs = resolveCrossRefs(withBlockRefs, crossTargets);
+  return inline ? resolveInlineReferences(withCrossRefs, inline) : withCrossRefs;
+}
+
+/** 单节点正文段：预处理后拆段去标签。 */
 function paragraphsOf(
   node: SelectedNode,
   titleById: Map<string, string>,
   blockTexts: Map<string, string>,
   content: BuildProfile['transform']['content'],
-  inline?: InlineReferences,
+  inline: InlineReferences | undefined,
+  crossTargets: ReadonlyMap<string, CrossRefTarget>,
 ): string {
-  // 块锚是编辑器元数据，不进成稿：编译/导出前先剥离。
-  // 引用/嵌入统一展开为被引块文本；失链写标记，成环截断（口径见 @core/dsl/blockRef）。
-  const source = stripBlockAnchors(node.body);
-  const withNodeRefs = content.resolveRefs === 'displayName' ? resolveRefs(source, titleById) : source;
-  const withBlockRefs = resolveBlockRefs(withNodeRefs, blockTexts);
-  // 引文编号与脚注在块引用展开后解析，保证被引块内的引文同样编号。
-  const body = inline ? resolveInlineReferences(withBlockRefs, inline) : withBlockRefs;
+  const body = prepareBody(node, titleById, blockTexts, content, inline, crossTargets);
   const paragraphs = body
     .split(/\n+/)
     .map((p) => p.trim())
@@ -190,6 +231,38 @@ function paragraphsOf(
     .filter((p) => !content.stripTags.some((tag) => p.includes(`[${tag}]`)))
     .map((p) => p.replace(/\[\/?[a-z-]+\]/gi, ''));
   return paragraphs.join('\n\n');
+}
+
+/** 诗歌/分行正文：保留单换行，空行作为分节分隔。 */
+export function isVerseNode(node: Pick<SelectedNode, 'type' | 'body'>): boolean {
+  if (node.type.startsWith('poem.')) return true;
+  return /^\s*#\s*@verse\s*[:：]\s*(true|1|yes)\s*$/im.test(node.body);
+}
+
+/** 分行正文行序列：去风格声明行与标签行，折叠连续空行，保留分节。 */
+function verseLinesOf(
+  node: SelectedNode,
+  titleById: Map<string, string>,
+  blockTexts: Map<string, string>,
+  content: BuildProfile['transform']['content'],
+  inline: InlineReferences | undefined,
+  crossTargets: ReadonlyMap<string, CrossRefTarget>,
+): string[] {
+  const body = prepareBody(node, titleById, blockTexts, content, inline, crossTargets);
+  const out: string[] = [];
+  for (const line of body.replace(/\r\n/g, '\n').split('\n')) {
+    const trimmed = line.trim();
+    if (/^\s*#\s*@verse\s*[:：]/i.test(line)) continue;
+    if (content.stripTags.some((tag) => trimmed.includes(`[${tag}]`))) continue;
+    const cleaned = trimmed.replace(/\[\/?[a-z-]+\]/gi, '').trim();
+    if (cleaned === '') {
+      if (out.length > 0 && out[out.length - 1] !== '') out.push('');
+    } else {
+      out.push(cleaned);
+    }
+  }
+  while (out.length > 0 && out[out.length - 1] === '') out.pop();
+  return out;
 }
 
 /** 标题模板回填：%N 编号（无则空）%T 标题。 */
@@ -224,6 +297,35 @@ export function transform(
   const backSet = new Set(backIds);
   const byId = new Map(nodes.map((n) => [n.id, n]));
 
+  const isVolume = (node: SelectedNode): boolean =>
+    volumeIdSet.has(node.id) || volumeTypes.some((pattern) => typeMatches(node.type, pattern));
+
+  // 交叉引用编号（docs/design/41 §3）：章节按重编号序列、图表按正文出现顺序，渲染前一次算清。
+  const crossTargets = new Map<string, CrossRefTarget>();
+  if (headings.renumber) {
+    let no = 0;
+    for (const node of nodes) {
+      if (frontSet.has(node.id) || backSet.has(node.id)) continue;
+      if (headings.hide.includes(node.type) && !node.material) continue;
+      if (isVolume(node)) continue;
+      if (node.type.startsWith('novel.chapter') || node.type.startsWith('meta.')) {
+        no += 1;
+        crossTargets.set(node.id, { kind: 'chapter', number: no, title: node.title });
+        if (!crossTargets.has(node.title)) crossTargets.set(node.title, { kind: 'chapter', number: no, title: node.title });
+      }
+    }
+  }
+  let figureNo = 0;
+  for (const node of nodes) {
+    if (headings.hide.includes(node.type) && !node.material) continue;
+    for (const decl of parseFigureDeclarations(node.body)) {
+      figureNo += 1;
+      if (!crossTargets.has(decl.label)) {
+        crossTargets.set(decl.label, { kind: 'figure', number: figureNo, title: decl.caption ?? '' });
+      }
+    }
+  }
+
   const blocks: DocBlock[] = [];
   const tocEntries: TocEntry[] = [];
   let chapterNo = 0;
@@ -235,7 +337,7 @@ export function transform(
     // 素材按口径纳入设定集时不受 hide 限制（否则设定集只选到却不渲染）
     if (headings.hide.includes(node.type) && !node.material) continue;
 
-    if (volumeIdSet.has(node.id) || volumeTypes.some((pattern) => typeMatches(node.type, pattern))) {
+    if (isVolume(node)) {
       volumeNo += 1;
       const text = headingText(volumeHeading, volumeNo, node.title);
       const volumeLevel = Math.max(1, level - 1);
@@ -257,7 +359,11 @@ export function transform(
       }
     }
 
-    blocks.push({ kind: 'paragraph', text: paragraphsOf(node, titleById, blockTexts, content, inline) });
+    blocks.push(
+      isVerseNode(node)
+        ? { kind: 'verse', lines: verseLinesOf(node, titleById, blockTexts, content, inline, crossTargets) }
+        : { kind: 'paragraph', text: paragraphsOf(node, titleById, blockTexts, content, inline, crossTargets) },
+    );
     if (headings.scene) blocks.push({ kind: 'separator', text: headings.scene });
   }
 
@@ -268,7 +374,11 @@ export function transform(
       const node = byId.get(id);
       if (!node) continue;
       out.push({ kind: 'chapter', text: node.title, level });
-      out.push({ kind: 'paragraph', text: paragraphsOf(node, titleById, blockTexts, content, inline) });
+      out.push(
+        isVerseNode(node)
+          ? { kind: 'verse', lines: verseLinesOf(node, titleById, blockTexts, content, inline, crossTargets) }
+          : { kind: 'paragraph', text: paragraphsOf(node, titleById, blockTexts, content, inline, crossTargets) },
+      );
     }
     return out;
   };
@@ -344,6 +454,7 @@ function renderTxt(blocks: DocBlock[]): string {
     .map((b) => {
       if (b.kind === 'toc') return tocPlain(b);
       if (b.kind === 'bibliography' || b.kind === 'footnotes') return numberedPlainSection(b);
+      if (b.kind === 'verse') return b.lines.join('\n');
       return b.text;
     })
     .join('\n\n');
@@ -351,6 +462,30 @@ function renderTxt(blocks: DocBlock[]): string {
 
 function mdHeading(level: number, text: string): string {
   return `${'#'.repeat(clampHeadingLevel(level))} ${text}`;
+}
+
+/** 分行正文 → 分组诗节：空行分节，节内每行两空格硬换行。 */
+function groupStanzas(lines: readonly string[]): string[][] {
+  const stanzas: string[][] = [];
+  let current: string[] = [];
+  for (const line of lines) {
+    if (line === '') {
+      if (current.length > 0) {
+        stanzas.push(current);
+        current = [];
+      }
+    } else {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) stanzas.push(current);
+  return stanzas;
+}
+
+function mdVerse(lines: readonly string[]): string {
+  return groupStanzas(lines)
+    .map((stanza) => stanza.map((line) => `${line}  `).join('\n'))
+    .join('\n\n');
 }
 
 function renderMd(blocks: DocBlock[], profile: BuildProfile): string {
@@ -373,6 +508,7 @@ function renderMd(blocks: DocBlock[], profile: BuildProfile): string {
         return `${heading}\n\n${b.entries.map((entry, index) => `[^${index + 1}]: ${entry}`).join('\n')}`;
       }
       if (b.kind === 'separator') return b.text;
+      if (b.kind === 'verse') return mdVerse(b.lines);
       return b.text;
     })
     .join('\n\n');
@@ -397,6 +533,11 @@ function renderHtml(blocks: DocBlock[], profile: BuildProfile): string {
         return `<nav class="toc"><h${h}>${escapeHtml(b.title)}</h${h}><ul>${items}</ul></nav>`;
       }
       if (b.kind === 'separator') return `<p class="scene">${escapeHtml(b.text)}</p>`;
+      if (b.kind === 'verse') {
+        return groupStanzas(b.lines)
+          .map((stanza) => `<p class="verse">${stanza.map(escapeHtml).join('<br>')}</p>`)
+          .join('\n');
+      }
       if (b.kind === 'bibliography' || b.kind === 'footnotes') {
         const h = clampHeadingLevel(COMPILE_DEFAULTS.chapterLevel);
         const className = b.kind === 'bibliography' ? 'bibliography' : 'footnotes';
@@ -453,6 +594,8 @@ function renderRtf(blocks: DocBlock[], profile: BuildProfile): string {
       b.entries.forEach((entry, index) => lines.push(`${escapeRtf(`${index + 1}. ${entry}`)}\\par`));
     } else if (b.kind === 'separator') {
       lines.push(`${escapeRtf(b.text)}\\par`);
+    } else if (b.kind === 'verse') {
+      lines.push(`${groupStanzas(b.lines).map((stanza) => stanza.map((line) => escapeRtf(line)).join('\\line ')).join('\\par ').trim()}\\par`);
     } else {
       for (const p of b.text.split('\n\n')) {
         lines.push(`${escapeRtf(p)}\\par`);

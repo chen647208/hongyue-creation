@@ -32,6 +32,7 @@ export const STORAGE_KEYS = {
   syncTransport: 'sync.transport',
   syncRecovery: 'sync.recovery',
   syncPendingExports: 'sync.pendingExports',
+  syncPendingMerges: 'sync.pendingMerges',
   syncExitExport: 'sync.exitExport',
   pluginsDisabled: 'plugins.disabled',
   trustedPluginKeys: 'plugins.trustedKeys',
@@ -40,6 +41,7 @@ export const STORAGE_KEYS = {
   aiUsage: 'ai.usage',
   aiHourlyLimit: 'ai.hourlyLimit',
   aiSessionMeta: 'ai.sessionMeta',
+  aiInjectionPrefs: 'ai.injectionPrefs',
   appFeaturesDisabled: 'features.disabled',
   buildUserProfiles: 'build.userProfiles',
 } as const;

@@ -7,14 +7,19 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import type { SyncTransportConfig } from '@shared/types';
+import type { SyncTransportConfig, SyncTransportObject } from '@shared/types';
 import { Cloud } from 'lucide-react';
 import React, { useState } from 'react';
 
+import { useProjectStore } from '@/app/stores/projectStore';
 import { useTranslation } from '@/i18n';
+import { dialogService } from '@/shared/services/dialogService';
 import { loadExitExportConfig, saveExitExportConfig } from '@/shared/services/syncExitService';
+import { SYNC_OBJECT_PREFIX } from '@/shared/services/syncService';
 import {
+  listSyncObjects,
   loadSyncTransportConfig,
+  removeSyncObject,
   saveSyncTransportConfig,
   storeSyncTransportSecret,
   SYNC_SECRET_IDS,
@@ -47,6 +52,12 @@ const SyncTransportPanel: React.FC = () => {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [exitExportEnabled, setExitExportEnabled] = useState(() => loadExitExportConfig().enabled);
+  const [exitExportBookIds, setExitExportBookIds] = useState<string[] | undefined>(() => loadExitExportConfig().bookIds);
+  const [remoteOpen, setRemoteOpen] = useState(false);
+  const [remoteObjects, setRemoteObjects] = useState<SyncTransportObject[]>([]);
+  const [remoteBusy, setRemoteBusy] = useState(false);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+  const projects = useProjectStore((s) => s.projects);
   const desktop = typeof window !== 'undefined' && !!window.electronAPI;
 
   const commit = (next: SyncTransportConfig): void => {
@@ -101,7 +112,58 @@ const SyncTransportPanel: React.FC = () => {
 
   const toggleExitExport = (enabled: boolean): void => {
     setExitExportEnabled(enabled);
-    saveExitExportConfig({ enabled });
+    saveExitExportConfig({ enabled, bookIds: exitExportBookIds });
+  };
+
+  const allBooksSelected = exitExportBookIds === undefined;
+  const isBookSelected = (id: string): boolean => allBooksSelected || (exitExportBookIds?.includes(id) ?? false);
+  const applyBookSelection = (nextIds: string[]): void => {
+    const value = nextIds.length === projects.length ? undefined : nextIds;
+    setExitExportBookIds(value);
+    saveExitExportConfig({ enabled: exitExportEnabled, bookIds: value });
+  };
+  const toggleBook = (id: string): void => {
+    const current = new Set(allBooksSelected ? projects.map((p) => p.id) : exitExportBookIds);
+    if (current.has(id)) current.delete(id);
+    else current.add(id);
+    applyBookSelection(projects.map((p) => p.id).filter((pid) => current.has(pid)));
+  };
+  const toggleAllBooks = (): void => {
+    applyBookSelection(allBooksSelected ? [] : projects.map((p) => p.id));
+  };
+
+  const refreshRemote = async (): Promise<void> => {
+    setRemoteBusy(true);
+    setRemoteError(null);
+    try {
+      const objects = await listSyncObjects(config, SYNC_OBJECT_PREFIX, { maxAttempts: 2, delayMs: 300 });
+      setRemoteObjects([...objects].sort((a, b) => a.key.localeCompare(b.key)));
+    } catch (error) {
+      setRemoteError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRemoteBusy(false);
+    }
+  };
+
+  const toggleRemote = (): void => {
+    const next = !remoteOpen;
+    setRemoteOpen(next);
+    if (next) void refreshRemote();
+  };
+
+  const removeRemote = async (key: string): Promise<void> => {
+    const confirmed = await dialogService.confirm({ message: t('syncTransfer.remoteRemoveConfirm', { key }), danger: true });
+    if (!confirmed) return;
+    setRemoteBusy(true);
+    setRemoteError(null);
+    try {
+      await removeSyncObject(config, key, { maxAttempts: 2, delayMs: 300 });
+      await refreshRemote();
+    } catch (error) {
+      setRemoteError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRemoteBusy(false);
+    }
   };
 
   const hasCredential = config.kind === 's3'
@@ -273,6 +335,40 @@ const SyncTransportPanel: React.FC = () => {
           )}
         </div>
 
+        <div className="space-y-2 border-t border-border pt-4">
+          <Button variant="outline" size="sm" disabled={!desktop || remoteBusy} onClick={toggleRemote}>
+            {remoteOpen ? t('syncTransfer.remoteHide') : t('syncTransfer.remoteShow')}
+          </Button>
+          {remoteOpen && (
+            <div className="max-w-2xl space-y-2">
+              {remoteBusy && <p className="text-xs text-muted-foreground">{t('syncTransfer.remoteLoading')}</p>}
+              {remoteError && <p className="text-xs text-destructive">{t('syncTransfer.remoteFailed', { error: remoteError })}</p>}
+              {!remoteBusy && !remoteError && remoteObjects.length === 0 && (
+                <p className="text-xs text-muted-foreground">{t('syncTransfer.remoteEmpty')}</p>
+              )}
+              {remoteObjects.length > 0 && (
+                <ul className="space-y-1">
+                  {remoteObjects.map((object) => (
+                    <li key={object.key} className="flex items-center gap-2 rounded-md border border-border p-2 text-xs">
+                      <span className="min-w-0 flex-1 truncate font-mono">{object.key}</span>
+                      <span className="shrink-0 text-muted-foreground">{object.size}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 shrink-0 text-destructive"
+                        disabled={remoteBusy}
+                        onClick={() => void removeRemote(object.key)}
+                      >
+                        {t('syncTransfer.remoteRemove')}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
           <span>
             <span className="block text-sm text-foreground">{t('syncTransfer.exitExportLabel')}</span>
@@ -285,6 +381,32 @@ const SyncTransportPanel: React.FC = () => {
             aria-label={t('syncTransfer.exitExportLabel')}
           />
         </div>
+        {exitExportEnabled && (
+          <div className="space-y-1 border-t border-border pt-3">
+            <span className="block text-xs text-muted-foreground">{t('syncTransfer.exitExportBooks')}</span>
+            {projects.length === 0 ? (
+              <p className="text-xs text-muted-foreground">{t('syncTransfer.exitExportNoBooks')}</p>
+            ) : (
+              <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
+                  <input type="checkbox" checked={allBooksSelected} onChange={toggleAllBooks} className="size-3.5 accent-primary" />
+                  {t('syncTransfer.exitExportAllBooks')}
+                </label>
+                {projects.map((book) => (
+                  <label key={book.id} className="flex cursor-pointer items-center gap-2 pl-5 text-xs text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={isBookSelected(book.id)}
+                      onChange={() => toggleBook(book.id)}
+                      className="size-3.5 accent-primary"
+                    />
+                    <span className="truncate">{book.title}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {!desktop && <p className="text-xs text-muted-foreground">{t('syncTransfer.desktopOnly')}</p>}
       </CardContent>
     </Card>

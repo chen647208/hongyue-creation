@@ -13,9 +13,12 @@ import type { Chapter } from '@shared/types';
 
 import { MIN_CLIP_DURATION, reorderChapters, type TimelineTrack } from './timelineModel';
 
-export type TimelineOperationKind = 'insert' | 'remove' | 'overwrite' | 'slide' | 'move';
+export type TimelineOperationKind = 'insert' | 'remove' | 'overwrite' | 'slide' | 'move' | 'roll' | 'external';
 /** 插入语义：涟漪把后续片段整体后移，覆盖替换目标位置的片段。 */
 export type InsertMode = 'ripple' | 'overwrite';
+
+/** 卷动步长（秒/时长单位）：工具栏与键盘一次调整相邻边界的幅度。 */
+export const ROLL_STEP = 0.5;
 
 /** 一次可撤销编辑：before/after 为章节数组全量快照，逆操作即取回 before。 */
 export interface TimelineEdit {
@@ -81,6 +84,56 @@ export function moveClip(
 }
 
 /**
+ * 卷动边界：同时调整同轨相邻两个片段的时长——左片段增加 delta，右片段减少相同 delta，
+ * 两段总时长不变，其余片段不动。delta 被夹在两段都能保持最小长度的范围内。
+ * 没有同轨后继片段时原样返回。
+ */
+export function rollBoundary(chapters: Chapter[], chapterId: string, delta: number): Chapter[] {
+  const current = chapters.find((chapter) => chapter.id === chapterId);
+  if (!current) return chapters;
+  const trackKey = current.trackId ?? null;
+  const siblings = chapters
+    .filter((chapter) => (chapter.trackId ?? null) === trackKey)
+    .sort((a, b) => a.order - b.order);
+  const index = siblings.findIndex((chapter) => chapter.id === chapterId);
+  const next = siblings[index + 1];
+  if (index < 0 || !next) return chapters;
+  const left = Math.max(MIN_CLIP_DURATION, current.duration ?? 1);
+  const right = Math.max(MIN_CLIP_DURATION, next.duration ?? 1);
+  const applied = Math.max(MIN_CLIP_DURATION - left, Math.min(right - MIN_CLIP_DURATION, delta));
+  if (applied === 0) return chapters;
+  return chapters.map((chapter) => {
+    if (chapter.id === current.id) return { ...chapter, duration: left + applied };
+    if (chapter.id === next.id) return { ...chapter, duration: right - applied };
+    return chapter;
+  });
+}
+
+/** 两组章节是否等价：引用全同走快路径，否则逐项按值比较（外部写入检测与持久化校验共用）。 */
+export function sameChapters(a: Chapter[], b: Chapter[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    const left = a[index];
+    const right = b[index];
+    if (left === right) continue;
+    if (!left || !right) return false;
+    if (JSON.stringify(left) !== JSON.stringify(right)) return false;
+  }
+  return true;
+}
+
+/** 内存与持久化的编辑条数上限：超出时丢弃最旧一条并把 baseline 前移。 */
+export const MAX_TIMELINE_EDITS = 40;
+
+/** 撤销栈的可序列化形态（会话侧车持久化用）。 */
+export interface TimelineHistoryState {
+  baseline: Chapter[];
+  edits: TimelineEdit[];
+  cursor: number;
+}
+
+/**
  * 时间线撤销栈：每次编辑记录 before/after 全量快照，撤销即回到 before，
  * 重做即回到 after；新编辑截断已撤销的重做分支。
  */
@@ -124,8 +177,35 @@ export class TimelineHistory {
     }
     const edit: TimelineEdit = { id: `edit_${Date.now()}_${uuidv7()}`, at: Date.now(), before, after, ...meta };
     this.edits.push(edit);
+    while (this.edits.length > MAX_TIMELINE_EDITS) {
+      const dropped = this.edits.shift();
+      if (dropped) this.baseline = dropped.before;
+    }
     this.cursor = this.edits.length - 1;
     return edit;
+  }
+
+  /**
+   * 登记一次外部写入（AI 工具 / 同步 / 其他视图）为可撤销编辑：
+   * 与当前状态等价则忽略；否则把外部结果作为一次编辑入栈，撤销即回到外部写入之前。
+   */
+  recordExternal(after: Chapter[], label = 'external', author = 'external'): TimelineEdit | null {
+    if (sameChapters(this.current, after)) return null;
+    return this.record({ kind: 'external', label, author }, after);
+  }
+
+  /** 导出可序列化状态（不含方法）。 */
+  toJSON(): TimelineHistoryState {
+    return { baseline: this.baseline, edits: this.edits, cursor: this.cursor };
+  }
+
+  /** 从可序列化状态恢复；游标越界时收敛到末尾。 */
+  static fromJSON(state: TimelineHistoryState): TimelineHistory {
+    const history = new TimelineHistory(state.baseline);
+    if (Array.isArray(state.edits)) history.edits = state.edits;
+    const maxCursor = history.edits.length - 1;
+    history.cursor = Math.max(-1, Math.min(maxCursor, Math.trunc(state.cursor)));
+    return history;
   }
 
   undo(): Chapter[] | null {
