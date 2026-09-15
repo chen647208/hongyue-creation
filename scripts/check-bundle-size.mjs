@@ -14,8 +14,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** 预算（KB，当前基线约 3693KB；接入离线壳/分片传输/图表/多会话后复核上调，待按需加载优化后下调）。 */
-const BUDGET_KB = 3750;
+/** 预算（KB，当前基线约 3769KB；放开逻辑型插件执行后引入 QuickJS 运行时 glue，复核上调；待精简未引用 wasm 与懒加载优化后下调）。 */
+const BUDGET_KB = 3800;
 const DIR = path.resolve(process.cwd(), 'build/renderer');
 
 if (!fs.existsSync(DIR)) {

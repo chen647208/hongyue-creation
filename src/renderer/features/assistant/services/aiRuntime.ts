@@ -15,15 +15,18 @@ import { ApprovalBroker, PromptAssembler, registerBuiltinSections } from '@core/
 import { EventBus, type PluginHost, profileDeniesAi, RendererRegistry, ScriptRegistry } from '@core/plugin';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 
+import { useSettingsStore } from '@/app/stores/settingsStore';
 import { setAiGate } from '@/shared/services/ai/aiGate';
 import { isOverHourlyLimit } from '@/shared/services/ai/usageTracker';
 import { buildProfileRegistry } from '@/shared/services/buildProfiles';
 import { localStore } from '@/shared/services/localStore';
+import type { CapabilityHostBindings } from '@/shared/services/pluginCapabilityPort';
 import { formulaRegistry } from '@/shared/services/viewFormulas';
 import { APP_VERSION } from '@/shared/version';
 
 import { AiSessionManager } from './aiSessionManager';
 import { createToolRegistry } from './builtinTools';
+import { executeMcpProposal } from './mcpProposalExecutor';
 import { createBuiltinSkillCatalog } from './skillCatalogSetup';
 
 const assembler = new PromptAssembler();
@@ -82,13 +85,23 @@ const pluginDeps = {
   scripts: scriptRegistry,
 };
 
+/** 助手层宿主契约：插件能力派发的注入源（审批 broker / 写入执行器 / 当前模型）。 */
+const capabilityBindings: CapabilityHostBindings = {
+  broker: approvalBroker,
+  executeProposal: executeMcpProposal,
+  activeModel: () => {
+    const settings = useSettingsStore.getState();
+    return settings.models.find((m) => m.id === settings.activeModelId) ?? settings.models[0];
+  },
+};
+
 export const pluginHostPromise = import('@/shared/services/pluginService').then((m) =>
-  m.bootstrapPlugins(pluginDeps, APP_VERSION, readDisabledList()),
+  m.bootstrapPlugins(pluginDeps, APP_VERSION, readDisabledList(), capabilityBindings),
 );
 
 /** 安装/卸载后重建宿主：释放旧宿主贡献再重新发现，返回新宿主供面板刷新。 */
 export async function reloadPlugins(): Promise<PluginHost> {
   const { reloadPluginHost } = await import('@/shared/services/pluginService');
   const previous = await pluginHostPromise.catch(() => null);
-  return reloadPluginHost(pluginDeps, APP_VERSION, previous);
+  return reloadPluginHost(pluginDeps, APP_VERSION, previous, capabilityBindings);
 }

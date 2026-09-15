@@ -72,7 +72,7 @@ function stubPort(text: string): StubPort {
   const preheatCalls: string[] = [];
   const requests: RendererRunRequest[] = [];
   const port: RendererExecutionPort = {
-    preheat: (entry) => {
+    preheat: (_pluginId, entry) => {
       preheatCalls.push(entry);
     },
     render: (request) => {

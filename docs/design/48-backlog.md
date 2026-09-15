@@ -85,7 +85,6 @@
 
 - 卡片服务从 `shared/services/cards` 迁入 `features/cards`：会重新引入 `assistant→cards`、`settings→cards` 跨 feature 依赖债（与 02 的边界规则和既有清理方向相反）；卡片服务属跨功能共享，保留在 `shared/services/cards`，`features/cards` 目录仅在未来出现卡片专属 UI 时使用。
 - `foreshadowing`/`consistency` 服务从 `shared/services` 迁入功能域：同卡片，属跨功能共享逻辑，迁入会引入跨 feature 依赖债；保留在 `shared/services`，域目录只承载 UI。
-- `contributes.renderers` 接线：描述符协议已立项（见 49），渲染器同步契约与 `renderers.json`/`scripts.json` 声明形态以 49 为准；宿主接线与沙箱执行在 49 的后续阶段。
 - 正文以文件为源、追加式事件日志（用户已明确暂缓，见 28）。
 - 协作 B/C 档的评论权限与工作流（协作只留缝，见 29）。
 - 平台化：发布、社区、收益、全勤、平台合规预审。

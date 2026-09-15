@@ -367,6 +367,22 @@ describe('PluginHost.runScript 能力通道与 tool:propose', () => {
     expect(routed).toHaveLength(1);
   });
 
+  it('能力回执：端口 results 经 outcome.toolResults 透传', async () => {
+    const host = makeHost({
+      script: PROPOSAL_SCRIPT,
+      permissions: { write: ['cards'] },
+      execution: proposalPort({ tool: 'write:cards', args: {} }),
+      toolProposal: () =>
+        Promise.resolve({ ok: true, accepted: 1, results: [{ tool: 'write:cards', text: '已应用' }] }),
+    });
+    host.activate(PLUGIN_ID);
+
+    const result = await host.runScript(PLUGIN_ID, REGISTERED_ID, 'chapter.open', {});
+
+    expect(result.ok).toBe(true);
+    expect(result.toolResults).toEqual([{ tool: 'write:cards', text: '已应用' }]);
+  });
+
   it('声明 tool:propose 但未配置审批端口：拒绝（fail-closed）', async () => {
     const host = makeHost({
       script: PROPOSAL_SCRIPT,

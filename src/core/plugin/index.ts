@@ -30,6 +30,18 @@ export {
   type ReleaseProfileName,
 } from './bundles.js';
 export {
+  type CapabilityAuthorizeRequest,
+  type CapabilityAuthorizeResult,
+  type CapabilityCallPermission,
+  type CapabilityDispatchAdapters,
+  type CapabilityExecuteResult,
+  type CapabilityProposalSummary,
+  createCapabilityDispatchPort,
+  isCapabilityDeclared,
+  parseCapabilityTool,
+  type ParsedCapabilityTool,
+} from './capabilityDispatch.js';
+export {
   type CatalogInstallContext,
   type CatalogInstallDecision,
   type CatalogParseResult,
@@ -110,6 +122,7 @@ export {
   type ScriptRunError,
   type ScriptRunErrorKind,
   type ScriptRunOutcome,
+  type ToolCallResult,
   type ToolProposalPort,
   type ToolProposalRequest,
   type ToolProposalResult,

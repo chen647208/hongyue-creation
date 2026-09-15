@@ -46,6 +46,8 @@ export interface ScriptRunOutcome {
   ok: boolean;
   output?: unknown;
   toolCalls?: SandboxToolCall[];
+  /** 已执行的能力调用回执（net/ai 文本已围栏）；无工具提议时缺席。 */
+  toolResults?: ToolCallResult[];
   error?: ScriptRunError;
 }
 
@@ -95,13 +97,21 @@ function schemaTypeOf(value: unknown): string {
  * 禁止秒级长任务；`preheat` 供实现编译/缓存入口，`render` 只做同步调用。
  */
 export interface RendererExecutionPort {
-  /** 预热入口：宿主在首次渲染前调用一次，实现可据此编译并缓存纯函数。 */
-  preheat?(entry: string, source: string): void;
+  /**
+   * 预热入口：宿主在首次渲染前调用一次，实现据此异步编译并缓存纯函数。
+   * 允许返回 Promise——加载沙箱引擎本身是异步的；`render` 仍保持同步。
+   * `pluginId` 参与缓存键：不同插件的插件内相对入口路径可同名，必须隔离。
+   */
+  preheat?(pluginId: string, entry: string, source: string): void | Promise<void>;
+  /** 释放某插件入口的预热缓存（插件停用/卸载时调用，避免常驻句柄泄漏）。 */
+  release?(pluginId: string, entry: string): void;
   /** 同步调用已预热的纯函数，返回输出文本。 */
   render(request: RendererRunRequest): RendererRunResult;
 }
 
 export interface RendererRunRequest {
+  /** 所属插件 id（缓存键组成部分）。 */
+  pluginId: string;
   /** 插件内相对入口文件。 */
   entry: string;
   /** 入口文件导出的具名函数。 */
@@ -196,10 +206,19 @@ export interface ToolProposalRequest {
   proposals: readonly SandboxToolCall[];
 }
 
+/** 单次能力调用回执：外部内容已由宿主围栏（`untrusted`）后再回给调用方。 */
+export interface ToolCallResult {
+  tool: string;
+  /** 宿主契约返回的文本（net/ai 结果已围栏为不可信输入）。 */
+  text: string;
+}
+
 export interface ToolProposalResult {
   ok: boolean;
   /** 受理并进入审批管线的提案数。 */
   accepted?: number;
+  /** 逐条能力调用回执（只含放行并执行成功的条目）。 */
+  results?: ToolCallResult[];
   error?: ScriptRunError;
 }
 

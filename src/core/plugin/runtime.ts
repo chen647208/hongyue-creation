@@ -264,6 +264,8 @@ export class PluginHost {
       const disposables: Disposable[] = [];
       this.installed.set(pluginId, disposables);
       this.installer(plugin, { add: (d) => disposables.push(d) });
+      // 激活即异步预热本插件的渲染器入口，使随后到达的同步 render 已可用。
+      this.warmRenderers(pluginId);
       status.state = 'active';
       status.activatedAt = Date.now();
       status.error = undefined;
@@ -356,8 +358,42 @@ export class PluginHost {
     }
     this.installed.delete(pluginId);
     // 释放该插件的渲染器预热缓存：重新启用时按当前入口重新预热。
-    for (const key of this.preheated) {
-      if (key.startsWith(`${pluginId}:`)) this.preheated.delete(key);
+    for (const key of [...this.preheated]) {
+      if (!key.startsWith(`${pluginId}:`)) continue;
+      this.preheated.delete(key);
+      try {
+        this.rendererExecution?.release?.(pluginId, key.slice(pluginId.length + 1));
+      } catch {
+        // 单个释放失败不阻断其余
+      }
+    }
+  }
+
+  /** 激活后异步预热本插件全部渲染器入口（`preheat` 允许异步，`render` 保持同步）。 */
+  private warmRenderers(pluginId: string): void {
+    const port = this.rendererExecution;
+    const plugin = this.plugins.get(pluginId);
+    if (!port?.preheat || !plugin) return;
+    for (const registered of this.executableReaders.renderers?.listByPlugin(pluginId) ?? []) {
+      const entry = registered.descriptor.entry;
+      const key = `${pluginId}:${entry}`;
+      if (this.preheated.has(key)) continue;
+      const source = plugin.files[entry];
+      if (source === undefined) continue;
+      this.preheated.add(key);
+      this.invokePreheat(port, pluginId, entry, source);
+    }
+  }
+
+  /** 调用预热端口：同步抛错与异步拒绝都吞掉，渲染时按「未预热」拒绝（fail-closed）。 */
+  private invokePreheat(port: RendererExecutionPort, pluginId: string, entry: string, source: string): void {
+    try {
+      const pending = port.preheat?.(pluginId, entry, source);
+      if (pending && typeof (pending as Promise<void>).then === 'function') {
+        void (pending as Promise<void>).catch(() => undefined);
+      }
+    } catch {
+      // 预热失败不阻断激活；渲染端口自行返回结构化错误
     }
   }
 
@@ -470,7 +506,7 @@ export class PluginHost {
           error: routed.error ?? { kind: 'capability', message: '工具提议未获审批管线受理' },
         };
       }
-      return { ok: true, output: adjudicated.output, toolCalls: proposals };
+      return { ok: true, output: adjudicated.output, toolCalls: proposals, toolResults: routed.results };
     }
     if (adjudicated.error?.kind === 'capability') {
       return { ok: false, error: adjudicated.error };
@@ -514,10 +550,11 @@ export class PluginHost {
     const preheatKey = `${pluginId}:${descriptor.entry}`;
     try {
       if (port.preheat && !this.preheated.has(preheatKey)) {
-        port.preheat(descriptor.entry, source);
         this.preheated.add(preheatKey);
+        this.invokePreheat(port, pluginId, descriptor.entry, source);
       }
       const result = port.render({
+        pluginId,
         entry: descriptor.entry,
         export: descriptor.export,
         source,

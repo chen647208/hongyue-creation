@@ -40,6 +40,8 @@ import { PluginFrame } from '@/shared/ui/PluginFrame';
 
 import { logger } from '../utils/logger';
 import { localStore } from './localStore';
+import { type CapabilityHostBindings, createPluginToolProposalPort } from './pluginCapabilityPort';
+import { createRendererExecutionPort } from './rendererExecutionPort';
 import { uiSlotRegistry } from './uiSlots';
 
 function electron(): NonNullable<Window['electronAPI']> {
@@ -438,11 +440,32 @@ const scriptExecutionPort: ScriptExecutionPort = (request) => {
   return api.pluginSandboxRun(request);
 };
 
-/** 创建宿主并完成一次完整发现-装载-激活循环（预览环境无文件系统时跳过磁盘发现）。 */
-export async function bootstrapPlugins(deps: PluginDeps, hostVersion: string, disabled: string[]): Promise<PluginHost> {
-  // 渲染器同步执行端口（design/49 §4 选型 B）未接线：缺省即拒绝，不跑任意代码。
+/** 渲染器同步执行端口（design/49 §4 选型 B）：渲染进程内预热 + 同步调用，QuickJS 懒加载。 */
+const rendererExecutionPort = createRendererExecutionPort();
+
+/**
+ * 创建宿主并完成一次完整发现-装载-激活循环（预览环境无文件系统时跳过磁盘发现）。
+ *
+ * 端口单源在本模块装配：脚本走主进程沙箱、渲染器走渲染进程同步 QuickJS、能力调用走
+ * 白名单派发。助手层契约（审批 broker / 提案执行器 / 当前模型）经 `capabilityBindings`
+ * 由应用层装配处注入；任一端口或注入项缺省即拒绝（fail-closed），未声明描述符的插件行为不变。
+ */
+export async function bootstrapPlugins(
+  deps: PluginDeps,
+  hostVersion: string,
+  disabled: string[],
+  capabilityBindings: CapabilityHostBindings = {},
+): Promise<PluginHost> {
   const host = new PluginHost(
-    { hostVersion, disabled, renderers: deps.renderers, scripts: deps.scripts, scriptExecution: scriptExecutionPort },
+    {
+      hostVersion,
+      disabled,
+      renderers: deps.renderers,
+      scripts: deps.scripts,
+      scriptExecution: scriptExecutionPort,
+      rendererExecution: rendererExecutionPort,
+      toolProposal: createPluginToolProposalPort(capabilityBindings),
+    },
     createContributionInstaller(deps),
   );
   activeHost = host;
@@ -557,11 +580,12 @@ export async function reloadPluginHost(
   deps: PluginDeps,
   hostVersion: string,
   previous?: PluginHost | null,
+  capabilityBindings: CapabilityHostBindings = {},
 ): Promise<PluginHost> {
   if (previous) {
     for (const status of previous.list()) previous.uninstall(status.id);
   }
-  return bootstrapPlugins(deps, hostVersion, readStringArraySetting(STORAGE_KEYS.pluginsDisabled) ?? []);
+  return bootstrapPlugins(deps, hostVersion, readStringArraySetting(STORAGE_KEYS.pluginsDisabled) ?? [], capabilityBindings);
 }
 
 /** 受控网络请求：仅在插件已激活且 manifest 声明 network 权限时放行。 */
