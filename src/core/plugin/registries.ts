@@ -82,6 +82,15 @@ export class ExecutableRegistry<D extends { id: string }> {
   }
 }
 
+/**
+ * 只读查询句柄：宿主与其它贡献只能查询已登记描述符，写入一律经装配器
+ * （design/49 §5）。执行层里程碑在此句柄之上取入口，不持有注册表写面。
+ */
+export type ExecutableReader<D extends { id: string }> = Pick<
+  ExecutableRegistry<D>,
+  'get' | 'list' | 'listByPlugin' | 'size'
+>;
+
 export class RendererRegistry extends ExecutableRegistry<RendererDescriptor> {
   constructor() {
     super('renderer', rendererId);

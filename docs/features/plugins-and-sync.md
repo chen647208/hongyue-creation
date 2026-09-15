@@ -15,7 +15,7 @@
 - **签名**：插件可附 `plugin.sig`，信封支持三种算法：
   `ed25519`（detached 签名 + PEM 公钥，须命中信任键白名单）、`sha256`（仅完整性，不放行可执行贡献）、
   `cosign`（Sigstore bundle，key 或 keyless；主进程调外部 cosign，工具链缺失或缺信任锚即拒载）。校验 `plugin.json` 内容，失败拒载（fail closed）。
-  可执行贡献（logic/editor）要求来源认证签名（ed25519/cosign）；无签名包只放行资源型。
+  可执行贡献（logic/editor/renderers/scripts）要求来源认证签名（ed25519/cosign）；无签名包只放行资源型。
 - **目录索引签名**：目录索引 `catalog.json` 的整份 payload 需带同级 detached 签名（`catalog.sig`，
   信封为 ed25519 或 cosign）；主进程按信任键清单验签，校验失败或不带签名即拒绝使用该索引。
   `sha256` 信封仅完整性，不足以认证索引来源，索引一律拒绝。
@@ -31,6 +31,11 @@
   - `types`：类型模板（强制 `短id.` 命名空间前缀，防抢占内置类型）
   - `buildProfiles`：导出构建档（JSON/YAML 双序列化，`.yml` 可 diff 分享；构建管线消费）
   - `hooks`：声明式策略（JSON，v0 支持 ai 接缝的 inject/filter）
+- **可执行描述符贡献（renderers/scripts）**：`contributes.renderers`/`contributes.scripts` 指向目录，
+  目录下 `*.json` 为描述符数组（入口文件 + 导出名 + 纯度/同步声明 + 能力白名单，见 `design/49`）。
+  装配期经 `installExecutableDescriptors` 登记进描述符注册表，宿主以只读查询句柄取入口；
+  未签名或缺对应能力权限整体拒绝（fail-closed），不产生半装，禁用/卸载/热重载按注册逆序释放。
+  描述符注册表只存声明，插件代码执行归沙箱阶段。
 - **运行时**：逐插件 try-catch 故障隔离；一切注册返回 `Disposable`，
   禁用/卸载时逆序释放（unwind 不变量）；权限 deny-by-default。
 - **资源配额**：装载期校验贡献资源——单文件 ≤128KiB、单贡献键 ≤32 文件、
@@ -62,7 +67,7 @@
   `license`/`source`/`path`（相对索引目录）/`digest`（plugin.json 的 sha256 base64）/`signature`。
 - **校验顺序**：读取包 → manifest 校验（错误定位 JSON 路径）→ 来源白名单（空白名单默认拒绝，
   除非显式开启「允许任意来源」）→ host 区间 → 签名/摘要 → 版本决策。任一步失败即拒装，不落盘；
-  可执行贡献（logic/editor）必须带来源认证签名。
+  可执行贡献（logic/editor/renderers/scripts）必须带来源认证签名。
 - **原子落盘**：暂存目录 → 备份旧版本 → 改名替换；失败回滚到旧版本，不留半成品。
 - **更新**：同 id 更高版本走 update，同版本为 up-to-date，更低版本拒绝降级。
 - **卸载**：删插件目录 + 清 `plugin.<id>.settings[.corrupt]` + 逆序释放全部贡献，

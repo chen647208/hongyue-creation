@@ -27,7 +27,7 @@ import type {
   PluginHostOptions,
   PluginStatus,
 } from '@core/plugin';
-import { formulaId, installFormulas, installHooks, installTypeTemplates, loadPluginCatalog, PermissionDenied, PluginHost, typeTemplateId } from '@core/plugin';
+import { formulaId, installExecutableDescriptors, installFormulas, installHooks, installTypeTemplates, loadPluginCatalog, PermissionDenied, PluginHost, type RendererRegistry, type ScriptRegistry, typeTemplateId } from '@core/plugin';
 import { adjudicateHandlerResult, checkPluginFileName, checkPluginRelPath, type SandboxRunResult } from '@core/plugin';
 import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
@@ -221,9 +221,9 @@ export async function discoverAndLoad(host: PluginHost): Promise<void> {
       const contributes = (manifestJson as { contributes?: Record<string, string[]> }).contributes;
       // 路径门（§11.2）：词法两道门在渲染侧前置，realpath 包含由主进程 fs 代理（pluginReadFile/pluginListDirectory）强制
       let denied = false;
-      for (const dirKey of ['skills', 'types', 'buildProfiles', 'formulas', 'ui', 'editor', 'logic'] as const) {
-        // 未签名插件不加载可执行贡献（logic/editor）：资源型仍可用
-        if ((dirKey === 'logic' || dirKey === 'editor') && !signed) {
+      for (const dirKey of ['skills', 'types', 'buildProfiles', 'formulas', 'ui', 'editor', 'logic', 'renderers', 'scripts'] as const) {
+        // 未签名插件不加载可执行贡献（logic/editor/renderers/scripts）：资源型仍可用
+        if ((dirKey === 'logic' || dirKey === 'editor' || dirKey === 'renderers' || dirKey === 'scripts') && !signed) {
           logger.warn(`未签名插件 ${pluginId}：跳过可执行贡献 ${dirKey}`);
           continue;
         }
@@ -253,7 +253,7 @@ export async function discoverAndLoad(host: PluginHost): Promise<void> {
         if (denied) break;
       }
       if (denied) continue;
-      host.loadRaw(pluginId, manifestJson, files);
+      host.loadRaw(pluginId, manifestJson, files, signed);
     } catch (error) {
       host.markFailed(pluginId, 'discover', error);
     }
@@ -265,6 +265,10 @@ export interface PluginDeps {
   buildProfiles: BuildProfileRegistry;
   events: EventBus;
   formulas: FormulaRegistry;
+  /** 导出渲染器描述符注册表（design/49 里程碑②）：装配器写入，宿主经只读句柄查询。 */
+  renderers: RendererRegistry;
+  /** 脚本描述符注册表（design/49 里程碑②）：装配器写入，宿主经只读句柄查询。 */
+  scripts: ScriptRegistry;
 }
 
 /** 贡献装配器：把资源型贡献注册进各注册表（经 sink 交回 Disposable 供 unwind）。 */
@@ -394,6 +398,20 @@ export function createContributionInstaller(deps: PluginDeps): ContributionInsta
       }
     }
 
+    // 可执行描述符（design/49 里程碑②）：只登记描述符，不加载、不执行代码。
+    // 未签名或缺能力权限时 installExecutableDescriptors 整体拒绝（fail-closed）；
+    // 上抛让本插件置 failed，宿主逆序回滚已装项，不留半装。
+    const executables = installExecutableDescriptors(
+      { manifest, files: plugin.files },
+      deps.renderers,
+      deps.scripts,
+      { signed: plugin.signed === true },
+    );
+    if (!executables.ok) {
+      throw new Error(executables.reason ?? '可执行贡献安装失败');
+    }
+    for (const disposable of executables.disposables) sink.add(disposable);
+
     // hooks（能力接缝，JSON 声明式策略）
     const hooksFile = manifest.contributes?.hooks;    if (hooksFile) {
       const key = hooksFile.replace(/^\.\//, '');
@@ -413,7 +431,10 @@ export function createContributionInstaller(deps: PluginDeps): ContributionInsta
 
 /** 创建宿主并完成一次完整发现-装载-激活循环（预览环境无文件系统时跳过磁盘发现）。 */
 export async function bootstrapPlugins(deps: PluginDeps, hostVersion: string, disabled: string[]): Promise<PluginHost> {
-  const host = new PluginHost({ hostVersion, disabled }, createContributionInstaller(deps));
+  const host = new PluginHost(
+    { hostVersion, disabled, renderers: deps.renderers, scripts: deps.scripts },
+    createContributionInstaller(deps),
+  );
   activeHost = host;
   try {
     const storedKeys = readTrustedPluginKeys();

@@ -225,6 +225,7 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
+                iconOnly
                 className="h-7 px-2 text-muted-foreground"
                 onClick={() => onDeleteExportProfile(exportProfileId)}
                 title={t('export.deleteProfileTitle')}

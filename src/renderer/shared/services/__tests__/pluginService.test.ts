@@ -8,7 +8,7 @@
  */
 
 import { SkillCatalog } from '@core/ai';
-import { BuildProfileRegistry, EventBus, FormulaRegistry } from '@core/plugin';
+import { BuildProfileRegistry, EventBus, FormulaRegistry, type RendererDescriptor, RendererRegistry, type ScriptDescriptor, ScriptRegistry } from '@core/plugin';
 import { afterEach,beforeEach, describe, expect, it, vi } from 'vitest';
 
 const files: Record<string, string> = {
@@ -76,7 +76,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
 
   it('发现→装载→自动激活：技能贡献进入目录；禁用后卸载', async () => {
     const catalog = new SkillCatalog();
-    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() }, '2.0.0', []);
+    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() }, '2.0.0', []);
 
     const status = host.list().find((s) => s.id === 'com.example.golden3');
     // bootstrap 即激活（否则贡献点永不生效）
@@ -91,7 +91,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
 
   it('配置级禁用：装载即 disabled，技能不注册', async () => {
     const catalog = new SkillCatalog();
-    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() }, '2.0.0', ['com.example.golden3']);
+    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() }, '2.0.0', ['com.example.golden3']);
     host.activate('com.example.golden3');
     expect(host.list()[0]!.state).toBe('disabled');
     expect(catalog.get('golden3-extra')).toBeUndefined();
@@ -100,7 +100,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
   it('无文件系统（预览环境）：静默跳过磁盘发现', async () => {
     vi.stubGlobal('window', { electronAPI: undefined });
     const catalog = new SkillCatalog();
-    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() }, '2.0.0', []);
+    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() }, '2.0.0', []);
     expect(host.list()).toEqual([]);
   });
 
@@ -129,7 +129,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
       },
     });
     const catalog = new SkillCatalog();
-    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() }, '2.0.0', []);
+    const host = await bootstrapPlugins({ skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() }, '2.0.0', []);
     const status = host.list().find((s) => s.id === 'com.bad.escape');
     expect(status?.state).toBe('failed');
     expect(status?.error?.cause.some((c) => String(c).includes('越界'))).toBe(true);
@@ -158,7 +158,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     });
     const catalog = new SkillCatalog();
     const host = await bootstrapPlugins(
-      { skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
+      { skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() },
       '2.0.0',
       [],
     );
@@ -190,7 +190,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     });
     const catalog = new SkillCatalog();
     const host = await bootstrapPlugins(
-      { skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
+      { skillCatalog: catalog, buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() },
       '2.0.0',
       [],
     );
@@ -224,7 +224,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
       },
     });
     const host = await bootstrapPlugins(
-      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() },
       '2.0.0',
       [],
     );
@@ -265,7 +265,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     });
     setTrustedPluginKeys(['test-key']);
     const host = await bootstrapPlugins(
-      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() },
       '2.0.0',
       [],
     );
@@ -315,7 +315,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     });
     setTrustedPluginKeys(['test-key']);
     const host = await bootstrapPlugins(
-      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() },
       '2.0.0',
       [],
     );
@@ -367,7 +367,7 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     });
     setTrustedPluginKeys(['test-key']);
     const host = await bootstrapPlugins(
-      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() },
       '2.0.0',
       [],
     );
@@ -401,12 +401,208 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
       },
     });
     const host = await bootstrapPlugins(
-      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry() },
+      { skillCatalog: new SkillCatalog(), buildProfiles: new BuildProfileRegistry(), events: new EventBus(), formulas: new FormulaRegistry(), renderers: new RendererRegistry(), scripts: new ScriptRegistry() },
       '2.0.0',
       [],
     );
     expect(host.list().find((s) => s.id === 'com.unsigned.p')?.state).toBe('active');
     expect((await runPluginLogic('com.unsigned.p', 'greet', 'hi')).ok).toBe(false);
+  });
+});
+
+describe('可执行插件描述符接线（design/49 里程碑②）', () => {
+  const RENDERER: RendererDescriptor = {
+    id: 'rtf',
+    entry: 'renderers/rtf.js',
+    export: 'renderRtf',
+    purity: 'pure',
+    mode: 'sync',
+    format: 'rtf',
+  };
+  const SCRIPT: ScriptDescriptor = {
+    id: 'on-open',
+    entry: 'scripts/open.js',
+    export: 'onOpen',
+    purity: 'effectful',
+    mode: 'async',
+    on: 'chapter.open',
+    capabilities: ['write:cards'],
+  };
+
+  function stubPluginFs(pluginId: string, root: Record<string, string>): void {
+    vi.stubGlobal('window', {
+      electronAPI: {
+        getAppDataPath: async () => '/data',
+        listDirectory: async (dir: string) =>
+          dir === '/data/plugins' ? [{ name: pluginId, type: 'directory' }] : [],
+        pluginListDirectory: async (rootDir: string, rel: string) => {
+          const prefix = `${rootDir}/${rel}/`;
+          return Object.keys(root)
+            .filter((path) => path.startsWith(prefix))
+            .map((path) => ({ name: path.slice(prefix.length), type: 'file' }));
+        },
+        pluginReadBinary: async (rootDir: string, rel: string) => {
+          const raw = root[`${rootDir}/${rel}`];
+          if (raw === undefined) throw new Error(`not found: ${rootDir}/${rel}`);
+          return raw;
+        },
+        pluginReadFile: async (rootDir: string, rel: string) => {
+          const raw = root[`${rootDir}/${rel}`];
+          if (raw === undefined) throw new Error(`not found: ${rootDir}/${rel}`);
+          return raw;
+        },
+        pluginVerifySignature: async () => true,
+      },
+    });
+  }
+
+  function recordingRegistries(): { renderers: RendererRegistry; scripts: ScriptRegistry; order: string[] } {
+    const order: string[] = [];
+    class RecordingRendererRegistry extends RendererRegistry {
+      override register(pluginId: string, descriptor: RendererDescriptor) {
+        const handle = super.register(pluginId, descriptor);
+        order.push(`register:renderer:${descriptor.id}`);
+        return {
+          dispose: () => {
+            order.push(`dispose:renderer:${descriptor.id}`);
+            handle.dispose();
+          },
+        };
+      }
+    }
+    class RecordingScriptRegistry extends ScriptRegistry {
+      override register(pluginId: string, descriptor: ScriptDescriptor) {
+        const handle = super.register(pluginId, descriptor);
+        order.push(`register:script:${descriptor.id}`);
+        return {
+          dispose: () => {
+            order.push(`dispose:script:${descriptor.id}`);
+            handle.dispose();
+          },
+        };
+      }
+    }
+    return { renderers: new RecordingRendererRegistry(), scripts: new RecordingScriptRegistry(), order };
+  }
+
+  function deps(renderers: RendererRegistry, scripts: ScriptRegistry) {
+    return {
+      skillCatalog: new SkillCatalog(),
+      buildProfiles: new BuildProfileRegistry(),
+      events: new EventBus(),
+      formulas: new FormulaRegistry(),
+      renderers,
+      scripts,
+    };
+  }
+
+  const SIGNED_ROOT = (contributes: Record<string, unknown>, permissions: Record<string, unknown>): Record<string, string> => ({
+    '/data/plugins/com.exec.p/plugin.json': JSON.stringify({
+      id: 'com.exec.p',
+      name: 'exec',
+      version: '1.0.0',
+      host: '^2.0.0',
+      license: 'MIT',
+      contributes,
+      permissions,
+    }),
+    '/data/plugins/com.exec.p/plugin.sig': JSON.stringify({ algorithm: 'ed25519', signature: 's', publicKey: 'k' }),
+    '/data/plugins/com.exec.p/renderers/renderers.json': JSON.stringify([RENDERER]),
+    '/data/plugins/com.exec.p/renderers/rtf.js': 'export function renderRtf() { return ""; }',
+    '/data/plugins/com.exec.p/scripts/scripts.json': JSON.stringify([SCRIPT]),
+    '/data/plugins/com.exec.p/scripts/open.js': 'export function onOpen() {}',
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setTrustedPluginKeys([]);
+  });
+
+  it('签名插件激活即注册描述符；只读句柄可见；停用逆序释放；重复启用幂等', async () => {
+    setTrustedPluginKeys(['k']);
+    stubPluginFs('com.exec.p', SIGNED_ROOT({ renderers: ['./renderers/'], scripts: ['./scripts/'] }, { write: ['cards'] }));
+    const { renderers, scripts, order } = recordingRegistries();
+    const host = await bootstrapPlugins(deps(renderers, scripts), '2.0.0', []);
+
+    expect(host.list().find((s) => s.id === 'com.exec.p')?.state).toBe('active');
+    expect(renderers.get('p.renderer.rtf')?.descriptor.format).toBe('rtf');
+    expect(scripts.get('p.script.on-open')?.descriptor.on).toBe('chapter.open');
+    expect(host.rendererDescriptors().map((e) => e.id)).toEqual(['p.renderer.rtf']);
+    expect(host.scriptDescriptors().map((e) => e.id)).toEqual(['p.script.on-open']);
+
+    // 重复激活幂等：不重复注册
+    host.activate('com.exec.p');
+    expect(renderers.size()).toBe(1);
+    expect(scripts.size()).toBe(1);
+
+    // 停用：注册顺序为 renderer → script，逆序释放即 script → renderer
+    host.disable('com.exec.p');
+    expect(renderers.size()).toBe(0);
+    expect(scripts.size()).toBe(0);
+    expect(order).toEqual([
+      'register:renderer:rtf',
+      'register:script:on-open',
+      'dispose:script:on-open',
+      'dispose:renderer:rtf',
+    ]);
+
+    // 重新启用幂等：回到 active 且注册恢复
+    host.enable('com.exec.p');
+    host.activate('com.exec.p');
+    expect(renderers.size()).toBe(1);
+    expect(scripts.size()).toBe(1);
+  });
+
+  it('非法描述符：整体不注册，插件 failed 且无残留', async () => {
+    setTrustedPluginKeys(['k']);
+    const root = SIGNED_ROOT({ renderers: ['./renderers/'] }, {});
+    root['/data/plugins/com.exec.p/renderers/renderers.json'] = JSON.stringify([
+      RENDERER,
+      { ...RENDERER, id: 'bad', purity: 'effectful' },
+    ]);
+    stubPluginFs('com.exec.p', root);
+    const renderers = new RendererRegistry();
+    const scripts = new ScriptRegistry();
+    const host = await bootstrapPlugins(deps(renderers, scripts), '2.0.0', []);
+
+    const status = host.list().find((s) => s.id === 'com.exec.p');
+    expect(status?.state).toBe('failed');
+    expect(status?.error?.message).toContain('purity');
+    expect(renderers.size()).toBe(0);
+    expect(scripts.size()).toBe(0);
+  });
+
+  it('未签名声明 renderers/scripts：拒绝注册且无残留', async () => {
+    const root = SIGNED_ROOT({ renderers: ['./renderers/'], scripts: ['./scripts/'] }, { write: ['cards'] });
+    delete root['/data/plugins/com.exec.p/plugin.sig'];
+    stubPluginFs('com.exec.p', root);
+    const renderers = new RendererRegistry();
+    const scripts = new ScriptRegistry();
+    const host = await bootstrapPlugins(deps(renderers, scripts), '2.0.0', []);
+
+    const status = host.list().find((s) => s.id === 'com.exec.p');
+    expect(status?.state).toBe('failed');
+    expect(status?.error?.message).toContain('签名');
+    expect(renderers.size()).toBe(0);
+    expect(scripts.size()).toBe(0);
+  });
+
+  it('能力缺对应权限：整体拒绝并可读报错', async () => {
+    setTrustedPluginKeys(['k']);
+    const root = SIGNED_ROOT({ scripts: ['./scripts/'] }, {});
+    root['/data/plugins/com.exec.p/scripts/scripts.json'] = JSON.stringify([
+      { ...SCRIPT, capabilities: ['read:secret'] },
+    ]);
+    stubPluginFs('com.exec.p', root);
+    const renderers = new RendererRegistry();
+    const scripts = new ScriptRegistry();
+    const host = await bootstrapPlugins(deps(renderers, scripts), '2.0.0', []);
+
+    const status = host.list().find((s) => s.id === 'com.exec.p');
+    expect(status?.state).toBe('failed');
+    expect(status?.error?.message).toContain('read:secret');
+    expect(renderers.size()).toBe(0);
+    expect(scripts.size()).toBe(0);
   });
 });
 

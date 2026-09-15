@@ -51,7 +51,7 @@
 
 已落地：响应式重排（`shared/utils/layout.ts` 断点单源，书库/阅读/轻编辑/统计/助手手机档流式重排，助手与参考面板改覆盖层，表格/时间线保留固有横滚，硬编码色改语义变量）；移动端落盘（`visibilitychange`/`pagehide` 强制刷盘，冲突副本复用 `mergeBundle`）；触控与无障碍（关键路径 44px 命中区、`deleteGuard` 删除二次确认、尊重 `prefers-reduced-motion`）；PWA manifest。
 
-未做：44px 命中区覆盖 `Button`/`TabBar`/`SegmentedControl` 等主要控件与图标按钮，裸 `<button>` 图标控件未逐一登记；表格/时间线固有横滚例外未动。
+未做：无。44px 命中区经 `.touch-target`（单源常量）覆盖组件库 `size="icon"`、`iconOnly` 纯图标按钮、`TabBar`/`SegmentedControl`/`ViewModeToggle` 与裸 `<button>` 图标控件；表格/时间线固有横滚内部为有意例外。
 
 ## 阶段 8 跨域视图与脚本层（47）
 

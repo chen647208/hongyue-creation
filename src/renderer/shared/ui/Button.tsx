@@ -48,16 +48,21 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   /** 占满父容器宽度 */
   block?: boolean;
+  /**
+   * 纯图标按钮（内容只有图标、无可见文字）。
+   * 窄视口下命中区不小于最小触控目标；图标尺寸由调用方的 className 决定。
+   */
+  iconOnly?: boolean;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant, size, block, className, type = 'button', ...rest }, ref) => (
+  ({ variant, size, block, iconOnly, className, type = 'button', ...rest }, ref) => (
     <button
       ref={ref}
       type={type}
       className={cn(
         buttonVariants({ variant, size }),
-        size === 'icon' && 'touch-target',
+        (iconOnly || size === 'icon') && 'touch-target',
         block && 'w-full',
         className,
       )}

@@ -439,7 +439,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
             {t('views.save')}
           </Button>
           {activeView && (
-            <Button size="sm" variant="ghost" aria-label={t('views.remove')} onClick={() => void removeView()}>
+            <Button size="sm" variant="ghost" iconOnly aria-label={t('views.remove')} onClick={() => void removeView()}>
               <Trash2 className="size-3.5" />
             </Button>
           )}

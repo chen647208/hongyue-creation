@@ -146,4 +146,5 @@
 ## 落地状态
 
 - 协议层：描述符 schema 与校验（`core/plugin/descriptors.ts`）、注册表占位（`core/plugin/registries.ts`）、清单字段与签名门（`core/plugin/manifest.ts`、`core/plugin/installer.ts`）已就位，配单测。
-- 宿主接线与沙箱执行：未做（见 §6）。
+- 宿主接线：装配器（`renderer/shared/services/pluginService.ts`）读 `contributes.renderers`/`scripts`，经 `installExecutableDescriptors` 登记到注册表；`PluginDeps` 持有两个注册表，`PluginHost` 暴露只读查询句柄。未签名或缺对应能力权限整体拒绝（fail-closed），禁用/卸载/热重载按注册逆序释放。登记层只存描述符，不执行代码。
+- 沙箱执行：未做（见 §6）。

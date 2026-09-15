@@ -141,6 +141,7 @@ export {
 } from './pathGate.js';
 export {
   type ExecutableContributionSource,
+  type ExecutableReader,
   ExecutableRegistry,
   installExecutableDescriptors,
   type InstallExecutableOptions,

@@ -205,7 +205,7 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
                   <span className="w-24 shrink-0 truncate font-medium">{snippet.label}</span>
                   <span className="min-w-0 flex-1 truncate text-muted-foreground">{snippet.text}</span>
                   <Button size="sm" variant="ghost" onClick={() => onInsertSnippet(snippet.text)}>{t('tools.snippets.insert')}</Button>
-                  <Button size="sm" variant="ghost" aria-label={t('tools.snippets.delete')} onClick={() => updateSnippets(snippets.filter((item) => item.id !== snippet.id))}>
+                  <Button size="sm" variant="ghost" iconOnly aria-label={t('tools.snippets.delete')} onClick={() => updateSnippets(snippets.filter((item) => item.id !== snippet.id))}>
                     <Trash2 className="size-3.5" />
                   </Button>
                 </li>

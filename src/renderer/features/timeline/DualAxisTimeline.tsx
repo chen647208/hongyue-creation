@@ -322,8 +322,8 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-sm">{t('dual.title')}</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setZoom((value) => Math.max(48, value - 24))} aria-label={t('dual.zoomOut')}><ZoomOut className="size-3.5" /></Button>
-          <Button size="sm" variant="outline" onClick={() => setZoom((value) => Math.min(240, value + 24))} aria-label={t('dual.zoomIn')}><ZoomIn className="size-3.5" /></Button>
+          <Button size="sm" variant="outline" iconOnly onClick={() => setZoom((value) => Math.max(48, value - 24))} aria-label={t('dual.zoomOut')}><ZoomOut className="size-3.5" /></Button>
+          <Button size="sm" variant="outline" iconOnly onClick={() => setZoom((value) => Math.min(240, value + 24))} aria-label={t('dual.zoomIn')}><ZoomIn className="size-3.5" /></Button>
           <Button size="sm" variant={snapEnabled ? 'default' : 'outline'} onClick={() => setSnapEnabled((value) => !value)}>{t('dual.snap')}</Button>
           <Button size="sm" variant={majorOnly ? 'default' : 'outline'} onClick={() => setMajorOnly((value) => !value)}>{t('dual.majorOnly')}</Button>
           <Button size="sm" variant="outline" onClick={() => setIssues(checkTimelineConsistency(project))}><Search className="size-3.5" />{t('dual.check')}</Button>
@@ -334,8 +334,8 @@ const DualAxisTimeline: React.FC<DualAxisTimelineProps> = ({ project, onUpdate, 
           <Button size="sm" variant="outline" disabled={selected.length === 0} onClick={() => void unmergeSelected()}><Undo2 className="size-3.5" />{t('dual.unmerge')}</Button>
           <Button size="sm" variant="outline" onClick={addMarker}><Flag className="size-3.5" />{t('dual.addMarker')}</Button>
           <Button size="sm" variant="outline" onClick={addTrack}><Plus className="size-3.5" />{t('dual.addTrack')}</Button>
-          <Button size="sm" variant="outline" disabled={!canUndo} onClick={undo} aria-label={t('dual.undo')} title={t('dual.undo')}><Undo2 className="size-3.5" /></Button>
-          <Button size="sm" variant="outline" disabled={!canRedo} onClick={redo} aria-label={t('dual.redo')} title={t('dual.redo')}><Redo2 className="size-3.5" /></Button>
+          <Button size="sm" variant="outline" iconOnly disabled={!canUndo} onClick={undo} aria-label={t('dual.undo')} title={t('dual.undo')}><Undo2 className="size-3.5" /></Button>
+          <Button size="sm" variant="outline" iconOnly disabled={!canRedo} onClick={redo} aria-label={t('dual.redo')} title={t('dual.redo')}><Redo2 className="size-3.5" /></Button>
           <Select value={insertMode} onChange={(event) => setInsertMode(event.target.value as InsertMode)} className="h-8 w-auto text-sm" aria-label={t('dual.insertMode')}>
             <option value="ripple">{t('dual.modeRipple')}</option>
             <option value="overwrite">{t('dual.modeOverwrite')}</option>

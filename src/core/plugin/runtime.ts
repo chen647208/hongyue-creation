@@ -19,6 +19,7 @@
  * 权限：deny-by-default。资源型贡献（skills/types/buildProfiles）零代码可热载；
  * 逻辑型贡献（logic/editor）由渲染端装配，执行前经 assertCan 权限门。
  */
+import type { RendererDescriptor, ScriptDescriptor } from './descriptors.js';
 import {
   assertPermission,
   type Disposable,
@@ -29,6 +30,7 @@ import {
   toPluginError,
   validateManifest,
 } from './manifest.js';
+import type { ExecutableReader, RegisteredExecutable } from './registries.js';
 import { ProviderStatusService } from './status.js';
 
 export type PluginState = 'discovered' | 'active' | 'failed' | 'disabled' | 'uninstalled';
@@ -86,6 +88,8 @@ export interface DiscoveredPlugin {
   manifest: PluginManifest;
   /** 贡献点资源（相对路径 → 内容）。资源型：SKILL.md 原文 / JSON 字符串。 */
   files: Record<string, string>;
+  /** 插件包是否经来源认证签名；可执行贡献（renderers/scripts）注册据此 fail-closed（design/49 §3）。 */
+  signed?: boolean;
 }
 
 /** 贡献装配回调：宿主把插件资源注册进对应注册表，每项通过 `sink.add` 交回 Disposable。
@@ -101,6 +105,10 @@ export interface PluginHostOptions {
   disabled?: string[];
   /** 主机版本（host 版本区间匹配；区间不匹配 = 贡献整体失效并上报） */
   hostVersion: string;
+  /** 已装配导出渲染器描述符的只读查询句柄（design/49 里程碑②）；缺省即无。 */
+  renderers?: ExecutableReader<RendererDescriptor>;
+  /** 已装配脚本描述符的只读查询句柄（design/49 里程碑②）；缺省即无。 */
+  scripts?: ExecutableReader<ScriptDescriptor>;
 }
 
 
@@ -112,6 +120,11 @@ export class PluginHost {
   private readonly installed = new Map<string, Disposable[]>();
   private readonly disabled: Set<string>;
   private readonly installer: ContributionInstaller;
+  /** 可执行描述符只读句柄：宿主只查询，写入经装配器（design/49 里程碑②）。 */
+  private readonly executableReaders: {
+    renderers?: ExecutableReader<RendererDescriptor>;
+    scripts?: ExecutableReader<ScriptDescriptor>;
+  };
   /** 激活失败退避：连续失败的插件在退避窗内跳过激活（§13.1）。 */
   readonly providerStatus = new ProviderStatusService();
 
@@ -119,6 +132,7 @@ export class PluginHost {
     this.disabled = new Set(options.disabled ?? []);
     this.installer = installer;
     this.hostVersion = options.hostVersion;
+    this.executableReaders = { renderers: options.renderers, scripts: options.scripts };
   }
 
   private readonly hostVersion: string;
@@ -153,7 +167,7 @@ export class PluginHost {
   }
 
   /** 从原始 JSON 走 validate 再装载（错误定位 JSON 路径）。 */
-  loadRaw(id: string, manifestJson: unknown, files: Record<string, string>): void {
+  loadRaw(id: string, manifestJson: unknown, files: Record<string, string>, signed = false): void {
     const result = validateManifest(manifestJson);
     if (!result.ok) {
       this.statuses.set(id, {
@@ -168,7 +182,7 @@ export class PluginHost {
       });
       return;
     }
-    this.loadAll([{ manifest: result.manifest, files }]);
+    this.loadAll([{ manifest: result.manifest, files, signed }]);
   }
 
   /** 发现/读取阶段失败的登记入口：状态面板可见、cause 链保留。 */
@@ -315,6 +329,16 @@ export class PluginHost {
 
   manifest(pluginId: string): PluginManifest | undefined {
     return this.plugins.get(pluginId)?.manifest;
+  }
+
+  /** 已装配导出渲染器描述符快照（只读；沙箱执行里程碑据此取入口，本轮不执行代码）。 */
+  rendererDescriptors(): RegisteredExecutable<RendererDescriptor>[] {
+    return this.executableReaders.renderers?.list() ?? [];
+  }
+
+  /** 已装配脚本描述符快照（只读；沙箱执行里程碑据此取入口，本轮不执行代码）。 */
+  scriptDescriptors(): RegisteredExecutable<ScriptDescriptor>[] {
+    return this.executableReaders.scripts?.list() ?? [];
   }
 
   /** 权限代理：宿主在数据访问边界调用；未声明即 PermissionDenied。 */

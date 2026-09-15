@@ -12,7 +12,7 @@
  * M3 插件宿主在此续注工具/section/技能，UI 层与 Agent 循环只消费这里的实例。
  */
 import { ApprovalBroker, PromptAssembler, registerBuiltinSections } from '@core/ai';
-import { EventBus, type PluginHost, profileDeniesAi } from '@core/plugin';
+import { EventBus, type PluginHost, profileDeniesAi, RendererRegistry, ScriptRegistry } from '@core/plugin';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 
 import { setAiGate } from '@/shared/services/ai/aiGate';
@@ -69,11 +69,17 @@ export function saveDisabledList(ids: string[]): void {
 }
 
 /** 启动期插件装载（预览环境无文件系统时空宿主）。状态面板复用同一 Promise。 */
+// 可执行描述符注册表（design/49 里程碑②）：装配器写入，沙箱执行里程碑经宿主只读句柄取入口。
+export const rendererRegistry = new RendererRegistry();
+export const scriptRegistry = new ScriptRegistry();
+
 const pluginDeps = {
   skillCatalog,
   buildProfiles: buildProfileRegistry,
   events: eventBus,
   formulas: formulaRegistry,
+  renderers: rendererRegistry,
+  scripts: scriptRegistry,
 };
 
 export const pluginHostPromise = import('@/shared/services/pluginService').then((m) =>
