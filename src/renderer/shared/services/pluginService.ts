@@ -440,6 +440,7 @@ const scriptExecutionPort: ScriptExecutionPort = (request) => {
 
 /** 创建宿主并完成一次完整发现-装载-激活循环（预览环境无文件系统时跳过磁盘发现）。 */
 export async function bootstrapPlugins(deps: PluginDeps, hostVersion: string, disabled: string[]): Promise<PluginHost> {
+  // 渲染器同步执行端口（design/49 §4 选型 B）未接线：缺省即拒绝，不跑任意代码。
   const host = new PluginHost(
     { hostVersion, disabled, renderers: deps.renderers, scripts: deps.scripts, scriptExecution: scriptExecutionPort },
     createContributionInstaller(deps),

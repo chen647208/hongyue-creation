@@ -93,13 +93,26 @@ export {
   type VetoResult,
 } from './events.js';
 export {
+  allowedToolNames,
   buildScriptRunCode,
+  type CapabilityMap,
+  capabilityName,
+  type CapabilityResolution,
   checkDescriptorSchema,
+  rendererDenied,
+  type RendererExecutionPort,
+  type RendererRunOutcome,
+  type RendererRunRequest,
+  type RendererRunResult,
+  resolveCapabilities,
   scriptDenied,
   type ScriptExecutionPort,
   type ScriptRunError,
   type ScriptRunErrorKind,
   type ScriptRunOutcome,
+  type ToolProposalPort,
+  type ToolProposalRequest,
+  type ToolProposalResult,
 } from './execution.js';
 export {
   installPackage,

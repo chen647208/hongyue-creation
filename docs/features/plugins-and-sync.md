@@ -37,9 +37,16 @@
   未签名、缺对应能力权限或入口文件不在插件文件集内整体拒绝（fail-closed），不产生半装，
   禁用/卸载/热重载按注册逆序释放。
 - **脚本执行（`PluginHost.runScript`）**：脚本触发时按「插件已激活 → 描述符已注册 → 触发挂点匹配 →
-  能力按当前 manifest 权限回查」四道门放行，任一不过即拒绝；入口文件经既有插件沙箱（主进程 QuickJS
-  + utilityProcess 隔离）执行，输入输出按描述符 `input`/`output` 顶层 `type` 校验。超时、内存、输出上限
-  单源在 `shared/constants/pluginExecution.ts`；未配置执行端口即拒绝执行。渲染器同步调用与工具提议走后续接缝。
+  能力按当前 manifest 权限回查 → 入口存在 → 输入 schema」放行，任一不过即拒绝；入口文件经既有插件沙箱
+  （主进程 QuickJS + utilityProcess 隔离）执行，输出按描述符 `output` 顶层 `type` 校验。超时、内存、输出上限
+  单源在 `shared/constants/pluginExecution.ts`；未配置执行端口即拒绝执行。
+- **能力通道与工具提议**：宿主只把描述符声明且过权限回查的能力名交执行端口，未声明能力不可见；
+  脚本返回的工具调用按能力白名单裁决，经 `tool:propose` 提议后交注入的 `ToolProposalPort`
+  进提案/审批管线，脚本无直接写路径。端口缺省即拒绝（fail-closed）。
+- **渲染器同步执行（`PluginHost.runRenderer`）**：渲染器描述符强制 `pure + sync`，按「已激活 → 已注册 →
+  纯同步约束 → 能力回查 → 入口存在 → 输入 schema → 同步端口 → 输出字符串 + output schema」门序调用
+  注入的 `RendererExecutionPort`（同步纯函数，毫秒级超时）；端口缺省即拒绝，生产端口未接线时渲染器执行
+  一律拒绝。
 - **运行时**：逐插件 try-catch 故障隔离；一切注册返回 `Disposable`，
   禁用/卸载时逆序释放（unwind 不变量）；权限 deny-by-default。
 - **资源配额**：装载期校验贡献资源——单文件 ≤128KiB、单贡献键 ≤32 文件、

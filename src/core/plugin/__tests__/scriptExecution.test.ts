@@ -10,11 +10,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ScriptDescriptor } from '../descriptors.js';
-import type { ScriptExecutionPort } from '../execution.js';
+import type { ScriptExecutionPort, ToolProposalPort, ToolProposalRequest } from '../execution.js';
 import type { PluginManifest, PluginPermissions } from '../manifest.js';
 import { ScriptRegistry } from '../registries.js';
 import { PluginHost } from '../runtime.js';
-import type { SandboxRunRequest } from '../sandbox/types.js';
+import type { SandboxRunRequest, SandboxRunResult } from '../sandbox/types.js';
 
 const PLUGIN_ID = 'com.example.plugin';
 const REGISTERED_ID = 'plugin.script.on-open';
@@ -46,13 +46,14 @@ interface HostOptions {
   permissions?: PluginPermissions;
   script?: ScriptDescriptor;
   execution?: ScriptExecutionPort;
+  toolProposal?: ToolProposalPort;
 }
 
 function makeHost(options: HostOptions = {}): PluginHost {
   const scripts = new ScriptRegistry();
   scripts.register(PLUGIN_ID, options.script ?? SCRIPT);
   const host = new PluginHost(
-    { hostVersion: '2.0.0', scripts, scriptExecution: options.execution },
+    { hostVersion: '2.0.0', scripts, scriptExecution: options.execution, toolProposal: options.toolProposal },
     () => [],
   );
   host.loadRaw(
@@ -239,5 +240,145 @@ describe('PluginHost.runScript 执行门控', () => {
     expect(result.ok).toBe(false);
     expect(result.error?.kind).toBe('permission');
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('PluginHost.runScript 能力通道与 tool:propose', () => {
+  const PROPOSAL_SCRIPT: ScriptDescriptor = {
+    ...SCRIPT,
+    capabilities: ['write:cards', 'tool:propose'],
+  };
+
+  function proposalPort(call: { tool: string; args: unknown }): ScriptExecutionPort {
+    return () =>
+      Promise.resolve<SandboxRunResult>({
+        ok: true,
+        output: { output: 'done', toolCalls: [call] },
+      });
+  }
+
+  function recordingProposal(sink: ToolProposalRequest[], result?: { ok: boolean; error?: { kind: 'capability'; message: string } }): ToolProposalPort {
+    return (request) => {
+      sink.push(request);
+      return Promise.resolve(result ? { ...result } : { ok: true, accepted: request.proposals.length });
+    };
+  }
+
+  it('放行：能力白名单入请求，能力映射交端口，工具提议走审批端口', async () => {
+    const calls: SandboxRunRequest[] = [];
+    const routed: ToolProposalRequest[] = [];
+    const host = makeHost({
+      script: PROPOSAL_SCRIPT,
+      permissions: { write: ['cards'] },
+      execution: (request) => {
+        calls.push(request);
+        return Promise.resolve<SandboxRunResult>({
+          ok: true,
+          output: { output: 'done', toolCalls: [{ tool: 'write:cards', args: { x: 1 } }] },
+        });
+      },
+      toolProposal: recordingProposal(routed),
+    });
+    host.activate(PLUGIN_ID);
+
+    const result = await host.runScript(PLUGIN_ID, REGISTERED_ID, 'chapter.open', {});
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toBe('done');
+    expect(result.toolCalls).toHaveLength(1);
+    // 端口只见到已声明且过权限回查的能力，未声明能力不可见
+    expect(calls[0]?.capabilities).toEqual(['write:cards', 'tool:propose']);
+    expect(calls[0]?.allowedTools).toEqual(['write:cards']);
+    // 提议经审批管线端口，附能力映射
+    expect(routed).toHaveLength(1);
+    expect(routed[0]?.capabilities).toEqual({ read: [], write: ['cards'], net: false, ai: false, toolPropose: true });
+    expect(routed[0]?.proposals).toEqual([{ tool: 'write:cards', args: { x: 1 } }]);
+  });
+
+  it('越权能力：运行期回查拒绝，不进执行端口', async () => {
+    const calls: SandboxRunRequest[] = [];
+    const host = makeHost({
+      script: { ...SCRIPT, capabilities: ['read:secret'] },
+      permissions: { write: ['cards'] },
+      execution: (request) => {
+        calls.push(request);
+        return Promise.resolve({ ok: true, output: 'done' });
+      },
+    });
+    host.activate(PLUGIN_ID);
+
+    const result = await host.runScript(PLUGIN_ID, REGISTERED_ID, 'chapter.open', {});
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.kind).toBe('permission');
+    expect(result.error?.message).toContain('read:secret');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('未声明能力不可见：工具调用被白名单裁决拒绝，不进审批端口', async () => {
+    const routed: ToolProposalRequest[] = [];
+    const host = makeHost({
+      script: { ...SCRIPT, capabilities: undefined },
+      execution: proposalPort({ tool: 'write:cards', args: {} }),
+      toolProposal: recordingProposal(routed),
+    });
+    host.activate(PLUGIN_ID);
+
+    const result = await host.runScript(PLUGIN_ID, REGISTERED_ID, 'chapter.open', {});
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.kind).toBe('capability');
+    expect(result.error?.message).toContain('未授权工具调用');
+    expect(routed).toHaveLength(0);
+  });
+
+  it('未声明 tool:propose：即使白名单命中也不受理提议', async () => {
+    const routed: ToolProposalRequest[] = [];
+    const host = makeHost({
+      script: { ...SCRIPT, capabilities: ['write:cards'] },
+      permissions: { write: ['cards'] },
+      execution: proposalPort({ tool: 'write:cards', args: {} }),
+      toolProposal: recordingProposal(routed),
+    });
+    host.activate(PLUGIN_ID);
+
+    const result = await host.runScript(PLUGIN_ID, REGISTERED_ID, 'chapter.open', {});
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.kind).toBe('capability');
+    expect(result.error?.message).toContain('tool:propose');
+    expect(routed).toHaveLength(0);
+  });
+
+  it('审批管线拒绝提议：结果失败，无直接写路径', async () => {
+    const routed: ToolProposalRequest[] = [];
+    const host = makeHost({
+      script: PROPOSAL_SCRIPT,
+      permissions: { write: ['cards'] },
+      execution: proposalPort({ tool: 'write:cards', args: {} }),
+      toolProposal: recordingProposal(routed, { ok: false, error: { kind: 'capability', message: '用户拒绝' } }),
+    });
+    host.activate(PLUGIN_ID);
+
+    const result = await host.runScript(PLUGIN_ID, REGISTERED_ID, 'chapter.open', {});
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.message).toContain('用户拒绝');
+    expect(routed).toHaveLength(1);
+  });
+
+  it('声明 tool:propose 但未配置审批端口：拒绝（fail-closed）', async () => {
+    const host = makeHost({
+      script: PROPOSAL_SCRIPT,
+      permissions: { write: ['cards'] },
+      execution: proposalPort({ tool: 'write:cards', args: {} }),
+    });
+    host.activate(PLUGIN_ID);
+
+    const result = await host.runScript(PLUGIN_ID, REGISTERED_ID, 'chapter.open', {});
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.kind).toBe('permission');
+    expect(result.error?.message).toContain('工具提议端口');
   });
 });

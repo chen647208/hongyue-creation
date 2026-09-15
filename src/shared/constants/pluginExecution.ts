@@ -20,3 +20,6 @@ export const PLUGIN_SCRIPT_TIMEOUT_MS = 3000;
 
 /** 序列化后输出上限（字节），超限为 limit 错误。 */
 export const PLUGIN_SCRIPT_MAX_OUTPUT_BYTES = 256 * 1024;
+
+/** 渲染器同步执行的墙钟超时（毫秒）：同步路径阻塞渲染进程，保持毫秒级，禁秒级长任务。 */
+export const PLUGIN_RENDERER_TIMEOUT_MS = 100;

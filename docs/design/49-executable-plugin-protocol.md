@@ -78,6 +78,8 @@
 
 白名单前缀之外一律拒绝；`net`/`ai` 不接受参数。能力与权限交叉回查：声明了描述符但没声明对应权限即拒绝注册。
 
+运行时通道：宿主在放行分支把描述符声明的能力解析为受控映射（`resolveCapabilities`），只把通过回查的能力名交执行端口，未声明的能力不进映射、脚本不可见。`read:*`/`write:*`/`net`/`ai` 只经宿主契约函数提供（网络沿用 `netGate`，外部内容沿用 `untrusted`，写入沿用审批三档），插件拿不到裸 `fetch`/`fs`/`eval`。脚本返回的工具调用经 `allowedTools` 白名单裁决：未声明 `tool:propose` 即空白名单、任何调用被拒；声明后也只作"提议"，经注入的 `ToolProposalPort` 进提案/审批管线，脚本不直接执行写操作。端口缺省即拒绝提议（fail-closed）。
+
 ### 3. 沙箱边界
 
 复用既有底座，不引入第二套隔离：
@@ -103,6 +105,8 @@
 - `quickjs-emscripten` 已在依赖内（`package.json`），其 `evalCode` 同步执行并支持中断处理器，可在渲染进程内做超时与内存限额。
 - 隔离取舍：执行不在 `utilityProcess`，因此只接受 `pure` 函数、不给宿主对象、不注入任何 I/O 宿主函数；超时中断、内存上限、输出上限三项齐备。
 - 若 B 的隔离取舍不可接受，回落到 A（声明式，不跑任意代码）；这条回落只影响渲染器执行层，协议与注册表不变。
+
+落地边界：协议层与宿主门序（激活 → 注册 → 纯同步约束 → 能力回查 → 入口存在 → 输入 schema → 同步端口 → 输出字符串 + output schema）落定，端口类型 `RendererExecutionPort` 由宿主注入，缺省即拒绝（fail-closed）。渲染进程内同步 QuickJS 执行未接线：生产端口缺省，渲染器执行一律拒绝，不跑任意代码；接线时实现 `preheat` 缓存已编译纯函数、`render` 同步调用并遵守 `PLUGIN_RENDERER_TIMEOUT_MS`（毫秒级，禁秒级长任务）。隔离取舍不可接受时回落选型 A。
 
 脚本不受同步约束，走既有 `utilityProcess` + QuickJS 异步沙箱。
 
@@ -148,4 +152,5 @@
 - 协议层：描述符 schema 与校验（`core/plugin/descriptors.ts`）、注册表占位（`core/plugin/registries.ts`）、清单字段与签名门（`core/plugin/manifest.ts`、`core/plugin/installer.ts`）已就位，配单测。
 - 宿主接线：装配器（`renderer/shared/services/pluginService.ts`）读 `contributes.renderers`/`scripts`，经 `installExecutableDescriptors` 登记到注册表；`PluginDeps` 持有两个注册表，`PluginHost` 暴露只读查询句柄。未签名或缺对应能力权限整体拒绝（fail-closed），禁用/卸载/热重载按注册逆序释放。登记层只存描述符，不执行代码。
 - 沙箱执行（脚本面）：入口存在性 fail-closed——`installExecutableDescriptors` 在作用域核对后校验 `entry` 命中插件已收集文件集，缺失即整体拒绝；`PluginHost.runScript(pluginId, scriptId, event, payload)` 做四道门（激活、描述符注册且属本插件、触发挂点匹配、`capabilities` 运行期按 manifest 权限回查），任一道不通过即拒绝且不进端口；通过后经注入的 `ScriptExecutionPort` 把入口文件交主进程 `pluginSandbox` IPC，结果按描述符 `input`/`output` 做顶层 `type` 校验。资源限额单源在 `shared/constants/pluginExecution.ts`（超时/内存/输出），生产端口在 `renderer/shared/services/pluginService.ts` 装配，端口缺省即拒绝执行。
-- 沙箱执行（渲染器面）：渲染器纯函数同步调用与工具提议走同一执行通道，接在 `ScriptExecutionPort` 之外的渲染器预热路径上。
+- 沙箱执行（渲染器面）：`PluginHost.runRenderer(pluginId, rendererId, input)` 走同步门序（激活 → 注册 → 纯同步约束 → 能力回查 → 入口存在 → 输入 schema → 同步端口 → 输出字符串 + output schema），经注入的 `RendererExecutionPort`（`preheat` + `render`，毫秒级超时）同步执行；端口缺省即拒绝。生产端口未接线，渲染器执行 fail-closed。
+- 能力调用通道与 `tool:propose`：`resolveCapabilities` / `allowedToolNames` 只放行描述符声明且过权限回查的能力；`runScript` 把能力名交执行端口，工具调用按白名单裁决，提议经注入的 `ToolProposalPort` 进审批管线，脚本无直接写路径。`ToolProposalPort` 缺省即拒绝提议。

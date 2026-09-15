@@ -16,7 +16,13 @@
  * 本层不持有沙箱实现，也不向插件暴露宿主对象：网络、文件、`eval` 均不经此通道。
  */
 
-import type { DescriptorSchema, ScriptDescriptor } from './descriptors.js';
+import {
+  type DescriptorSchema,
+  type HostCapability,
+  parseHostCapability,
+  type ScriptDescriptor,
+} from './descriptors.js';
+import type { PluginManifest } from './manifest.js';
 import type {
   SandboxErrorKind,
   SandboxRunRequest,
@@ -79,3 +85,126 @@ function schemaTypeOf(value: unknown): string {
   if (Array.isArray(value)) return 'array';
   return typeof value;
 }
+
+// ── 渲染器同步执行（design/49 §4 选型 B）────────────────────────────────
+
+/**
+ * 渲染器同步执行端口：宿主同步调用已预热的纯函数并取回输出文本。
+ *
+ * 端口缺省即拒绝（fail-closed）。实现须保持毫秒级：同步路径阻塞渲染进程，
+ * 禁止秒级长任务；`preheat` 供实现编译/缓存入口，`render` 只做同步调用。
+ */
+export interface RendererExecutionPort {
+  /** 预热入口：宿主在首次渲染前调用一次，实现可据此编译并缓存纯函数。 */
+  preheat?(entry: string, source: string): void;
+  /** 同步调用已预热的纯函数，返回输出文本。 */
+  render(request: RendererRunRequest): RendererRunResult;
+}
+
+export interface RendererRunRequest {
+  /** 插件内相对入口文件。 */
+  entry: string;
+  /** 入口文件导出的具名函数。 */
+  export: string;
+  /** 入口文件源码。 */
+  source: string;
+  input: unknown;
+  /** 墙钟超时（毫秒）；实现须在此内中断并返回 timeout 错误。 */
+  timeoutMs: number;
+}
+
+export interface RendererRunResult {
+  ok: boolean;
+  /** 成功时的输出文本。 */
+  text?: string;
+  error?: ScriptRunError;
+}
+
+/** 渲染器执行结果：失败必带可读原因，门禁拒绝也走此结构。 */
+export interface RendererRunOutcome {
+  ok: boolean;
+  text?: string;
+  error?: ScriptRunError;
+}
+
+/** 渲染器门禁拒绝结果（未激活、未注册、非纯同步、越权、未配置端口）。 */
+export function rendererDenied(message: string): RendererRunOutcome {
+  return { ok: false, error: { kind: 'permission', message } };
+}
+
+// ── 受控能力映射与工具提议（design/49 §2）──────────────────────────────
+
+/** 解析后的受控能力映射：只含描述符声明且 manifest 权限放行的条目，未声明不可见。 */
+export interface CapabilityMap {
+  read: string[];
+  write: string[];
+  net: boolean;
+  ai: boolean;
+  toolPropose: boolean;
+}
+
+export type CapabilityResolution =
+  | { ok: true; capabilities: HostCapability[]; map: CapabilityMap }
+  | { ok: false; reason: string };
+
+/**
+ * 逐条回查描述符声明的能力并回查 manifest 权限；任一条越权即整体拒绝（deny-by-default）。
+ * 返回值只含通过校验的条目，未声明的能力不进入映射。
+ */
+export function resolveCapabilities(
+  declared: readonly string[] | undefined,
+  manifest: PluginManifest,
+): CapabilityResolution {
+  const capabilities: HostCapability[] = [];
+  for (const raw of declared ?? []) {
+    const check = parseHostCapability(raw, manifest);
+    if (!check.ok) return { ok: false, reason: check.reason };
+    capabilities.push(check.capability);
+  }
+  const map: CapabilityMap = { read: [], write: [], net: false, ai: false, toolPropose: false };
+  for (const capability of capabilities) {
+    if (capability.kind === 'read' || capability.kind === 'write') map[capability.kind].push(capability.domain);
+    else if (capability.kind === 'net') map.net = true;
+    else if (capability.kind === 'ai') map.ai = true;
+    else map.toolPropose = true;
+  }
+  return { ok: true, capabilities, map };
+}
+
+/** 能力字符串（宿主契约名，沙箱所见白名单条目）。 */
+export function capabilityName(capability: HostCapability): string {
+  if (capability.kind === 'read' || capability.kind === 'write') {
+    return `${capability.kind}:${capability.domain}`;
+  }
+  if (capability.kind === 'tool') return `tool:${capability.action}`;
+  return capability.kind;
+}
+
+/**
+ * 工具提议白名单：取已声明的读写/网络/AI 能力名；未声明的能力名不在清单，工具调用被裁决拒绝。
+ * `tool:propose` 是提议通道的开关（见 `CapabilityMap.toolPropose`），不进白名单。
+ */
+export function allowedToolNames(capabilities: readonly HostCapability[]): string[] {
+  return capabilities.filter((capability) => capability.kind !== 'tool').map(capabilityName);
+}
+
+/** 工具提议请求：脚本只能"提议"，执行归宿主审批管线，脚本拿不到写操作。 */
+export interface ToolProposalRequest {
+  pluginId: string;
+  scriptId: string;
+  capabilities: CapabilityMap;
+  proposals: readonly SandboxToolCall[];
+}
+
+export interface ToolProposalResult {
+  ok: boolean;
+  /** 受理并进入审批管线的提案数。 */
+  accepted?: number;
+  error?: ScriptRunError;
+}
+
+/**
+ * 工具提议端口：接既有提案/审批管线（read 直通 / write:proposal 弹批 / write:direct 审计）。
+ * 未配置端口即拒绝全部提议（fail-closed）；本层不执行任何写操作。
+ */
+export type ToolProposalPort = (request: ToolProposalRequest) => Promise<ToolProposalResult>;

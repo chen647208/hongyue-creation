@@ -61,6 +61,8 @@ export interface SandboxRunRequest {
   code: string;
   input?: unknown;
   limits?: Partial<SandboxLimits>;
+  /** 宿主放行的能力白名单（描述符 capabilities，已过权限回查）；沙箱仅见此清单，未声明不可见。 */
+  capabilities?: readonly string[];
   /** 技能声明的工具白名单；handler 提议的越界工具调用被拒。 */
   allowedTools?: readonly string[];
   /** 执行形态：js（QuickJS）或 wasm（无导入纯计算模块）。 */

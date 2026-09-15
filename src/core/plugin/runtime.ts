@@ -20,22 +20,30 @@
  * 逻辑型贡献（logic/editor）由渲染端装配，执行前经 assertCan 权限门。
  */
 import {
+  PLUGIN_RENDERER_TIMEOUT_MS,
   PLUGIN_SCRIPT_MAX_OUTPUT_BYTES,
   PLUGIN_SCRIPT_MEMORY_BYTES,
   PLUGIN_SCRIPT_TIMEOUT_MS,
 } from '../../shared/constants/pluginExecution';
 import {
-  parseHostCapability,
   type RendererDescriptor,
+  rendererId as namespacedRendererId,
   type ScriptDescriptor,
   scriptId as namespacedScriptId,
 } from './descriptors.js';
 import {
+  allowedToolNames,
   buildScriptRunCode,
+  capabilityName,
   checkDescriptorSchema,
+  rendererDenied,
+  type RendererExecutionPort,
+  type RendererRunOutcome,
+  resolveCapabilities,
   scriptDenied,
   type ScriptExecutionPort,
   type ScriptRunOutcome,
+  type ToolProposalPort,
 } from './execution.js';
 import {
   assertPermission,
@@ -48,6 +56,7 @@ import {
   validateManifest,
 } from './manifest.js';
 import type { ExecutableReader, RegisteredExecutable } from './registries.js';
+import { adjudicateHandlerResult } from './sandbox/capabilities.js';
 import { ProviderStatusService } from './status.js';
 
 export type PluginState = 'discovered' | 'active' | 'failed' | 'disabled' | 'uninstalled';
@@ -128,6 +137,10 @@ export interface PluginHostOptions {
   scripts?: ExecutableReader<ScriptDescriptor>;
   /** 脚本执行端口（design/49 沙箱执行）；缺省即拒绝执行，保证未声明描述符的行为不变。 */
   scriptExecution?: ScriptExecutionPort;
+  /** 渲染器同步执行端口（design/49 §4 选型 B）；缺省即拒绝渲染，不跑任意代码。 */
+  rendererExecution?: RendererExecutionPort;
+  /** 工具提议端口（design/49 §2）：接既有提案/审批管线；缺省即拒绝全部提议。 */
+  toolProposal?: ToolProposalPort;
 }
 
 
@@ -146,6 +159,12 @@ export class PluginHost {
   };
   /** 脚本执行端口：缺省即拒绝执行（fail-closed），未声明描述符的插件不受影响。 */
   private readonly scriptExecution?: ScriptExecutionPort;
+  /** 渲染器同步执行端口：缺省即拒绝渲染（fail-closed）。 */
+  private readonly rendererExecution?: RendererExecutionPort;
+  /** 工具提议端口：缺省即拒绝提议（fail-closed）。 */
+  private readonly toolProposal?: ToolProposalPort;
+  /** 已预热渲染器入口（`<插件 id>:<entry>` 去重，避免重复预热）。 */
+  private readonly preheated = new Set<string>();
   /** 激活失败退避：连续失败的插件在退避窗内跳过激活（§13.1）。 */
   readonly providerStatus = new ProviderStatusService();
 
@@ -155,6 +174,8 @@ export class PluginHost {
     this.hostVersion = options.hostVersion;
     this.executableReaders = { renderers: options.renderers, scripts: options.scripts };
     this.scriptExecution = options.scriptExecution;
+    this.rendererExecution = options.rendererExecution;
+    this.toolProposal = options.toolProposal;
   }
 
   private readonly hostVersion: string;
@@ -334,6 +355,10 @@ export class PluginHost {
       }
     }
     this.installed.delete(pluginId);
+    // 释放该插件的渲染器预热缓存：重新启用时按当前入口重新预热。
+    for (const key of this.preheated) {
+      if (key.startsWith(`${pluginId}:`)) this.preheated.delete(key);
+    }
   }
 
   list(): PluginStatus[] {
@@ -367,8 +392,9 @@ export class PluginHost {
    * 执行已注册脚本（design/49 沙箱执行）。
    *
    * 门序：插件激活 → 描述符注册且属本插件 → 触发挂点匹配 → 能力运行期回查 →
-   * 入口存在 → 输入 schema → 注入端口执行 → 输出 schema。任一步失败即拒绝且不进端口；
-   * 未配置端口一律拒绝（fail-closed）。脚本代码经既有沙箱运行，拿不到宿主对象。
+   * 入口存在 → 输入 schema → 注入端口执行 → 输出 schema → 工具提议走审批端口。
+   * 任一步失败即拒绝且不进端口；未配置端口一律拒绝（fail-closed）。
+   * 脚本代码经既有沙箱运行，拿不到宿主对象：能力只以白名单交端口，写操作只能提议。
    */
   async runScript(
     pluginId: string,
@@ -390,10 +416,8 @@ export class PluginHost {
       return scriptDenied(`脚本 ${registered.id} 未声明触发挂点 ${event}（声明为 ${descriptor.on}）`);
     }
     // 运行期能力回查：注册期已校验一次，这里对当前 manifest 权限再查，防注册后权限收窄。
-    for (const capability of descriptor.capabilities ?? []) {
-      const check = parseHostCapability(capability, plugin.manifest);
-      if (!check.ok) return scriptDenied(`脚本 ${registered.id} 能力越权：${check.reason}`);
-    }
+    const resolved = resolveCapabilities(descriptor.capabilities, plugin.manifest);
+    if (!resolved.ok) return scriptDenied(`脚本 ${registered.id} 能力越权：${resolved.reason}`);
     const source = plugin.files[descriptor.entry];
     if (source === undefined) {
       return { ok: false, error: { kind: 'not-found', message: `脚本入口不存在：${descriptor.entry}` } };
@@ -403,6 +427,8 @@ export class PluginHost {
     if (!this.scriptExecution) {
       return scriptDenied('未配置脚本执行端口，拒绝执行');
     }
+    // 受控能力映射：只把已声明且过权限回查的能力交端口，未声明不可见。
+    const allowedTools = allowedToolNames(resolved.capabilities);
     const result = await this.scriptExecution({
       code: buildScriptRunCode(descriptor, source),
       input: payload ?? null,
@@ -411,13 +437,105 @@ export class PluginHost {
         timeoutMs: PLUGIN_SCRIPT_TIMEOUT_MS,
         maxOutputBytes: PLUGIN_SCRIPT_MAX_OUTPUT_BYTES,
       },
+      capabilities: resolved.capabilities.map(capabilityName),
+      allowedTools,
     });
     if (!result.ok) {
       return { ok: false, error: result.error ?? { kind: 'runtime', message: '脚本执行失败' } };
     }
-    const outputIssue = checkDescriptorSchema(result.output, descriptor.output, 'output');
+    // 工具调用按能力白名单裁决：未声明的能力名不在清单，越界调用在此被拒。
+    const adjudicated = adjudicateHandlerResult(result.output, allowedTools);
+    const outputIssue = checkDescriptorSchema(adjudicated.output, descriptor.output, 'output');
     if (outputIssue) return { ok: false, error: { kind: 'schema', message: outputIssue } };
-    return { ok: true, output: result.output, toolCalls: result.toolCalls };
+    const proposals = adjudicated.toolCalls ?? [];
+    if (proposals.length > 0) {
+      if (!resolved.map.toolPropose) {
+        return {
+          ok: false,
+          error: { kind: 'capability', message: `脚本 ${registered.id} 未声明 tool:propose，拒绝工具提议` },
+        };
+      }
+      if (!this.toolProposal) {
+        return scriptDenied('未配置工具提议端口，拒绝工具提议');
+      }
+      const routed = await this.toolProposal({
+        pluginId,
+        scriptId: registered.id,
+        capabilities: resolved.map,
+        proposals,
+      });
+      if (!routed.ok) {
+        return {
+          ok: false,
+          error: routed.error ?? { kind: 'capability', message: '工具提议未获审批管线受理' },
+        };
+      }
+      return { ok: true, output: adjudicated.output, toolCalls: proposals };
+    }
+    if (adjudicated.error?.kind === 'capability') {
+      return { ok: false, error: adjudicated.error };
+    }
+    return { ok: true, output: adjudicated.output, toolCalls: adjudicated.toolCalls };
+  }
+
+  /**
+   * 同步执行已注册渲染器（design/49 §4 选型 B）。
+   *
+   * 门序：插件激活 → 描述符注册且属本插件 → 纯函数同步约束 → 能力运行期回查 →
+   * 入口存在 → 输入 schema → 注入同步端口（预热一次）→ 输出必须为字符串且过 output schema。
+   * 未配置端口一律拒绝（fail-closed）；同步路径不跑秒级长任务。
+   */
+  runRenderer(pluginId: string, renderer: string, input?: unknown): RendererRunOutcome {
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin || this.statuses.get(pluginId)?.state !== 'active') {
+      return rendererDenied(`插件 ${pluginId} 未激活，拒绝执行渲染器`);
+    }
+    const reader = this.executableReaders.renderers;
+    const registered = reader?.get(renderer) ?? reader?.get(namespacedRendererId(pluginId, renderer));
+    if (!registered || registered.pluginId !== pluginId) {
+      return rendererDenied(`渲染器 ${renderer} 未注册，拒绝执行`);
+    }
+    const descriptor = registered.descriptor;
+    if (descriptor.purity !== 'pure' || descriptor.mode !== 'sync') {
+      return rendererDenied(`渲染器 ${registered.id} 必须为纯同步函数（pure + sync）`);
+    }
+    const resolved = resolveCapabilities(descriptor.capabilities, plugin.manifest);
+    if (!resolved.ok) return rendererDenied(`渲染器 ${registered.id} 能力越权：${resolved.reason}`);
+    const source = plugin.files[descriptor.entry];
+    if (source === undefined) {
+      return { ok: false, error: { kind: 'not-found', message: `渲染器入口不存在：${descriptor.entry}` } };
+    }
+    const inputIssue = checkDescriptorSchema(input, descriptor.input, 'input');
+    if (inputIssue) return { ok: false, error: { kind: 'schema', message: inputIssue } };
+    const port = this.rendererExecution;
+    if (!port) {
+      return rendererDenied('未配置渲染器同步执行端口，拒绝执行');
+    }
+    const preheatKey = `${pluginId}:${descriptor.entry}`;
+    try {
+      if (port.preheat && !this.preheated.has(preheatKey)) {
+        port.preheat(descriptor.entry, source);
+        this.preheated.add(preheatKey);
+      }
+      const result = port.render({
+        entry: descriptor.entry,
+        export: descriptor.export,
+        source,
+        input: input ?? null,
+        timeoutMs: PLUGIN_RENDERER_TIMEOUT_MS,
+      });
+      if (!result.ok) {
+        return { ok: false, error: result.error ?? { kind: 'runtime', message: '渲染器执行失败' } };
+      }
+      if (typeof result.text !== 'string') {
+        return { ok: false, error: { kind: 'schema', message: 'output 形状不符：渲染器必须同步返回字符串' } };
+      }
+      const outputIssue = checkDescriptorSchema(result.text, descriptor.output, 'output');
+      if (outputIssue) return { ok: false, error: { kind: 'schema', message: outputIssue } };
+      return { ok: true, text: result.text };
+    } catch (error) {
+      return { ok: false, error: { kind: 'runtime', message: error instanceof Error ? error.message : String(error) } };
+    }
   }
 
   /** 权限代理：宿主在数据访问边界调用；未声明即 PermissionDenied。 */
