@@ -9,10 +9,13 @@
 
 import type { FormulaExpr } from '@shared/formulaScript';
 
+import type { CanvasEdge, CanvasNode } from './jsonCanvas';
+
+export type { CanvasDocument, CanvasEdge, CanvasNode } from './jsonCanvas';
 export type { FormulaExpr, FormulaFunction } from '@shared/formulaScript';
 
-/** 视图引擎的类型：同一份行数据可由表格/卡片/图/大纲/读者/图表六种视图呈现。 */
-export type ViewKind = 'table' | 'card' | 'graph' | 'list' | 'reader' | 'chart';
+/** 视图引擎的类型：同一份行数据可由表格/卡片/图/大纲/读者/图表/画布七种视图呈现。 */
+export type ViewKind = 'table' | 'card' | 'graph' | 'list' | 'reader' | 'chart' | 'canvas';
 
 /** 一列：key 决定取 row.cells[key]，label 为 i18n 键或计算列的用户标签。 */
 export interface ViewColumn {
@@ -145,6 +148,28 @@ export interface ChartSpec {
   bindings: ChartFieldBinding[];
 }
 
+/** 画布节点坐标与可选尺寸。 */
+export interface CanvasPoint {
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+}
+
+/**
+ * 画布布局：只存坐标、连线与自由节点，不复制行内容。
+ * 行投影节点（实体/章节等）的坐标按行 id 存在 `positions`，内容仍从行数据取；
+ * 自由节点（便签/图片/链接）没有对应行，其内容即真相，坐标随节点一起存。
+ */
+export interface CanvasLayout {
+  /** 行投影节点坐标：键为行 id。 */
+  positions?: Record<string, CanvasPoint>;
+  /** 自由节点：JSON Canvas 节点原样存放。 */
+  nodes?: CanvasNode[];
+  /** 连线：fromNode/toNode 引用行 id 或自由节点 id。 */
+  edges?: CanvasEdge[];
+}
+
 /** 待展示的数据集：列、行与关系边。 */
 export interface EntityViewData {
   columns: ViewColumn[];
@@ -176,4 +201,6 @@ export interface ViewLayout {
   fieldAliases?: Record<string, string>;
   /** 图表声明：字段→通道映射与图形类型（kind=chart 时使用）。 */
   chart?: ChartSpec;
+  /** 画布布局：节点坐标、连线与自由节点（kind=canvas 时使用）。 */
+  canvas?: CanvasLayout;
 }

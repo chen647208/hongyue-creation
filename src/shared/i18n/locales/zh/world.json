@@ -40,11 +40,28 @@
         "shape": "形状"
       }
     },
+    "canvas": {
+      "loading": "正在加载画布…",
+      "connect": "连线",
+      "connectHint": "在两个节点上依次点击「连线」建立关联，按 Esc 取消。",
+      "cancelConnect": "取消",
+      "removeEdge": "删除连线",
+      "moveHint": "拖动移动；方向键微调，按住 Shift 步长更大",
+      "nodeLabel": "{{kind}}：{{title}}",
+      "freeNode": "便签",
+      "format": "JSON Canvas",
+      "export": "导出画布",
+      "exportFailed": "导出失败：{{error}}",
+      "importLabel": "导入画布",
+      "importFailed": "导入失败：{{error}}",
+      "importSkipped": "已跳过 {{count}} 条失效或重复的连线。"
+    },
     "kind": {
       "table": "表格",
       "card": "卡片",
       "graph": "关系图",
       "chart": "图表",
+      "canvas": "画布",
       "list": "大纲",
       "reader": "读者预览",
       "character": "角色",

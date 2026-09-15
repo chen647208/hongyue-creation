@@ -11,8 +11,11 @@
 import { validateFormulaExpr } from '@shared/formulaScript';
 
 import { ENTITY_VIEW_COLUMNS } from './buildEntityView';
+import { parseCanvasDocument } from './jsonCanvas';
 import type {
   AggregationKind,
+  CanvasLayout,
+  CanvasPoint,
   ChartAggregate,
   ChartChannel,
   ChartFieldBinding,
@@ -30,7 +33,7 @@ import type {
   ViewLayout,
 } from './types';
 
-const KINDS: readonly ViewKind[] = ['table', 'card', 'graph', 'list', 'reader', 'chart'];
+const KINDS: readonly ViewKind[] = ['table', 'card', 'graph', 'list', 'reader', 'chart', 'canvas'];
 
 const CHART_MARKS: readonly ChartMark[] = ['point', 'bar', 'line', 'area'];
 const CHART_CHANNELS: readonly ChartChannel[] = ['x', 'y', 'size', 'color', 'shape'];
@@ -183,6 +186,46 @@ function parseAggregations(value: unknown): ViewAggregation[] | undefined {
   return aggregations.length > 0 ? aggregations : undefined;
 }
 
+function parseCanvasPoint(value: unknown): CanvasPoint | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  if (typeof record.x !== 'number' || !Number.isFinite(record.x) || typeof record.y !== 'number' || !Number.isFinite(record.y)) return undefined;
+  const point: CanvasPoint = { x: record.x, y: record.y };
+  if (typeof record.width === 'number' && Number.isFinite(record.width) && record.width > 0) point.width = record.width;
+  if (typeof record.height === 'number' && Number.isFinite(record.height) && record.height > 0) point.height = record.height;
+  return point;
+}
+
+function parseCanvasLayout(value: unknown): CanvasLayout | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const positions: Record<string, CanvasPoint> = {};
+  if (typeof record.positions === 'object' && record.positions !== null && !Array.isArray(record.positions)) {
+    for (const [id, raw] of Object.entries(record.positions as Record<string, unknown>)) {
+      if (id === '') continue;
+      const point = parseCanvasPoint(raw);
+      if (point) positions[id] = point;
+    }
+  }
+  // 自由节点与连线复用 JSON Canvas 校验；单条非法即降级丢弃。
+  const parsed = parseCanvasDocument({ nodes: record.nodes, edges: record.edges });
+  const nodes = parsed.ok ? parsed.document.nodes : [];
+  const edges = parsed.ok ? parsed.document.edges : [];
+  const canvas: CanvasLayout = {};
+  if (Object.keys(positions).length > 0) canvas.positions = positions;
+  if (nodes.length > 0) canvas.nodes = nodes;
+  if (edges.length > 0) canvas.edges = edges;
+  return Object.keys(canvas).length > 0 ? canvas : undefined;
+}
+
+function serializeCanvasLayout(layout: CanvasLayout): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (layout.positions && Object.keys(layout.positions).length > 0) out.positions = layout.positions;
+  if (layout.nodes && layout.nodes.length > 0) out.nodes = layout.nodes;
+  if (layout.edges && layout.edges.length > 0) out.edges = layout.edges;
+  return out;
+}
+
 function parseColumns(value: unknown): ViewColumn[] {
   if (!Array.isArray(value)) return ENTITY_VIEW_COLUMNS;
   const columns = value
@@ -216,6 +259,7 @@ export function parseViewLayout(config: Record<string, unknown> | undefined): Vi
     aggregations: parseAggregations(config.aggregations),
     fieldAliases: parseFieldAliases(config.fieldAliases),
     chart: parseChartSpec(config.chart),
+    canvas: parseCanvasLayout(config.canvas),
   };
 }
 
@@ -235,5 +279,6 @@ export function serializeViewLayout(layout: ViewLayout): Record<string, unknown>
     aggregations: layout.aggregations,
     fieldAliases: layout.fieldAliases,
     chart: layout.chart,
+    canvas: layout.canvas ? serializeCanvasLayout(layout.canvas) : undefined,
   };
 }

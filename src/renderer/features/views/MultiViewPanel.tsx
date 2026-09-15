@@ -10,13 +10,14 @@
 /** 多视图面板：同一份作品数据可在表格/卡片/图之间切换，布局存入 ViewDefinition。 */
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import type { Project } from '@shared/types';
-import { BarChart3, BookmarkPlus, BookOpen, FileDown, LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2 } from 'lucide-react';
+import { BarChart3, BookmarkPlus, BookOpen, FileDown, LayoutDashboard, LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2, Upload } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { useGenericModelStore } from '@/app/stores/genericModelStore';
 import { useTranslation } from '@/i18n';
 import { dt } from '@/i18n/dynamic';
 import { dialogService } from '@/shared/services/dialogService';
+import { pickTextFile } from '@/shared/services/fileOpen';
 import { saveTextFile } from '@/shared/services/fileSave';
 import { localStore } from '@/shared/services/localStore';
 import { formulaRegistry } from '@/shared/services/viewFormulas';
@@ -29,7 +30,9 @@ import { ViewModeToggle } from '@/shared/ui/ViewModeToggle';
 import { cn } from '@/shared/utils/cn';
 
 import { buildEntityView } from './buildEntityView';
-import type { AggregationKind, ChartChannel, ChartMark, ConditionOperator, QueryLeaf, ViewColumn, ViewRow } from './types';
+import { addCanvasEdge, mergeCanvasDocument, moveCanvasNode, projectCanvas, removeCanvasEdge } from './canvasView';
+import { parseCanvasText, serializeCanvas } from './jsonCanvas';
+import type { AggregationKind, CanvasPoint, ChartChannel, ChartMark, ConditionOperator, QueryLeaf, ViewColumn, ViewRow } from './types';
 import ViewCards from './ViewCards';
 import { DEFAULT_CHART_SPEC, projectChart } from './viewChart';
 import { serializeViewTable, type TableFormat } from './viewExport';
@@ -43,6 +46,9 @@ import ViewTable from './ViewTable';
 
 /** 图表渲染器按需加载：不进默认视图包。 */
 const LazyViewChart = React.lazy(() => import('./ChartView'));
+
+/** 画布渲染器按需加载：不进默认视图包。 */
+const LazyCanvasView = React.lazy(() => import('./ViewCanvas'));
 
 const CHART_MARKS: readonly ChartMark[] = ['bar', 'point', 'line', 'area'];
 const CHART_CHANNELS: readonly ChartChannel[] = ['x', 'y', 'color', 'size', 'shape'];
@@ -281,6 +287,22 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
 
   const rows = layout.kindFilter && layout.kindFilter !== 'all' ? projection.rows.filter((row) => row.kind === layout.kindFilter) : projection.rows;
   const aggregations = useMemo(() => aggregateRows(rows, layout.aggregations), [rows, layout.aggregations]);
+
+  // 画布：行数据投影为节点，坐标与连线取自 ViewDefinition.config，拖动后写回同一份。
+  const canvasProjection = useMemo(() => projectCanvas(layout.canvas, rows), [layout.canvas, rows]);
+  const moveCanvasNodeById = (id: string, point: CanvasPoint) => {
+    setLayout({ canvas: moveCanvasNode(layout.canvas, id, point) });
+  };
+  const connectCanvasNodes = (source: string, target: string) => {
+    setLayout({ canvas: addCanvasEdge(layout.canvas, source, target) });
+  };
+  const removeCanvasEdgeById = (edgeId: string) => {
+    setLayout({ canvas: removeCanvasEdge(layout.canvas, edgeId) });
+  };
+  const selectCanvasNode = (id: string) => {
+    const row = data.rows.find((item) => item.id === id);
+    if (row) handleSelectRow(row);
+  };
   const conditionLeaves = layout.conditions?.type === 'and' ? layout.conditions.children.filter((child): child is QueryLeaf => child.type === 'leaf') : [];
 
   const addCondition = () => {
@@ -362,6 +384,40 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     });
   };
 
+  // 画布导出为 .canvas（JSON Canvas 开放格式），导入按行 id 与节点 id 合并进当前视图。
+  const exportCanvas = () => {
+    const content = serializeCanvas({ nodes: canvasProjection.nodes, edges: canvasProjection.edges });
+    const safeName = (activeView?.name ?? project.title).replace(/[\\/:*?"<>|]/g, '_');
+    void saveTextFile(`${project.title}_${safeName}.canvas`, content, {
+      mime: 'application/json',
+      extension: 'canvas',
+      filterName: t('views.canvas.format'),
+      dialogTitle: t('views.canvas.export'),
+    }).catch((error) => {
+      dialogService.alert(t('views.canvas.exportFailed', { error: error instanceof Error ? error.message : String(error) }));
+    });
+  };
+
+  const importCanvas = async () => {
+    let text: string | null;
+    try {
+      text = await pickTextFile({ title: t('views.canvas.importLabel'), filterName: t('views.canvas.format'), extension: 'canvas' });
+    } catch (error) {
+      dialogService.alert(t('views.canvas.importFailed', { error: error instanceof Error ? error.message : String(error) }));
+      return;
+    }
+    if (text === null) return;
+    const parsed = parseCanvasText(text);
+    if (!parsed.ok) {
+      dialogService.alert(t('views.canvas.importFailed', { error: parsed.issues.map((issue) => `${issue.path}: ${issue.message}`).join('; ') }));
+      return;
+    }
+    const merged = mergeCanvasDocument(layout.canvas, rows, parsed.document);
+    setLayout({ canvas: merged.layout });
+    const skipped = parsed.issues.length + merged.skippedEdges;
+    if (skipped > 0) dialogService.alert(t('views.canvas.importSkipped', { count: skipped }));
+  };
+
   const bodyHeight = liveHeight ?? layout.height ?? 440;
 
   const handleSelectRow = (row: ViewRow) => {
@@ -389,6 +445,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     { value: 'card' as const, icon: LayoutGrid, title: t('views.kind.card') },
     { value: 'graph' as const, icon: Network, title: t('views.kind.graph') },
     { value: 'chart' as const, icon: BarChart3, title: t('views.kind.chart') },
+    { value: 'canvas' as const, icon: LayoutDashboard, title: t('views.kind.canvas') },
     { value: 'list' as const, icon: ListOrdered, title: t('views.kind.list') },
     { value: 'reader' as const, icon: BookOpen, title: t('views.kind.reader') },
   ];
@@ -495,6 +552,18 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
               <DropdownMenuItem onSelect={() => exportTable('html')}>{t('views.export.html')}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {layout.kind === 'canvas' && (
+            <Button size="sm" variant="outline" title={t('views.canvas.export')} onClick={exportCanvas}>
+              <FileDown className="size-3.5" />
+              {t('views.canvas.export')}
+            </Button>
+          )}
+          {layout.kind === 'canvas' && (
+            <Button size="sm" variant="outline" title={t('views.canvas.importLabel')} onClick={() => void importCanvas()}>
+              <Upload className="size-3.5" />
+              {t('views.canvas.importLabel')}
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -726,6 +795,28 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
           {layout.kind === 'chart' && (
             <React.Suspense fallback={<p className="py-10 text-center text-sm text-muted-foreground">{t('views.chart.loading')}</p>}>
               <LazyViewChart projection={chartProjection} emptyText={t('views.empty')} />
+            </React.Suspense>
+          )}
+          {layout.kind === 'canvas' && (
+            <React.Suspense fallback={<p className="py-10 text-center text-sm text-muted-foreground">{t('views.canvas.loading')}</p>}>
+              <LazyCanvasView
+                projection={canvasProjection}
+                emptyText={t('views.empty')}
+                connectLabel={t('views.canvas.connect')}
+                connectHint={t('views.canvas.connectHint')}
+                cancelConnectLabel={t('views.canvas.cancelConnect')}
+                removeEdgeLabel={t('views.canvas.removeEdge')}
+                moveHint={t('views.canvas.moveHint')}
+                nodeLabel={(node) => {
+                  const title = node.text ?? node.label ?? node.url ?? node.file ?? node.id;
+                  const kind = node.kind ? kindLabel(node.kind) : t('views.canvas.freeNode');
+                  return t('views.canvas.nodeLabel', { kind, title });
+                }}
+                onMoveNode={moveCanvasNodeById}
+                onConnect={connectCanvasNodes}
+                onRemoveEdge={removeCanvasEdgeById}
+                onSelectNode={selectCanvasNode}
+              />
             </React.Suspense>
           )}
           {layout.kind === 'list' && (

@@ -14,3 +14,24 @@
 export const FORMULA_MAX_NODES = 256;
 export const FORMULA_MAX_DEPTH = 16;
 export const FORMULA_MAX_ARGS = 16;
+
+/** 画布节点缺省尺寸：JSON Canvas 规范要求 width/height，行投影未指定尺寸时使用。 */
+export const CANVAS_NODE_WIDTH = 180;
+export const CANVAS_NODE_HEIGHT = 96;
+
+/** 画布行节点的缺省网格排布：原点、列数与间距。 */
+export const CANVAS_GRID_ORIGIN_X = 40;
+export const CANVAS_GRID_ORIGIN_Y = 40;
+export const CANVAS_GRID_COLUMNS = 4;
+export const CANVAS_GRID_GAP_X = 40;
+export const CANVAS_GRID_GAP_Y = 32;
+
+/** 画布节点键盘移动步长（Shift 放大四倍）。 */
+export const CANVAS_KEYBOARD_STEP = 16;
+
+/** 画布内容四周预留的空白（坐标平移与画布尺寸计算用）。 */
+export const CANVAS_PADDING = 40;
+
+/** 画布导入解析上限：超出部分丢弃并在 issues 中记录。 */
+export const CANVAS_MAX_NODES = 2000;
+export const CANVAS_MAX_EDGES = 4000;

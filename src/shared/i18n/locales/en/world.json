@@ -40,11 +40,28 @@
         "shape": "Shape"
       }
     },
+    "canvas": {
+      "loading": "Loading canvas…",
+      "connect": "Connect",
+      "connectHint": "Pick Connect on two nodes to link them. Esc cancels.",
+      "cancelConnect": "Cancel",
+      "removeEdge": "Remove link",
+      "moveHint": "Drag to move; arrow keys nudge, Shift for a larger step",
+      "nodeLabel": "{{kind}}: {{title}}",
+      "freeNode": "Note",
+      "format": "JSON Canvas",
+      "export": "Export canvas",
+      "exportFailed": "Export failed: {{error}}",
+      "importLabel": "Import canvas",
+      "importFailed": "Import failed: {{error}}",
+      "importSkipped": "Skipped {{count}} broken or duplicate links."
+    },
     "kind": {
       "table": "Table",
       "card": "Cards",
       "graph": "Graph",
       "chart": "Chart",
+      "canvas": "Canvas",
       "list": "Outline",
       "reader": "Reader",
       "character": "Character",
