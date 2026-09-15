@@ -19,7 +19,24 @@
  * 权限：deny-by-default。资源型贡献（skills/types/buildProfiles）零代码可热载；
  * 逻辑型贡献（logic/editor）由渲染端装配，执行前经 assertCan 权限门。
  */
-import type { RendererDescriptor, ScriptDescriptor } from './descriptors.js';
+import {
+  PLUGIN_SCRIPT_MAX_OUTPUT_BYTES,
+  PLUGIN_SCRIPT_MEMORY_BYTES,
+  PLUGIN_SCRIPT_TIMEOUT_MS,
+} from '../../shared/constants/pluginExecution';
+import {
+  parseHostCapability,
+  type RendererDescriptor,
+  type ScriptDescriptor,
+  scriptId as namespacedScriptId,
+} from './descriptors.js';
+import {
+  buildScriptRunCode,
+  checkDescriptorSchema,
+  scriptDenied,
+  type ScriptExecutionPort,
+  type ScriptRunOutcome,
+} from './execution.js';
 import {
   assertPermission,
   type Disposable,
@@ -109,6 +126,8 @@ export interface PluginHostOptions {
   renderers?: ExecutableReader<RendererDescriptor>;
   /** 已装配脚本描述符的只读查询句柄（design/49 里程碑②）；缺省即无。 */
   scripts?: ExecutableReader<ScriptDescriptor>;
+  /** 脚本执行端口（design/49 沙箱执行）；缺省即拒绝执行，保证未声明描述符的行为不变。 */
+  scriptExecution?: ScriptExecutionPort;
 }
 
 
@@ -125,6 +144,8 @@ export class PluginHost {
     renderers?: ExecutableReader<RendererDescriptor>;
     scripts?: ExecutableReader<ScriptDescriptor>;
   };
+  /** 脚本执行端口：缺省即拒绝执行（fail-closed），未声明描述符的插件不受影响。 */
+  private readonly scriptExecution?: ScriptExecutionPort;
   /** 激活失败退避：连续失败的插件在退避窗内跳过激活（§13.1）。 */
   readonly providerStatus = new ProviderStatusService();
 
@@ -133,6 +154,7 @@ export class PluginHost {
     this.installer = installer;
     this.hostVersion = options.hostVersion;
     this.executableReaders = { renderers: options.renderers, scripts: options.scripts };
+    this.scriptExecution = options.scriptExecution;
   }
 
   private readonly hostVersion: string;
@@ -339,6 +361,63 @@ export class PluginHost {
   /** 已装配脚本描述符快照（只读；沙箱执行里程碑据此取入口，本轮不执行代码）。 */
   scriptDescriptors(): RegisteredExecutable<ScriptDescriptor>[] {
     return this.executableReaders.scripts?.list() ?? [];
+  }
+
+  /**
+   * 执行已注册脚本（design/49 沙箱执行）。
+   *
+   * 门序：插件激活 → 描述符注册且属本插件 → 触发挂点匹配 → 能力运行期回查 →
+   * 入口存在 → 输入 schema → 注入端口执行 → 输出 schema。任一步失败即拒绝且不进端口；
+   * 未配置端口一律拒绝（fail-closed）。脚本代码经既有沙箱运行，拿不到宿主对象。
+   */
+  async runScript(
+    pluginId: string,
+    script: string,
+    event: string,
+    payload?: unknown,
+  ): Promise<ScriptRunOutcome> {
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin || this.statuses.get(pluginId)?.state !== 'active') {
+      return scriptDenied(`插件 ${pluginId} 未激活，拒绝执行脚本`);
+    }
+    const reader = this.executableReaders.scripts;
+    const registered = reader?.get(script) ?? reader?.get(namespacedScriptId(pluginId, script));
+    if (!registered || registered.pluginId !== pluginId) {
+      return scriptDenied(`脚本 ${script} 未注册，拒绝执行`);
+    }
+    const descriptor = registered.descriptor;
+    if (event !== descriptor.on) {
+      return scriptDenied(`脚本 ${registered.id} 未声明触发挂点 ${event}（声明为 ${descriptor.on}）`);
+    }
+    // 运行期能力回查：注册期已校验一次，这里对当前 manifest 权限再查，防注册后权限收窄。
+    for (const capability of descriptor.capabilities ?? []) {
+      const check = parseHostCapability(capability, plugin.manifest);
+      if (!check.ok) return scriptDenied(`脚本 ${registered.id} 能力越权：${check.reason}`);
+    }
+    const source = plugin.files[descriptor.entry];
+    if (source === undefined) {
+      return { ok: false, error: { kind: 'not-found', message: `脚本入口不存在：${descriptor.entry}` } };
+    }
+    const inputIssue = checkDescriptorSchema(payload, descriptor.input, 'input');
+    if (inputIssue) return { ok: false, error: { kind: 'schema', message: inputIssue } };
+    if (!this.scriptExecution) {
+      return scriptDenied('未配置脚本执行端口，拒绝执行');
+    }
+    const result = await this.scriptExecution({
+      code: buildScriptRunCode(descriptor, source),
+      input: payload ?? null,
+      limits: {
+        memoryBytes: PLUGIN_SCRIPT_MEMORY_BYTES,
+        timeoutMs: PLUGIN_SCRIPT_TIMEOUT_MS,
+        maxOutputBytes: PLUGIN_SCRIPT_MAX_OUTPUT_BYTES,
+      },
+    });
+    if (!result.ok) {
+      return { ok: false, error: result.error ?? { kind: 'runtime', message: '脚本执行失败' } };
+    }
+    const outputIssue = checkDescriptorSchema(result.output, descriptor.output, 'output');
+    if (outputIssue) return { ok: false, error: { kind: 'schema', message: outputIssue } };
+    return { ok: true, output: result.output, toolCalls: result.toolCalls };
   }
 
   /** 权限代理：宿主在数据访问边界调用；未声明即 PermissionDenied。 */

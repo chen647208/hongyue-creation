@@ -12,6 +12,12 @@
  * 主进程与渲染层共用的单源（跨 IPC 边界序列化）。
  */
 
+import {
+  PLUGIN_SCRIPT_MAX_OUTPUT_BYTES,
+  PLUGIN_SCRIPT_MEMORY_BYTES,
+  PLUGIN_SCRIPT_TIMEOUT_MS,
+} from './constants/pluginExecution.js';
+
 export interface SandboxLimits {
   /** QuickJS 线性内存上限（字节）。 */
   memoryBytes: number;
@@ -22,9 +28,9 @@ export interface SandboxLimits {
 }
 
 export const DEFAULT_SANDBOX_LIMITS: SandboxLimits = {
-  memoryBytes: 16 * 1024 * 1024,
-  timeoutMs: 3000,
-  maxOutputBytes: 256 * 1024,
+  memoryBytes: PLUGIN_SCRIPT_MEMORY_BYTES,
+  timeoutMs: PLUGIN_SCRIPT_TIMEOUT_MS,
+  maxOutputBytes: PLUGIN_SCRIPT_MAX_OUTPUT_BYTES,
 };
 
 export type SandboxErrorKind = 'timeout' | 'memory' | 'runtime' | 'limit' | 'capability' | 'permission';

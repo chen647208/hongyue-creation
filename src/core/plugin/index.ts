@@ -93,6 +93,15 @@ export {
   type VetoResult,
 } from './events.js';
 export {
+  buildScriptRunCode,
+  checkDescriptorSchema,
+  scriptDenied,
+  type ScriptExecutionPort,
+  type ScriptRunError,
+  type ScriptRunErrorKind,
+  type ScriptRunOutcome,
+} from './execution.js';
+export {
   installPackage,
   type InstallResult,
   type PluginInstallPort,

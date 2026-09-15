@@ -205,6 +205,10 @@ export function installExecutableDescriptors(
         problems.push(`${file.file}: 入口 ${result.descriptor.entry} 不在贡献目录 ${file.root}/ 内`);
         continue;
       }
+      if (source.files[result.descriptor.entry] === undefined) {
+        problems.push(`${file.file}: 入口文件不存在：${result.descriptor.entry}`);
+        continue;
+      }
       pending.push({ kind: 'renderer', id: result.descriptor.id, descriptor: result.descriptor });
     }
   }
@@ -223,6 +227,10 @@ export function installExecutableDescriptors(
       }
       if (!withinRoot(result.descriptor.entry, file.root)) {
         problems.push(`${file.file}: 入口 ${result.descriptor.entry} 不在贡献目录 ${file.root}/ 内`);
+        continue;
+      }
+      if (source.files[result.descriptor.entry] === undefined) {
+        problems.push(`${file.file}: 入口文件不存在：${result.descriptor.entry}`);
         continue;
       }
       pending.push({ kind: 'script', id: result.descriptor.id, descriptor: result.descriptor });

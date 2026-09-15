@@ -122,7 +122,9 @@ describe('installExecutableDescriptors', () => {
         { renderers: ['./renderers/'], scripts: ['./scripts/'] },
         {
           'renderers/renderers.json': JSON.stringify([RENDERER]),
+          'renderers/rtf.js': 'export function renderRtf() {}',
           'scripts/scripts.json': JSON.stringify([SCRIPT]),
+          'scripts/open.js': 'export function onOpen() {}',
         },
       ),
       renderers,
@@ -165,6 +167,21 @@ describe('installExecutableDescriptors', () => {
     );
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('不在贡献目录');
+    expect(renderers.size()).toBe(0);
+  });
+
+  it('入口文件不存在：整体拒绝并可读报错', () => {
+    const renderers = new RendererRegistry();
+    const scripts = new ScriptRegistry();
+    const result = installExecutableDescriptors(
+      source({ renderers: ['./renderers/'] }, { 'renderers/renderers.json': JSON.stringify([RENDERER]) }),
+      renderers,
+      scripts,
+      { signed: true },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('入口文件不存在');
+    expect(result.reason).toContain('renderers/rtf.js');
     expect(renderers.size()).toBe(0);
   });
 

@@ -27,7 +27,7 @@ import type {
   PluginHostOptions,
   PluginStatus,
 } from '@core/plugin';
-import { formulaId, installExecutableDescriptors, installFormulas, installHooks, installTypeTemplates, loadPluginCatalog, PermissionDenied, PluginHost, type RendererRegistry, type ScriptRegistry, typeTemplateId } from '@core/plugin';
+import { formulaId, installExecutableDescriptors, installFormulas, installHooks, installTypeTemplates, loadPluginCatalog, PermissionDenied, PluginHost, type RendererRegistry, type ScriptExecutionPort, type ScriptRegistry, typeTemplateId } from '@core/plugin';
 import { adjudicateHandlerResult, checkPluginFileName, checkPluginRelPath, type SandboxRunResult } from '@core/plugin';
 import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
@@ -429,10 +429,19 @@ export function createContributionInstaller(deps: PluginDeps): ContributionInsta
   };
 }
 
+/** 脚本执行端口：把宿主门控后的请求转交主进程既有插件沙箱（design/49 沙箱执行）。 */
+const scriptExecutionPort: ScriptExecutionPort = (request) => {
+  const api = typeof window === 'undefined' ? undefined : window.electronAPI;
+  if (!api?.pluginSandboxRun) {
+    return Promise.resolve({ ok: false, error: { kind: 'runtime', message: '当前环境不支持插件沙箱' } });
+  }
+  return api.pluginSandboxRun(request);
+};
+
 /** 创建宿主并完成一次完整发现-装载-激活循环（预览环境无文件系统时跳过磁盘发现）。 */
 export async function bootstrapPlugins(deps: PluginDeps, hostVersion: string, disabled: string[]): Promise<PluginHost> {
   const host = new PluginHost(
-    { hostVersion, disabled, renderers: deps.renderers, scripts: deps.scripts },
+    { hostVersion, disabled, renderers: deps.renderers, scripts: deps.scripts, scriptExecution: scriptExecutionPort },
     createContributionInstaller(deps),
   );
   activeHost = host;

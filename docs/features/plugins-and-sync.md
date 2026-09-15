@@ -34,8 +34,12 @@
 - **可执行描述符贡献（renderers/scripts）**：`contributes.renderers`/`contributes.scripts` 指向目录，
   目录下 `*.json` 为描述符数组（入口文件 + 导出名 + 纯度/同步声明 + 能力白名单，见 `design/49`）。
   装配期经 `installExecutableDescriptors` 登记进描述符注册表，宿主以只读查询句柄取入口；
-  未签名或缺对应能力权限整体拒绝（fail-closed），不产生半装，禁用/卸载/热重载按注册逆序释放。
-  描述符注册表只存声明，插件代码执行归沙箱阶段。
+  未签名、缺对应能力权限或入口文件不在插件文件集内整体拒绝（fail-closed），不产生半装，
+  禁用/卸载/热重载按注册逆序释放。
+- **脚本执行（`PluginHost.runScript`）**：脚本触发时按「插件已激活 → 描述符已注册 → 触发挂点匹配 →
+  能力按当前 manifest 权限回查」四道门放行，任一不过即拒绝；入口文件经既有插件沙箱（主进程 QuickJS
+  + utilityProcess 隔离）执行，输入输出按描述符 `input`/`output` 顶层 `type` 校验。超时、内存、输出上限
+  单源在 `shared/constants/pluginExecution.ts`；未配置执行端口即拒绝执行。渲染器同步调用与工具提议走后续接缝。
 - **运行时**：逐插件 try-catch 故障隔离；一切注册返回 `Disposable`，
   禁用/卸载时逆序释放（unwind 不变量）；权限 deny-by-default。
 - **资源配额**：装载期校验贡献资源——单文件 ≤128KiB、单贡献键 ≤32 文件、

@@ -147,4 +147,5 @@
 
 - 协议层：描述符 schema 与校验（`core/plugin/descriptors.ts`）、注册表占位（`core/plugin/registries.ts`）、清单字段与签名门（`core/plugin/manifest.ts`、`core/plugin/installer.ts`）已就位，配单测。
 - 宿主接线：装配器（`renderer/shared/services/pluginService.ts`）读 `contributes.renderers`/`scripts`，经 `installExecutableDescriptors` 登记到注册表；`PluginDeps` 持有两个注册表，`PluginHost` 暴露只读查询句柄。未签名或缺对应能力权限整体拒绝（fail-closed），禁用/卸载/热重载按注册逆序释放。登记层只存描述符，不执行代码。
-- 沙箱执行：未做（见 §6）。
+- 沙箱执行（脚本面）：入口存在性 fail-closed——`installExecutableDescriptors` 在作用域核对后校验 `entry` 命中插件已收集文件集，缺失即整体拒绝；`PluginHost.runScript(pluginId, scriptId, event, payload)` 做四道门（激活、描述符注册且属本插件、触发挂点匹配、`capabilities` 运行期按 manifest 权限回查），任一道不通过即拒绝且不进端口；通过后经注入的 `ScriptExecutionPort` 把入口文件交主进程 `pluginSandbox` IPC，结果按描述符 `input`/`output` 做顶层 `type` 校验。资源限额单源在 `shared/constants/pluginExecution.ts`（超时/内存/输出），生产端口在 `renderer/shared/services/pluginService.ts` 装配，端口缺省即拒绝执行。
+- 沙箱执行（渲染器面）：渲染器纯函数同步调用与工具提议走同一执行通道，接在 `ScriptExecutionPort` 之外的渲染器预热路径上。
