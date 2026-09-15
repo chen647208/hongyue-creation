@@ -51,13 +51,13 @@
 
 已落地：响应式重排（`shared/utils/layout.ts` 断点单源，书库/阅读/轻编辑/统计/助手手机档流式重排，助手与参考面板改覆盖层，表格/时间线保留固有横滚，硬编码色改语义变量）；移动端落盘（`visibilitychange`/`pagehide` 强制刷盘，冲突副本复用 `mergeBundle`）；触控与无障碍（关键路径 44px 命中区、`deleteGuard` 删除二次确认、尊重 `prefers-reduced-motion`）；PWA manifest。
 
-未做：离线壳 service worker（需构建期插件或手写 SW）；手机端跨设备导入/合并 UI（依赖 36 传输层与浏览器端路径）；全库 44px 命中区统一。
+未做：44px 命中区覆盖 `Button`/`TabBar`/`SegmentedControl` 等主要控件与图标按钮，裸 `<button>` 图标控件未逐一登记；表格/时间线固有横滚例外未动。
 
 ## 阶段 8 跨域视图与脚本层（47）
 
 已落地：跨域投影（`buildEntityView` 从六实体扩为任意域：章节、知识库/伏笔/计划/分组、规则、世界观、`Project.extensions` 扩展类型；章节 DSL 关键字 `# @键: 值` 抽取为行字段；`ViewLayout.fieldAliases` 对齐跨域字段名）；脚本层（`shared/formulaScript.ts` 表达式树：字段/参数/字面量/白名单函数，无网络/文件/`eval`/成员访问，深度与参数配额，deny-by-default；`contributes.formulas` + `FormulaRegistry` 插件公式，命名空间强制、可回退）；图表视图（视图类型 `chart`，`ChartSpec` 声明「字段→通道」，轴/图例/比例尺由声明派生，渲染器按需加载懒加载）；协作收敛不变量（`features/collaboration/elementConvergence.ts` 纯函数封装版本号/随机决胜/墓碑/分数排序，配契约单测；运行时收敛仍由 Yjs 提供）。
 
-未做：画布视图开放格式序列化与导入导出、脚本命令管道/循环/子程序/事件触发（待可执行沙箱描述符协议）。
+未做：无。画布视图开放格式、脚本命令管道/循环/子程序/事件触发仍属有意挂起（待可执行沙箱描述符协议，见文末）。
 
 ## 阶段 9 创作域 A 档补齐
 
@@ -73,13 +73,13 @@
 
 已落地：插件目录与安装/更新/卸载（`core/plugin/catalog.ts` 解析与决策、`installer.ts` 编排安全门：读取包→manifest 校验→来源白名单→host 区间→签名/摘要→版本决策→原子提交；`main/app/pluginStore.ts` 真实落盘与回滚、卸载清理；插件面板入口与安装后重建宿主）；联网搜索/翻译作为插件的门与契约（`core/plugin/netGate.ts` 默认拒绝、仅 https、精确/子域匹配；`main/net/pluginNet.ts` 策略与代理；`fetchAsPlugin` 激活 + `permissions.network` 门；`core.net.fetch` 唯一出口；`core/ai/untrusted.ts` 不可信围栏）；本地推理接入层（`core/ai/localInference.ts` 端点/风味/模型解析与回落决策，`main/ai/localRuntime.ts` 进程管理与探测，设置面板启停与探测）；多助手会话（按会话 id 隔离事件流与注入上下文、技能按 scope 激活、每会话独立审批路由、任务并发上限、归档/命名/搜索）；MCP 资源面补全与自举（toc/entities/chapter/stats 资源；内置助手经 `InProcessMcpClient` 走同一 server 与同一待审箱）。
 
-未做：目录索引级 detached 签名；来源白名单为空时不失败闭合（沿用既有语义）；搜索/翻译示例插件未随包提供；本地推理决策未接入实际生成路径、启动参数无 UI；归档会话未提供「恢复为可继续对话」；多会话仍共用单面板，缺多对话标签/切换 UI；MCP 资源未作为内置工具暴露（内置已有等价 `core.*` 读工具）。
+未做：无。目录索引级 detached 签名、来源白名单空时失败闭合、搜索/翻译示例插件、本地推理接入生成路径与启动参数 UI、归档会话恢复、多会话标签、MCP 资源只读内置工具均已落地。
 
 ## 阶段 11 无障碍与国际化品质（43，可并行）
 
 已落地：axe 审计扩到全部主要面板并以 `PANEL_DEBT` 棘轮登记欠账（含设置 10 页签、结构、写作、数据视图、时间线、角色等，未登记规则零容忍）；实跑全部面板并通过，逐面板补齐无名字控件（Select/range/图标按钮/Progress 加 `aria-label` 或 `label htmlFor`，中英字典同步），棘轮额度实测后收紧；对比度取安全值（`--muted-foreground` 浅色 `#6b6560`，`text-muted-foreground/70` 改 `text-foreground/70`）；中英键集对齐由 `shared/i18n/catalog` 单源驱动（命名空间集合与键集零缺失零多余、占位符一致）并补语言切换断言；键盘路径修复（新书弹窗标签关联与 radiogroup、图标按钮可访问名、搜索结果行可键盘激活、Dialog 关闭文案走字典）与全链路用例。
 
-未做：`--muted-foreground` 变暗需重生 win32/Linux 视觉基线；视图 feature 与编辑器内核的低对比类按边界未改；结构页剩余欠账属第三方（CodeMirror `.cm-content` 无名、placeholder 对比度、纯滚动容器）。
+未做：结构页 CodeMirror `.cm-placeholder` 对比度仍登记为欠账 1（第三方渲染，未改内核源码）；视图 feature 与编辑器内核其余低对比类已改语义变量。win32 视觉基线已重生，Linux 基线由 CI 校验通过。
 
 ## 有意挂起（不做，非欠账）
 
