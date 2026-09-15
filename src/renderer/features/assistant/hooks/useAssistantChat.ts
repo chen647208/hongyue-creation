@@ -15,12 +15,14 @@ import type { Citation, ContextInjectionResult } from '@core/ai';
 import { composeContextTarget } from '@core/ai';
 import { indexService } from '@core/index';
 import type { TFunction } from 'i18next';
-import { useEffect, useRef, useState } from 'react';
+import { type Dispatch,type SetStateAction,useCallback, useEffect, useRef, useState } from 'react';
 
+import { loadViewContextScope } from '@/app/viewContext';
 import { AICardCommandService } from '@/shared/services/cards/aiCardCommandService';
 import { AICardCreationService } from '@/shared/services/cards/aiCardCreationService';
 import { getDefaultCardPrompts } from '@/shared/services/cards/cardPromptService';
 import { getEditorContext } from '@/shared/services/editorContextService';
+import { resolveEffectiveModel } from '@/shared/services/localInferenceService';
 import { isModelUsable } from '@/shared/utils/modelReadiness';
 
 import { ATTACHMENT_TRUNCATE } from '../../../../shared/constants/chapters';
@@ -36,7 +38,9 @@ import {
 import { approvalBroker, sessionManager } from '../services/aiRuntime';
 import type { SessionRunResult } from '../services/aiSessionManager';
 import { assistantTaskService } from '../services/assistantTaskService';
+import { type SessionArchiveEntry,toChatMessages } from '../services/sessionArchive';
 import { type ChatMessage } from '../types';
+import { useAssistantConversations } from './useAssistantConversations';
 import { useAssistantHistory } from './useAssistantHistory';
 
 export interface PendingImage {
@@ -86,7 +90,23 @@ export function useAssistantChat({
   injectionEnabled = true,
   disabledInjectionIds,
 }: UseAssistantChatOptions) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // 多会话：对话线程列表 + 切换；messages 为当前线程的消息
+  const {
+    conversations,
+    activeConversationId,
+    activeConversation,
+    updateMessages,
+    selectConversation,
+    newConversation,
+    removeConversation,
+    clearConversation,
+    restoreConversation,
+  } = useAssistantConversations();
+  const messages = activeConversation.messages;
+  const setMessages = useCallback<Dispatch<SetStateAction<ChatMessage[]>>>(
+    (value) => updateMessages(activeConversationId, value),
+    [activeConversationId, updateMessages],
+  );
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   // 计划模式：只出计划不执行（codex /plan 同语义，指令级；批准=下一条发送执行）
@@ -125,7 +145,7 @@ export function useAssistantChat({
       };
       setMessages(prev => [...prev, userMsg]);
 
-      const activeModel = usableModel;
+      const activeModel = (await resolveEffectiveModel(usableModel)) ?? usableModel;
 
       if (!isModelUsable(activeModel)) {
         const errorMsg: ChatMessage = {
@@ -205,7 +225,7 @@ export function useAssistantChat({
     setIsLoading(true);
     lastUserText.current = text;
 
-    const activeModel = usableModel;
+    const activeModel = (await resolveEffectiveModel(usableModel)) ?? usableModel;
     if (!isModelUsable(activeModel)) {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
@@ -251,7 +271,7 @@ export function useAssistantChat({
     const taskHandle = assistantTaskService.enqueue({
       bookId: project?.id,
       label: text,
-      run: (signal) => sessionManager.run({
+      run: async (signal) => sessionManager.run({
         bookId: project?.id,
         task: taskText,
         project,
@@ -260,8 +280,10 @@ export function useAssistantChat({
         fallbackModel: models.find((m) => m.id !== activeModel?.id && m.isEnabled !== false && isModelUsable(m)),
         history,
         images,
-        // 上下文注入（design/37）：编辑器真实状态（活动章节/选中实体）优先于任务文本推断
+        // 上下文注入（design/37）：编辑器真实状态（活动章节/选中实体）优先于任务文本推断；
+        // 视图范围按 bookId 查询视图定义后投影，注入当前视图可见实体与条件摘要。
         contextTarget: composeContextTarget(project, text, getEditorContext()),
+        viewContext: await loadViewContextScope(project),
         injectionEnabled,
         disabledInjectionIds,
         cardTemplate: selectedCardTemplateId
@@ -346,7 +368,32 @@ export function useAssistantChat({
   };
 
   const handleClearChat = () => {
-    setMessages([]);
+    clearConversation(activeConversationId);
+    setHistorySummary('');
+    lastUserText.current = '';
+  };
+
+  const handleSelectConversation = (id: string) => {
+    selectConversation(id);
+    setHistorySummary('');
+  };
+
+  const handleNewConversation = () => {
+    newConversation();
+    setHistorySummary('');
+    lastUserText.current = '';
+  };
+
+  const handleDeleteConversation = (id: string) => {
+    removeConversation(id);
+    setHistorySummary('');
+  };
+
+  /** 归档会话恢复为可继续对话：重建消息后进入新线程，后续发送沿用该历史。 */
+  const handleRestoreConversation = (entry: SessionArchiveEntry) => {
+    const restored = toChatMessages(entry.events);
+    const title = entry.name ?? entry.task ?? entry.sessionId;
+    restoreConversation(restored, title, entry.sessionId);
     setHistorySummary('');
     lastUserText.current = '';
   };
@@ -369,6 +416,12 @@ export function useAssistantChat({
     selectedCardTemplateId,
     setSelectedCardTemplateId,
     lastInjection,
+    conversations,
+    activeConversationId,
+    handleSelectConversation,
+    handleNewConversation,
+    handleDeleteConversation,
+    handleRestoreConversation,
     sendMessageInternal,
     handleSendMessage,
     handleStopStreaming,

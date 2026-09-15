@@ -87,7 +87,7 @@ describe('runAgentSession', () => {
     expect(result.turns).toBe(1);
 
     const types = session.events.map((e) => e.t);
-    expect(types).toEqual(['session.start', 'turn.start', 'llm.request', 'llm.done', 'turn.end', 'session.end']);
+    expect(types).toEqual(['session.start', 'message', 'turn.start', 'llm.request', 'llm.done', 'message', 'turn.end', 'session.end']);
   });
 
   it('工具循环：read 工具直接执行并回填，第二轮给答复', async () => {

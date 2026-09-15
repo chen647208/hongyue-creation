@@ -19,6 +19,7 @@ import type {
   LocalProbeResult,
   LocalRuntimeConfig,
   LocalRuntimeFlavor,
+  ModelConfig,
 } from '../../shared/types.js';
 
 export type { LocalModelInfo, LocalProbeResult, LocalRuntimeConfig, LocalRuntimeFlavor };
@@ -124,7 +125,7 @@ export interface InferenceDecisionInput {
 }
 
 /**
- * 选择推理目标：本地启用且探测可达时走本地，否则回落远程。
+ * 选择推理目标：本地启用、探测可达且已选模型时走本地，否则回落远程。
  * 只做决策，不修改远程网关契约；远程模型由既有选择逻辑继续持有。
  */
 export function resolveInferenceTarget(input: InferenceDecisionInput): InferenceTarget {
@@ -132,5 +133,35 @@ export function resolveInferenceTarget(input: InferenceDecisionInput): Inference
   if (!local.enabled) return { kind: 'remote', reason: '本地推理已关闭' };
   if (!local.endpoint.trim()) return { kind: 'remote', reason: '本地端点未配置' };
   if (!localAvailable) return { kind: 'remote', reason: '本地端点不可达' };
-  return { kind: 'local', endpoint: normalizeLocalEndpoint(local.endpoint), model: local.model };
+  if (!local.model?.trim()) return { kind: 'remote', reason: '未选择本地模型' };
+  return { kind: 'local', endpoint: normalizeLocalEndpoint(local.endpoint), model: local.model.trim() };
+}
+
+/** 本地目标的 chat 端点：Ollama 走 `<base>/v1`，OpenAI 兼容端点原样使用。 */
+function localChatEndpoint(endpoint: string, flavor: LocalRuntimeFlavor): string {
+  if (flavor !== 'ollama') return endpoint;
+  return /\/v1$/.test(endpoint) ? endpoint : `${endpoint}/v1`;
+}
+
+/**
+ * 把本地目标转成网关可消费的 ModelConfig（本地推理走真实生成路径）。
+ * 端点或模型缺失返回 null，调用方据此回落远程。远程模型契约不受影响。
+ */
+export function localModelConfig(
+  local: LocalRuntimeConfig,
+  flavor?: LocalRuntimeFlavor,
+): ModelConfig | null {
+  const endpoint = normalizeLocalEndpoint(local.endpoint);
+  const modelName = local.model?.trim();
+  if (!endpoint || !modelName) return null;
+  const kind = flavor ?? inferLocalFlavor(endpoint);
+  return {
+    id: `local:${kind}:${modelName}`,
+    name: `本地 · ${modelName}`,
+    provider: kind === 'ollama' ? 'ollama' : 'openai-chat',
+    endpoint: localChatEndpoint(endpoint, kind),
+    modelName,
+    isEnabled: true,
+    supportsStreaming: true,
+  };
 }

@@ -12,10 +12,12 @@ import { describe, expect,it } from 'vitest';
 
 import {
   applySessionMeta,
+  extractSessionMessages,
   filterSessionEntries,
   matchesSessionQuery,
   type SessionArchiveEntry,
   summarizeSessionUsage,
+  toChatMessages,
 } from '../sessionArchive';
 import { parseMetaIndex, upsertMeta } from '../sessionIndexService';
 
@@ -107,5 +109,40 @@ describe('summarizeSessionUsage', () => {
 
   it('空事件返回零汇总', () => {
     expect(summarizeSessionUsage([]).total).toBe(0);
+  });
+});
+
+describe('会话恢复（事件流 → 对话消息）', () => {
+  const events: AiEvent[] = [
+    { t: 'session.start', sessionId: 's1', task: '原始任务', sections: [], at: 1 },
+    { t: 'message', role: 'user', content: '你好', at: 2 },
+    { t: 'turn.start', turn: 1, at: 2 },
+    { t: 'tool.result', turn: 1, callId: 'c1', ok: true, citations: [{ id: 'cit1', refId: 'ch1', anchor: 'chapter:ch1', title: '雨夜', snippet: '片段', sourceKind: 'chapter', rank: 1 }], at: 3 },
+    { t: 'message', role: 'assistant', content: '你好呀（见雨夜）', at: 4 },
+    { t: 'session.end', ok: true, at: 5 },
+  ];
+
+  it('extractSessionMessages 取 message 事件，忽略空内容', () => {
+    expect(extractSessionMessages(events)).toEqual([
+      { role: 'user', content: '你好', at: 2 },
+      { role: 'assistant', content: '你好呀（见雨夜）', at: 4 },
+    ]);
+  });
+
+  it('旧归档无 message 事件时回落 session.start.task', () => {
+    const legacy: AiEvent[] = [
+      { t: 'session.start', sessionId: 'old', task: '旧任务文本', sections: [], at: 1 },
+      { t: 'session.end', ok: true, at: 2 },
+    ];
+    expect(extractSessionMessages(legacy)).toEqual([{ role: 'user', content: '旧任务文本', at: 1 }]);
+    expect(extractSessionMessages([])).toEqual([]);
+  });
+
+  it('toChatMessages 生成可渲染消息，末条助手消息带引用', () => {
+    const messages = toChatMessages(events);
+    expect(messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(messages[0]!.id).toContain('restored-0');
+    expect(messages[0]!.citations).toBeUndefined();
+    expect(messages[1]!.citations?.[0]?.id).toBe('cit1');
   });
 });

@@ -11,6 +11,7 @@ import type { SyncTransportConfig, SyncTransportObject } from '@shared/types';
 import { Cloud } from 'lucide-react';
 import React, { useState } from 'react';
 
+import SyncDialog from '@/app/app-shell/SyncDialog';
 import { useProjectStore } from '@/app/stores/projectStore';
 import { useTranslation } from '@/i18n';
 import { dialogService } from '@/shared/services/dialogService';
@@ -58,6 +59,7 @@ const SyncTransportPanel: React.FC = () => {
   const [remoteBusy, setRemoteBusy] = useState(false);
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const projects = useProjectStore((s) => s.projects);
+  const activeProject = useProjectStore((s) => s.projects.find((p) => p.id === s.activeProjectId) ?? null);
   const desktop = typeof window !== 'undefined' && !!window.electronAPI;
 
   const commit = (next: SyncTransportConfig): void => {
@@ -208,6 +210,7 @@ const SyncTransportPanel: React.FC = () => {
                 {t('syncTransfer.pickDirectory')}
               </Button>
             </div>
+            {!desktop && <p className="text-xs text-muted-foreground">{t('syncTransfer.localBrowserUnsupported')}</p>}
           </div>
         )}
 
@@ -310,7 +313,7 @@ const SyncTransportPanel: React.FC = () => {
                 onChange={(e) => setSecretDraft(e.target.value)}
                 className="font-mono"
               />
-              <Button variant="outline" size="sm" disabled={!desktop || !secretDraft || secretState === 'saving'} onClick={() => void saveSecret()}>
+              <Button variant="outline" size="sm" disabled={!secretDraft || secretState === 'saving'} onClick={() => void saveSecret()}>
                 {t('syncTransfer.saveCredential')}
               </Button>
             </div>
@@ -318,11 +321,12 @@ const SyncTransportPanel: React.FC = () => {
             {secretState === 'error' && secretError && (
               <p className="text-xs text-destructive">{t('syncTransfer.credentialFailed', { error: secretError })}</p>
             )}
+            {!desktop && <p className="text-xs text-muted-foreground">{t('syncTransfer.browserSecretNote')}</p>}
           </div>
         )}
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" size="sm" disabled={!desktop || testing} onClick={() => void handleTest()}>
+          <Button variant="outline" size="sm" disabled={testing} onClick={() => void handleTest()}>
             {testing ? t('syncTransfer.testing') : t('syncTransfer.test')}
           </Button>
           {testResult && (
@@ -336,7 +340,7 @@ const SyncTransportPanel: React.FC = () => {
         </div>
 
         <div className="space-y-2 border-t border-border pt-4">
-          <Button variant="outline" size="sm" disabled={!desktop || remoteBusy} onClick={toggleRemote}>
+          <Button variant="outline" size="sm" disabled={remoteBusy} onClick={toggleRemote}>
             {remoteOpen ? t('syncTransfer.remoteHide') : t('syncTransfer.remoteShow')}
           </Button>
           {remoteOpen && (
@@ -405,6 +409,13 @@ const SyncTransportPanel: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        )}
+        {!desktop && (
+          <div className="space-y-2 border-t border-border pt-4">
+            <span className="block text-sm text-foreground">{t('syncTransfer.mergeTitle')}</span>
+            <span className="block text-xs text-muted-foreground">{t('syncTransfer.mergeHint')}</span>
+            <SyncDialog project={activeProject} triggerLabel={t('syncTransfer.mergeOpen')} />
           </div>
         )}
         {!desktop && <p className="text-xs text-muted-foreground">{t('syncTransfer.desktopOnly')}</p>}

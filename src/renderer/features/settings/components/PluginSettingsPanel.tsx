@@ -8,7 +8,7 @@
  */
 
 /** 插件状态面板（docs/design/04 §2）：状态汇总 + 错误详情 + 一键禁用/启用 + 安装/卸载 + 受控网络门 + 本地推理。 */
-import { type AssemblyRow, assemblyTree, DEFAULT_RELEASE_PROFILE, parsePluginCatalog, type PluginCatalogEntry, type PluginHost, type PluginStatus,PROFILE_CHANGED_EVENT, profileByName, RELEASE_PROFILES } from '@core/plugin';
+import { type AssemblyRow, assemblyTree, DEFAULT_RELEASE_PROFILE, type PluginCatalogEntry, type PluginHost, type PluginStatus,PROFILE_CHANGED_EVENT, profileByName, RELEASE_PROFILES } from '@core/plugin';
 import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import type { LocalProbeResult, LocalRuntimeConfig, LocalRuntimeStatus, PluginInstallResult } from '@shared/types';
@@ -22,6 +22,7 @@ import {
   getLocalInferenceConfig,
   getLocalRuntimeStatus,
   probeLocalInference,
+  resetLocalInferenceProbeCache,
   setLocalInferenceConfig,
   startLocalRuntime,
   stopLocalRuntime,
@@ -31,6 +32,9 @@ import { connectServer, disconnectServer, fetchServerTools } from '@/shared/serv
 import {
   installPluginFromDirectory,
   loadPluginNetworkHosts,
+  readAllowAnyPluginSource,
+  readPluginCatalog,
+  saveAllowAnyPluginSource,
   saveAllowedPluginSources,
   savePluginNetworkHosts,
   saveTrustedPluginKeys,
@@ -127,11 +131,12 @@ const TrustedKeysSection: React.FC = () => {
   );
 };
 
-/** 插件来源白名单（manifest.source，每行一个）；空清单表示不限制来源。 */
+/** 插件来源白名单（manifest.source，每行一个）。空白名单即拒绝安装未认证来源，需显式开启"允许任意来源"。 */
 const AllowedSourcesSection: React.FC = () => {
   const { t } = useTranslation(['settings']);
   const [text, setText] = useState('');
   const [saved, setSaved] = useState(false);
+  const [allowAny, setAllowAny] = useState(() => readAllowAnyPluginSource());
   const save = (): void => {
     const sources = text
       .split('\n')
@@ -139,6 +144,10 @@ const AllowedSourcesSection: React.FC = () => {
       .filter((line) => line.length > 0);
     saveAllowedPluginSources(sources);
     setSaved(true);
+  };
+  const toggleAllowAny = (checked: boolean): void => {
+    setAllowAny(checked);
+    saveAllowAnyPluginSource(checked);
   };
   return (
     <div className="rounded-lg border border-border p-3">
@@ -160,6 +169,14 @@ const AllowedSourcesSection: React.FC = () => {
         </Button>
         {saved && <span className="text-xs text-muted-foreground">{t('plugins.sources.saved')}</span>}
       </div>
+      <label className="mt-3 flex items-start gap-2">
+        <Switch checked={allowAny} onCheckedChange={toggleAllowAny} aria-label={t('plugins.sources.allowAny')} />
+        <span className="text-xs text-muted-foreground">
+          <span className="text-foreground">{t('plugins.sources.allowAny')}</span>
+          <br />
+          {t('plugins.sources.allowAnyHint')}
+        </span>
+      </label>
     </div>
   );
 };
@@ -194,6 +211,7 @@ const InstallSection: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
         sourceDir,
         hostVersion: APP_VERSION,
         allowedSources: allowedSources(),
+        allowAnySource: readAllowAnyPluginSource(),
         expectedDigest,
       });
       setMessage(describe(result));
@@ -225,7 +243,7 @@ const InstallSection: React.FC<{ onChanged: () => void }> = ({ onChanged }) => {
     const file = picked.filePaths[0];
     if (picked.canceled || !file) return;
     try {
-      const parsed = parsePluginCatalog(JSON.parse(await api.readFile(file)) as unknown);
+      const parsed = await readPluginCatalog(file);
       if (!parsed.ok) {
         setMessage(t('plugins.install.catalogInvalid'));
         return;
@@ -332,13 +350,17 @@ const LocalInferenceSection: React.FC = () => {
 
   const persist = async (next: LocalRuntimeConfig): Promise<void> => {
     setConfig(next);
+    // 配置变化即失效探测缓存，生成路径的下一次路由按新配置判定
+    resetLocalInferenceProbeCache();
     await setLocalInferenceConfig(next);
   };
 
   const runProbe = async (): Promise<void> => {
     setBusy(true);
     try {
-      setProbe(await probeLocalInference());
+      const result = await probeLocalInference();
+      setProbe(result);
+      resetLocalInferenceProbeCache();
       setStatus(await getLocalRuntimeStatus());
     } finally {
       setBusy(false);
@@ -382,6 +404,28 @@ const LocalInferenceSection: React.FC = () => {
           </Button>
         )}
       </div>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <Input
+          value={config.command ?? ''}
+          onChange={(event) => void persist({ ...config, command: event.target.value.trim() || undefined })}
+          placeholder={t('plugins.local.commandPlaceholder')}
+          className="h-8 flex-1 font-mono text-xs"
+          aria-label={t('plugins.local.command')}
+        />
+        <Input
+          value={(config.args ?? []).join(' ')}
+          onChange={(event) =>
+            void persist({
+              ...config,
+              args: event.target.value.trim() ? event.target.value.trim().split(/\s+/) : undefined,
+            })
+          }
+          placeholder={t('plugins.local.argsPlaceholder')}
+          className="h-8 flex-1 font-mono text-xs"
+          aria-label={t('plugins.local.args')}
+        />
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{t('plugins.local.commandHint')}</p>
       {probe && (
         <p className="mt-2 text-xs text-muted-foreground">
           {probe.reachable

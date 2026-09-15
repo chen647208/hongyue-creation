@@ -17,8 +17,21 @@ import { interceptClose } from './tray.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** 开发服务器候选端口（与 vite.config.ts 的 5199 及并发实例回退保持一致） */
-const DEV_SERVER_PORTS = [5199, 5200, 5201, 5202];
+/**
+ * 开发服务器候选端口（与 vite.config.ts 的 5310 及并发实例回退保持一致）。
+ * 5310 起避开 Windows 动态保留端口区间（5141–5240 会拦截 5199/5200）。
+ */
+const DEFAULT_DEV_SERVER_PORTS = [5310, 5311, 5312, 5313];
+
+/**
+ * 端口覆写：系统保留端口（如 Windows 动态排除区间）会占用默认候选时，
+ * 可用 HONGYUE_DEV_SERVER_PORT 指定优先端口，其余候选仍作回退。
+ */
+const envDevServerPort = Number(process.env.HONGYUE_DEV_SERVER_PORT);
+const DEV_SERVER_PORTS =
+  Number.isInteger(envDevServerPort) && envDevServerPort > 0
+    ? [envDevServerPort, ...DEFAULT_DEV_SERVER_PORTS.filter((p) => p !== envDevServerPort)]
+    : DEFAULT_DEV_SERVER_PORTS;
 
 const LOAD_ERROR_HTML = [
   '<html><body style="font-family:Arial;padding:40px;text-align:center;">',

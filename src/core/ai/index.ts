@@ -56,6 +56,7 @@ export {
   type InjectionSourceKind,
   planContextInjection,
   renderContextInjection,
+  type ViewContextScope,
 } from './contextInjection.js';
 export {
   buildCitations,
@@ -74,6 +75,7 @@ export {
   type InferenceDecisionInput,
   type InferenceTarget,
   inferLocalFlavor,
+  localModelConfig,
   type LocalModelInfo,
   localModelsUrl,
   type LocalProbeResult,

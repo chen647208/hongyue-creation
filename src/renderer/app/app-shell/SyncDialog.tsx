@@ -47,7 +47,7 @@ import type { Project, SyncTransportConfig } from '../../../shared/types';
 
 const POLICIES: SyncConflictPolicy[] = ['keep-copy', 'use-remote', 'defer'];
 
-export const SyncDialog: React.FC<{ project: Project | null }> = ({ project }) => {
+export const SyncDialog: React.FC<{ project: Project | null; triggerLabel?: string }> = ({ project, triggerLabel }) => {
   const { t } = useTranslation('app');
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -231,24 +231,33 @@ export const SyncDialog: React.FC<{ project: Project | null }> = ({ project }) =
     }
   };
 
+  const openSync = (): void => {
+    setReport(null);
+    setPlan(null);
+    setShowRecovery(false);
+    setTransportConfig(loadSyncTransportConfig());
+    refreshRecords();
+    setOpen(true);
+  };
+
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => {
-          setReport(null);
-          setPlan(null);
-          setShowRecovery(false);
-          setTransportConfig(loadSyncTransportConfig());
-          refreshRecords();
-          setOpen(true);
-        }}
-        disabled={!project}
-        title={t('sync.title')}
-      >
-        <ArrowLeftRight className="size-4" />
-      </Button>
+      {triggerLabel ? (
+        <Button variant="outline" size="sm" onClick={openSync} disabled={!project}>
+          <ArrowLeftRight className="size-4" />
+          {triggerLabel}
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={openSync}
+          disabled={!project}
+          title={t('sync.title')}
+        >
+          <ArrowLeftRight className="size-4" />
+        </Button>
+      )}
 
       {open && project && (
         <ModalShell

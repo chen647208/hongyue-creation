@@ -507,9 +507,11 @@
     },
     "sources": {
       "title": "Plugin source allowlist",
-      "hint": "One manifest.source identifier per line. When non-empty, plugins from other sources are rejected; an empty list allows any source but still checks signatures.",
+      "hint": "One manifest.source identifier per line. When non-empty, plugins from other sources are rejected; an empty list rejects installs unless \"Allow any source\" is enabled below.",
       "save": "Save allowlist",
-      "saved": "Saved"
+      "saved": "Saved",
+      "allowAny": "Allow any source",
+      "allowAnyHint": "Install plugins whose manifest.source is not on the allowlist. Off by default; enable only for sources you trust."
     },
     "panel": {
       "title": "Plugin UI"
@@ -540,6 +542,11 @@
       "hint": "Connect a self-provided local runtime (OpenAI-compatible or Ollama endpoint); the runtime is not bundled. When disabled or unreachable, calls fall back to the remote gateway.",
       "enabled": "Enabled",
       "endpoint": "Local endpoint",
+      "command": "Launch command",
+      "commandPlaceholder": "e.g. llama-server / ollama",
+      "args": "Launch arguments",
+      "argsPlaceholder": "--port 8080 (space-separated)",
+      "commandHint": "Leave the command empty to manage the runtime externally; when set, \"Start runtime\" spawns it as a child process (array args, no shell).",
       "probe": "Probe",
       "start": "Start runtime",
       "stop": "Stop runtime",
@@ -599,7 +606,7 @@
   },
   "syncTransfer": {
     "title": "Sync transport",
-    "subtitle": "Send sync bundles to a local folder, WebDAV, or S3-compatible storage. Passwords and keys go to the system keychain; config keeps only references.",
+    "subtitle": "Send sync bundles to a local folder, WebDAV, or S3-compatible storage. Desktop keeps credentials in the system keychain; the browser stores them in its local storage. Config keeps only references.",
     "backendLabel": "Transport",
     "backend": {
       "local": "Local folder",
@@ -644,6 +651,11 @@
     "remoteFailed": "Failed to load: {{error}}",
     "remoteRemove": "Delete",
     "remoteRemoveConfirm": "Delete remote object {{key}}? This cannot be undone.",
-    "desktopOnly": "Sync transport is available on desktop only."
+    "localBrowserUnsupported": "Local folders are not supported in the browser; use WebDAV or S3.",
+    "browserSecretNote": "The browser has no system keychain; credentials are stored in this browser's local storage, visible on this device only.",
+    "mergeTitle": "Cross-device import & merge",
+    "mergeHint": "Download a sync bundle from the configured transport and merge it into the local library; conflicts offer keep-copy / use-remote / defer.",
+    "mergeOpen": "Open sync panel",
+    "desktopOnly": "Folder selection and exit export are available on desktop only."
   }
 }

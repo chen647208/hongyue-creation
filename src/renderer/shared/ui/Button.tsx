@@ -55,7 +55,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       type={type}
-      className={cn(buttonVariants({ variant, size }), block && 'w-full', className)}
+      className={cn(
+        buttonVariants({ variant, size }),
+        size === 'icon' && 'touch-target',
+        block && 'w-full',
+        className,
+      )}
       {...rest}
     />
   )

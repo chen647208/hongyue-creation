@@ -18,6 +18,7 @@ import type { Citation } from './grounding.js';
 
 export type AiEvent =
   | { t: 'session.start'; sessionId: string; bookId?: string; task: string; skill?: string; sections: string[]; at: number }
+  | { t: 'message'; role: 'user' | 'assistant'; content: string; at: number }
   | { t: 'context.injection'; enabled: boolean; entries: number; dropped: number; totalChars: number; budgetChars: number; at: number }
   | { t: 'turn.start'; turn: number; at: number }
   | { t: 'llm.request'; turn: number; model: string; promptChars: number; at: number }

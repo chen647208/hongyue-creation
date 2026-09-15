@@ -62,8 +62,8 @@ export function SegmentedControl<T extends string>({ value, onChange, options, c
           onClick={() => onChange(opt.value)}
           disabled={opt.disabled}
           className={cn(
-            'font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
-            size === 'sm' ? 'rounded-md px-3 py-1.5 text-xs' : 'rounded-md px-3 py-1.5 text-sm',
+            'touch-target rounded-md px-3 py-1.5 font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+            size === 'sm' ? 'text-xs' : 'text-sm',
             value === opt.value ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
           )}
         >

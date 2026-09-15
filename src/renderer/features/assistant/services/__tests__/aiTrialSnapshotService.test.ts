@@ -7,13 +7,29 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import { MAX_TRIAL_STEPS_PER_SESSION } from '@shared/constants/aiTrial';
+import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import type { Chapter } from '@shared/types';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { AiTrialSnapshotService } from '../aiTrialSnapshotService';
+import { AiTrialSnapshotService, type TrialSnapshotStorage } from '../aiTrialSnapshotService';
 
 function chapter(id: string, content: string, snapshots: Chapter['snapshots'] = []): Chapter {
   return { id, title: id, summary: '', content, order: 0, snapshots };
+}
+
+/** 内存存储替身：模拟 localStorage 的字符串键值面。 */
+function memoryStorage(seed: Record<string, string> = {}): TrialSnapshotStorage {
+  const map = new Map(Object.entries(seed));
+  return {
+    getItem: (key) => map.get(key) ?? null,
+    setItem: (key, value) => {
+      map.set(key, value);
+    },
+    removeItem: (key) => {
+      map.delete(key);
+    },
+  };
 }
 
 describe('AI 试错快照', () => {
@@ -77,5 +93,48 @@ describe('AI 试错快照', () => {
     expect(service.latestForBook('b1')?.label).toBe('b1-2');
     expect(service.latestForBook('b2')?.label).toBe('b2-1');
     expect(service.latestForBook()?.label).toBe('b1-2');
+  });
+
+  it('持久化到注入存储，重启后仍可回滚且与正式历史分离', () => {
+    const storage = memoryStorage();
+    const first = new AiTrialSnapshotService(storage);
+    const formal = [chapter('c1', '原文', [{ id: 'snap1', content: '更早', timestamp: 1, charCount: 2, source: 'manual' }])];
+    first.begin({ sessionId: 's1', bookId: 'b1', label: '改写', chapters: formal });
+
+    // 重启：新实例从同一存储恢复
+    const second = new AiTrialSnapshotService(storage);
+    const restored = second.latestForBook('b1');
+    expect(restored?.label).toBe('改写');
+    expect(second.rollback(restored?.id ?? '')?.[0]?.content).toBe('原文');
+    expect(second.list('s1')[0]?.chapters[0]?.snapshots).toHaveLength(1);
+    expect(STORAGE_KEYS.aiTrialSnapshots).toBe('ai.trialSnapshots');
+  });
+
+  it('clear 同步清空本地存储', () => {
+    const storage = memoryStorage();
+    const first = new AiTrialSnapshotService(storage);
+    first.begin({ sessionId: 's1', label: 'a', chapters: [] });
+    first.clear();
+
+    const second = new AiTrialSnapshotService(storage);
+    expect(second.list()).toHaveLength(0);
+  });
+
+  it('步数超上限时丢弃最旧一步并重排步号', () => {
+    const service = new AiTrialSnapshotService(memoryStorage());
+    for (let index = 0; index < MAX_TRIAL_STEPS_PER_SESSION + 2; index += 1) {
+      service.begin({ sessionId: 's1', label: `step${index}`, chapters: [] });
+    }
+    const list = service.list('s1');
+    expect(list).toHaveLength(MAX_TRIAL_STEPS_PER_SESSION);
+    expect(list[0]?.step).toBe(0);
+    expect(list[0]?.label).toBe('step2');
+  });
+
+  it('损坏的持久化数据按无快照处理', () => {
+    const service = new AiTrialSnapshotService(memoryStorage({ [STORAGE_KEYS.aiTrialSnapshots]: '{broken' }));
+    expect(service.list()).toHaveLength(0);
+    service.begin({ sessionId: 's1', label: 'a', chapters: [] });
+    expect(service.list('s1')).toHaveLength(1);
   });
 });

@@ -25,6 +25,13 @@ function eventLine(e: AiEvent, t: TFunction<'assistant'>): { label: string; tone
   switch (e.t) {
     case 'session.start':
       return { label: t('events.sessionStart', { task: e.task }), tone: 'ok' };
+    case 'message':
+      return {
+        label: e.role === 'user'
+          ? t('events.userMessage', { text: e.content.slice(0, 160) })
+          : t('events.assistantMessage', { text: e.content.slice(0, 160) }),
+        tone: e.role === 'user' ? 'muted' : 'ok',
+      };
     case 'turn.start':
       return { label: t('events.turnStart', { turn: e.turn }), tone: 'muted' };
     case 'llm.request':

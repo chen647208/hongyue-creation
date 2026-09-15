@@ -15,8 +15,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   defaultSyncTransportConfig,
+  getSyncObject,
   listSyncObjects,
   loadSyncTransportConfig,
+  putSyncObject,
   removeSyncObject,
   retryAsync,
   saveSyncTransportConfig,
@@ -65,9 +67,12 @@ describe('凭据与连通测试', () => {
     expect(JSON.stringify(loadSyncTransportConfig())).not.toContain('p@ss');
   });
 
-  it('无桌面环境时连通测试返回可读失败', async () => {
+  it('无桌面环境时本地配置走浏览器分支并给出可读失败', async () => {
     setElectronAPI(undefined);
-    expect(await testSyncTransport(defaultSyncTransportConfig())).toEqual({ ok: false, message: '同步传输仅桌面端可用' });
+    expect(await testSyncTransport(defaultSyncTransportConfig())).toEqual({
+      ok: false,
+      message: '浏览器端不支持本地目录传输，请改用 WebDAV 或 S3',
+    });
   });
 
   it('委托主进程测试并透传结果', async () => {
@@ -78,8 +83,12 @@ describe('凭据与连通测试', () => {
 });
 
 describe('远端目录 list / remove', () => {
-  it('列出对象与删除对象都委托主进程', async () => {
-    const list = vi.fn(async () => [{ key: 'hongyue-sync/b1.json', size: 12 }]);
+  it('列出对象与删除对象都委托主进程，内部对象被过滤', async () => {
+    const list = vi.fn(async () => [
+      { key: 'hongyue-sync/b1.json', size: 12 },
+      { key: 'hongyue-sync/b1.json.part-000000.json', size: 12 },
+      { key: 'hongyue-sync/b1.json.manifest.json', size: 12 },
+    ]);
     const remove = vi.fn(async () => ({ ok: true }));
     setElectronAPI({ sync: { list, remove } });
 
@@ -89,6 +98,20 @@ describe('远端目录 list / remove', () => {
 
     await removeSyncObject(defaultSyncTransportConfig(), 'hongyue-sync/b1.json', { maxAttempts: 1 });
     expect(remove).toHaveBeenCalledWith(defaultSyncTransportConfig(), 'hongyue-sync/b1.json');
+  });
+});
+
+describe('分片传输服务', () => {
+  it('上传走 putChunked、下载走 getChunked', async () => {
+    const putChunked = vi.fn(async () => ({ ok: true, total: 2, digest: 'd' }));
+    const getChunked = vi.fn(async () => 'payload');
+    setElectronAPI({ sync: { putChunked, getChunked } });
+
+    await putSyncObject(defaultSyncTransportConfig(), 'hongyue-sync/b1.json', 'payload', { maxAttempts: 1 });
+    expect(putChunked).toHaveBeenCalledWith(defaultSyncTransportConfig(), 'hongyue-sync/b1.json', 'payload');
+
+    expect(await getSyncObject(defaultSyncTransportConfig(), 'hongyue-sync/b1.json', { maxAttempts: 1 })).toBe('payload');
+    expect(getChunked).toHaveBeenCalledWith(defaultSyncTransportConfig(), 'hongyue-sync/b1.json');
   });
 });
 

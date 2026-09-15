@@ -27,6 +27,9 @@ export const MAX_RETRIEVAL_INJECTION_ENTRIES = 5;
 /** 时间线事件注入条数上限。 */
 export const MAX_INJECTION_TIMELINE_EVENTS = 4;
 
+/** 按视图范围注入的可见实体条数上限（视图行可能很多，只取前若干条）。 */
+export const MAX_VIEW_INJECTION_ENTRIES = 12;
+
 /** 关键词命中需要的最小长度（短词命中噪声大）。 */
 export const INJECTION_TRIGGER_MIN_LENGTH = 2;
 

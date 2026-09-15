@@ -28,6 +28,8 @@ import {
 } from '@core/sync';
 import type { FileDialogOptions, SaveDialogOptions, SyncTransportConfig } from '@shared/types';
 
+import { saveTextFile } from './fileSave';
+import { repository } from './repository';
 import { getSyncObject, putSyncObject, type RetryOptions } from './syncTransportService';
 
 function db(): NonNullable<Window['electronAPI']>['db'] {
@@ -49,18 +51,60 @@ function toEdge(r: EdgeRow): EdgeEntity {
   return { id: r.id, fromId: r.from_id, toId: r.to_id, kind: r.kind as EdgeEntity['kind'], role: r.role ?? undefined, position: Number(r.position), bookId: r.book_id, erased: r.erased === 1 };
 }
 
-async function readEntities(bookId: string): Promise<EntitySnapshot> {
-  const nodeRows = (await db().all('nodes.selectByBook', [bookId])) as unknown as NodeRow[];
-  const attrRows = (await db().all('attrs.selectByBook', [bookId])) as unknown as AttrRow[];
-  const edgeRows = (await db().all('edges.selectByBook', [bookId])) as unknown as EdgeRow[];
-  return { nodes: nodeRows.map(toNode), attrs: attrRows.map(toAttr), edges: edgeRows.map(toEdge) };
+/** 同步读写接缝：桌面走 IPC 数据通道，浏览器走仓储（OPFS/SQLite）。 */
+interface SyncEntityStore {
+  read(bookId: string): Promise<EntitySnapshot>;
+  upsert(input: { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] }): Promise<void>;
+}
+
+function ipcSyncStore(): SyncEntityStore {
+  return {
+    read: async (bookId) => {
+      const nodeRows = (await db().all('nodes.selectByBook', [bookId])) as unknown as NodeRow[];
+      const attrRows = (await db().all('attrs.selectByBook', [bookId])) as unknown as AttrRow[];
+      const edgeRows = (await db().all('edges.selectByBook', [bookId])) as unknown as EdgeRow[];
+      return { nodes: nodeRows.map(toNode), attrs: attrRows.map(toAttr), edges: edgeRows.map(toEdge) };
+    },
+    upsert: async ({ nodes, attrs, edges }) => {
+      for (const node of nodes) {
+        const hash = await hashEntity('nodes', node);
+        await db().run('nodes.upsert', [node.id, node.bookId, node.type, node.title, node.body, node.path ?? null, node.createdAt, node.updatedAt, node.erased ? 1 : 0, hash]);
+      }
+      for (const attr of attrs) {
+        const hash = await hashEntity('attrs', attr);
+        await db().run('attrs.upsert', [attr.id, attr.nodeId, attr.type, attr.name, attr.value, attr.inheritable ? 1 : 0, attr.position, attr.erased ? 1 : 0, hash]);
+      }
+      for (const edge of edges) {
+        const hash = await hashEntity('edges', edge);
+        await db().run('edges.upsert', [edge.id, edge.fromId, edge.toId, edge.kind, edge.role ?? null, edge.position, edge.bookId, edge.erased ? 1 : 0, hash]);
+      }
+    },
+  };
+}
+
+function repositorySyncStore(): SyncEntityStore {
+  return {
+    read: async (bookId) => {
+      if (!repository.readSyncEntities) throw new Error('当前存储后端不支持同步合并');
+      return repository.readSyncEntities(bookId);
+    },
+    upsert: async (input) => {
+      if (!repository.applySyncEntities) throw new Error('当前存储后端不支持同步合并');
+      await repository.applySyncEntities(input);
+    },
+  };
+}
+
+function syncEntityStore(): SyncEntityStore {
+  const hasIpc = typeof window !== 'undefined' && !!window.electronAPI?.db;
+  return hasIpc ? ipcSyncStore() : repositorySyncStore();
 }
 
 export interface SyncBundleExport { path: string; changeCount: number }
 
 /** 合成某本书的同步包（导出、上传与退出导出共用）。 */
 export async function buildSyncBundle(bookId: string): Promise<{ bundle: SyncBundle; changeCount: number }> {
-  const entities = await readEntities(bookId);
+  const entities = await syncEntityStore().read(bookId);
   let seq = 0;
   const changes = [
     ...entities.nodes.map((n) => ({ changeId: ++seq, entityName: 'nodes' as const, entityId: n.id, hash: canonicalOf(n), isErased: n.erased, agentId: 'sync', utcDateChanged: n.updatedAt })),
@@ -79,21 +123,31 @@ export function syncObjectKey(bookId: string): string {
   return `${SYNC_OBJECT_PREFIX}${bookId}.json`;
 }
 
-/** 导出某本书的同步包（JSON），写入用户选择的路径。 */
+/** 导出某本书的同步包（JSON）：桌面写入用户选择的路径，浏览器触发下载。 */
 export async function exportSyncBundle(bookId: string, bookTitle: string): Promise<SyncBundleExport> {
   const { bundle, changeCount } = await buildSyncBundle(bookId);
+  const filename = `${bookTitle || bookId}-sync-${new Date().toISOString().slice(0, 10)}.json`;
 
-  const saveOptions: SaveDialogOptions = {
-    title: '导出同步包',
-    defaultPath: `${bookTitle || bookId}-sync-${new Date().toISOString().slice(0, 10)}.json`,
-    filters: [{ name: 'AI Novel Sync', extensions: ['json'] }],
-  };
   const api = window.electronAPI;
-  if (!api) throw new Error('同步需要桌面环境');
-  const save = await api.saveFileDialog(saveOptions);
-  if (save.canceled || !save.filePath) throw new Error('已取消导出');
-  await api.writeFile(save.filePath, JSON.stringify(bundle, null, 2));
-  return { path: save.filePath, changeCount };
+  if (api?.saveFileDialog && api.writeFile) {
+    const saveOptions: SaveDialogOptions = {
+      title: '导出同步包',
+      defaultPath: filename,
+      filters: [{ name: 'AI Novel Sync', extensions: ['json'] }],
+    };
+    const save = await api.saveFileDialog(saveOptions);
+    if (save.canceled || !save.filePath) throw new Error('已取消导出');
+    await api.writeFile(save.filePath, JSON.stringify(bundle, null, 2));
+    return { path: save.filePath, changeCount };
+  }
+
+  await saveTextFile(filename, JSON.stringify(bundle, null, 2), {
+    mime: 'application/json',
+    extension: 'json',
+    filterName: 'AI Novel Sync',
+    dialogTitle: '导出同步包',
+  });
+  return { path: filename, changeCount };
 }
 
 export interface SyncUploadResult { key: string; changeCount: number }
@@ -159,7 +213,7 @@ export interface SyncApplyReport {
 }
 
 async function prepareSync(bundle: SyncBundle): Promise<SyncMergePlan> {
-  const local = await readEntities(bundle.bookId);
+  const local = await syncEntityStore().read(bundle.bookId);
   const report = mergeBundle(bundle, localState(local));
   const conflicts: SyncConflictItem[] = [
     ...report.conflictCopies.map((c) => ({
@@ -187,13 +241,40 @@ async function prepareSync(bundle: SyncBundle): Promise<SyncMergePlan> {
   };
 }
 
+/** 浏览器端选择同步包文件（无主进程文件对话框时）。取消返回 null。 */
+function pickSyncBundleFile(): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    if (typeof document === 'undefined') {
+      resolve(null);
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) {
+        resolve(null);
+        return;
+      }
+      file.text().then(resolve, reject);
+    });
+    input.addEventListener('cancel', () => resolve(null));
+    input.click();
+  });
+}
+
 /** 选择文件 → 解析 → 预合并（不落库），返回待决策的合并计划；取消返回 null。 */
 export async function prepareImportBundle(): Promise<SyncMergePlan | null> {
   const api = window.electronAPI;
-  if (!api) throw new Error('同步需要桌面环境');
-  const picked = await api.openFileDialog({ title: '导入同步包', filters: [{ name: 'AI Novel Sync', extensions: ['json'] }], properties: ['openFile'] } satisfies FileDialogOptions);
-  if (picked.canceled || !picked.filePaths[0]) return null;
-  const raw = await api.readFile(picked.filePaths[0]);
+  if (api?.openFileDialog && api.readFile) {
+    const picked = await api.openFileDialog({ title: '导入同步包', filters: [{ name: 'AI Novel Sync', extensions: ['json'] }], properties: ['openFile'] } satisfies FileDialogOptions);
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    const raw = await api.readFile(picked.filePaths[0]);
+    return prepareSync(JSON.parse(raw) as SyncBundle);
+  }
+  const raw = await pickSyncBundleFile();
+  if (raw === null) return null;
   return prepareSync(JSON.parse(raw) as SyncBundle);
 }
 
@@ -216,21 +297,6 @@ export async function prepareBundlePlan(bundle: SyncBundle): Promise<SyncMergePl
   return prepareSync(bundle);
 }
 
-async function upsertNode(node: NodeEntity): Promise<void> {
-  const hash = await hashEntity('nodes', node);
-  await db().run('nodes.upsert', [node.id, node.bookId, node.type, node.title, node.body, node.path ?? null, node.createdAt, node.updatedAt, node.erased ? 1 : 0, hash]);
-}
-
-async function upsertAttr(attr: AttributeEntity): Promise<void> {
-  const hash = await hashEntity('attrs', attr);
-  await db().run('attrs.upsert', [attr.id, attr.nodeId, attr.type, attr.name, attr.value, attr.inheritable ? 1 : 0, attr.position, attr.erased ? 1 : 0, hash]);
-}
-
-async function upsertEdge(edge: EdgeEntity): Promise<void> {
-  const hash = await hashEntity('edges', edge);
-  await db().run('edges.upsert', [edge.id, edge.fromId, edge.toId, edge.kind, edge.role ?? null, edge.position, edge.bookId, edge.erased ? 1 : 0, hash]);
-}
-
 /** 远端实体在浏览器包中的同 id 当前值。 */
 function remoteNode(bundle: SyncBundle, id: string): NodeEntity | undefined {
   return bundle.entities.nodes.find((n) => n.id === id);
@@ -245,29 +311,33 @@ function remoteEdge(bundle: SyncBundle, id: string): EdgeEntity | undefined {
   return bundle.entities.edges.find((e) => e.id === id);
 }
 
-/** 应用远端替换：覆盖本地节点/属性，软删本地多出的属性，人工项也以远端覆盖。 */
-async function applyRemoteReplace(plan: SyncMergePlan): Promise<void> {
+/** 应用远端替换的实体集：覆盖本地节点/属性，软删本地多出的属性，人工项也以远端覆盖。 */
+function collectRemoteReplace(plan: SyncMergePlan): { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] } {
+  const nodes: NodeEntity[] = [];
+  const attrs: AttributeEntity[] = [];
+  const edges: EdgeEntity[] = [];
   for (const copy of plan.report.conflictCopies) {
     const node = remoteNode(plan.bundle, copy.sourceId);
     if (!node) continue;
-    await upsertNode(node);
-    const attrs = remoteAttrsOf(plan.bundle, copy.sourceId);
-    for (const attr of attrs) await upsertAttr(attr);
-    const keep = new Set(attrs.map((a) => a.id));
+    nodes.push(node);
+    const remoteAttrs = remoteAttrsOf(plan.bundle, copy.sourceId);
+    attrs.push(...remoteAttrs);
+    const keep = new Set(remoteAttrs.map((a) => a.id));
     for (const local of plan.local.attrs) {
       if (local.nodeId !== copy.sourceId || local.erased || keep.has(local.id)) continue;
-      await upsertAttr({ ...local, erased: true });
+      attrs.push({ ...local, erased: true });
     }
   }
   for (const item of plan.report.manual) {
     if (item.entityName === 'attrs') {
       const attr = remoteAttr(plan.bundle, item.entityId);
-      if (attr) await upsertAttr(attr);
+      if (attr) attrs.push(attr);
     } else if (item.entityName === 'edges') {
       const edge = remoteEdge(plan.bundle, item.entityId);
-      if (edge) await upsertEdge(edge);
+      if (edge) edges.push(edge);
     }
   }
+  return { nodes, attrs, edges };
 }
 
 /**
@@ -281,19 +351,23 @@ export async function applySyncPlan(plan: SyncMergePlan, policy: SyncConflictPol
   const copyIds = new Set(report.conflictCopies.map((c) => c.node.id));
   const baseNodes = report.insertNodes.filter((n) => !copyIds.has(n.id));
   const baseAttrs = report.insertAttrs.filter((a) => !copyIds.has(a.nodeId));
-
-  for (const node of baseNodes) await upsertNode(node);
-  for (const attr of baseAttrs) await upsertAttr(attr);
-  for (const edge of report.insertEdges) await upsertEdge(edge);
+  const nodes: NodeEntity[] = [...baseNodes];
+  const attrs: AttributeEntity[] = [...baseAttrs];
+  const edges: EdgeEntity[] = [...report.insertEdges];
 
   if (policy === 'keep-copy') {
     for (const copy of report.conflictCopies) {
-      await upsertNode(copy.node);
-      for (const attr of copy.attrs) await upsertAttr(attr);
+      nodes.push(copy.node);
+      attrs.push(...copy.attrs);
     }
   } else if (policy === 'use-remote') {
-    await applyRemoteReplace(plan);
+    const replace = collectRemoteReplace(plan);
+    nodes.push(...replace.nodes);
+    attrs.push(...replace.attrs);
+    edges.push(...replace.edges);
   }
+
+  await syncEntityStore().upsert({ nodes, attrs, edges });
 
   return {
     applied: baseNodes.length + report.insertEdges.length,

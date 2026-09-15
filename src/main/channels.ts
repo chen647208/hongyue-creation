@@ -152,7 +152,9 @@ export const IPC = {
   sync: {
     transportTest: 'sync:transport:test',
     transportPut: 'sync:transport:put',
+    transportPutChunked: 'sync:transport:put-chunked',
     transportGet: 'sync:transport:get',
+    transportGetChunked: 'sync:transport:get-chunked',
     transportList: 'sync:transport:list',
     transportRemove: 'sync:transport:remove',
     // 退出导出：主进程请求渲染层导出，渲染层完成后回执

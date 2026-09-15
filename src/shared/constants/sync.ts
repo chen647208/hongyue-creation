@@ -11,3 +11,12 @@
 
 /** 退出导出单本上传超时（毫秒）：超时按失败登记，不无限等待拖住退出。 */
 export const EXIT_EXPORT_UPLOAD_TIMEOUT_MS = 30_000;
+
+/** 传输分片大小（字符）：超过即按分片上传，支持断点续传与合并校验。 */
+export const SYNC_CHUNK_SIZE_CHARS = 256 * 1024;
+
+/** 分片清单对象键后缀：清单最后写入，是整套分片完成的提交点。 */
+export const SYNC_CHUNK_MANIFEST_SUFFIX = '.manifest.json';
+
+/** 分片对象键中段：`<key>.part-<序号>.json`，保留 .json 后缀以兼容各后端列举。 */
+export const SYNC_CHUNK_PART_INFIX = '.part-';

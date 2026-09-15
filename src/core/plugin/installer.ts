@@ -49,7 +49,10 @@ export interface PluginInstallPort {
 }
 
 export interface InstallOptions {
+  /** 来源白名单；空白名单默认拒绝安装未认证来源（fail-closed）。 */
   allowedSources?: readonly string[];
+  /** 显式放行任意来源（仅用于用户明确选择"允许任意来源"时）。 */
+  allowAnySource?: boolean;
   hostVersion: string;
   /** 目录索引给出的期望摘要；给出时必须命中。 */
   expectedDigest?: string;
@@ -90,13 +93,19 @@ export async function installPackage(
   if (!validated.ok) return failure(`manifest 校验失败：${issueText(validated.issues)}`);
   const manifest = validated.manifest;
 
-  // 来源白名单：非空即拒绝清单外来源（默认拒绝未知来源）。
+  // 来源白名单：空白名单默认拒绝安装未认证来源（fail-closed）；
+  // 仅当显式 allowAnySource=true 时才放行任意来源。
   const allowedSources = options.allowedSources ?? [];
   const declaredSource = typeof (pkg.manifestJson as { source?: unknown }).source === 'string'
     ? (pkg.manifestJson as { source: string }).source
     : undefined;
-  if (allowedSources.length > 0 && (!declaredSource || !allowedSources.includes(declaredSource))) {
-    return failure(`来源不在白名单：${declaredSource ?? '未声明 source'}`);
+  if (options.allowAnySource !== true) {
+    if (allowedSources.length === 0) {
+      return failure('未配置来源白名单：默认拒绝安装未认证来源；如需安装任意来源，请在插件设置中显式开启「允许任意来源」');
+    }
+    if (!declaredSource || !allowedSources.includes(declaredSource)) {
+      return failure(`来源不在白名单：${declaredSource ?? '未声明 source'}`);
+    }
   }
 
   // host 兼容区间。

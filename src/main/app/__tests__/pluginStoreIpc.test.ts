@@ -76,6 +76,7 @@ describe('registerPluginStoreIpc（安装/卸载/列表）', () => {
       sourceDir: '/src/pkg',
       hostVersion: '1.2.3',
       allowedSources: ['/src'],
+      allowAnySource: true,
       expectedDigest: 'abc',
       requireSignature: true,
     });
@@ -83,6 +84,7 @@ describe('registerPluginStoreIpc（安装/卸载/列表）', () => {
     expect(state.install).toHaveBeenCalledWith(options, '/src/pkg', {
       hostVersion: '1.2.3',
       allowedSources: ['/src'],
+      allowAnySource: true,
       expectedDigest: 'abc',
       requireSignature: true,
     });

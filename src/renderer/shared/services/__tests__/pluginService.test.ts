@@ -32,7 +32,7 @@ description: 社区黄金三章扩展写法。触发词：社区开篇
 
 vi.mock('@/shared/services/repository', () => ({}));
 
-import { bootstrapPlugins, runPluginLogic,setTrustedPluginKeys } from '../pluginService';
+import { bootstrapPlugins, readPluginCatalog, runPluginLogic,setTrustedPluginKeys } from '../pluginService';
 import { uiSlotRegistry } from '../uiSlots';
 
 describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
@@ -407,5 +407,70 @@ describe('pluginService（磁盘发现 + 技能贡献装配）', () => {
     );
     expect(host.list().find((s) => s.id === 'com.unsigned.p')?.state).toBe('active');
     expect((await runPluginLogic('com.unsigned.p', 'greet', 'hi')).ok).toBe(false);
+  });
+});
+
+describe('readPluginCatalog（目录索引 detached 签名）', () => {
+  const INDEX_PATH = '/data/catalog.json';
+  const SIG_PATH = '/data/catalog.sig';
+  const catalog = {
+    schema: 1,
+    entries: [
+      { id: 'com.example.search', name: 'search', version: '1.2.0', host: '^2.0.0', license: 'MIT', source: 'https://example.com', path: 'search' },
+    ],
+  };
+  const envelope = JSON.stringify({ algorithm: 'ed25519', signature: 'sig', publicKey: 'pem' });
+
+  function stub(readFile: (path: string) => Promise<string>, verify: () => Promise<boolean>): void {
+    vi.stubGlobal('window', {
+      electronAPI: {
+        readFile,
+        pluginVerifySignature: verify,
+      },
+    });
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('签名有效：返回目录条目', async () => {
+    stub(
+      async (path) => {
+        if (path === INDEX_PATH) return JSON.stringify(catalog);
+        if (path === SIG_PATH) return envelope;
+        throw new Error('missing');
+      },
+      async () => true,
+    );
+    const result = await readPluginCatalog(INDEX_PATH);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.catalog.entries).toHaveLength(1);
+  });
+
+  it('验签失败：拒绝使用该索引', async () => {
+    stub(
+      async (path) => {
+        if (path === INDEX_PATH) return JSON.stringify(catalog);
+        if (path === SIG_PATH) return envelope;
+        throw new Error('missing');
+      },
+      async () => false,
+    );
+    const result = await readPluginCatalog(INDEX_PATH);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.issues[0]?.path).toBe('signature');
+  });
+
+  it('缺少 catalog.sig：fail-closed 拒绝', async () => {
+    stub(
+      async (path) => {
+        if (path === INDEX_PATH) return JSON.stringify(catalog);
+        throw new Error('missing');
+      },
+      async () => true,
+    );
+    const result = await readPluginCatalog(INDEX_PATH);
+    expect(result.ok).toBe(false);
   });
 });

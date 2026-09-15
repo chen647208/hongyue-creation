@@ -23,7 +23,7 @@ import type {
 import { vaultGet } from '../app/secureStore.js';
 import { IPC } from '../channels.js';
 import { logger } from '../logger.js';
-import { createTransport, type TransportSecrets } from './transport.js';
+import { createTransport, getChunkedObject, putChunkedObject, removeChunkedObject, type TransportSecrets } from './transport.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -122,11 +122,28 @@ export function registerSyncIpc(): void {
     return { ok: true };
   });
 
+  ipcMain.handle(IPC.sync.transportPutChunked, async (_event, rawConfig: unknown, key: unknown, data: unknown) => {
+    if (typeof key !== 'string' || typeof data !== 'string') {
+      throw new TypeError('sync:transport:put-chunked 入参非法');
+    }
+    const config = parseTransportConfig(rawConfig);
+    const secrets = await resolveSecrets(config);
+    const manifest = await putChunkedObject(createTransport(config, secrets), key, data);
+    return { ok: true, total: manifest.total, digest: manifest.digest };
+  });
+
   ipcMain.handle(IPC.sync.transportGet, async (_event, rawConfig: unknown, key: unknown) => {
     if (typeof key !== 'string') throw new TypeError('sync:transport:get 入参非法');
     const config = parseTransportConfig(rawConfig);
     const secrets = await resolveSecrets(config);
     return createTransport(config, secrets).get(key);
+  });
+
+  ipcMain.handle(IPC.sync.transportGetChunked, async (_event, rawConfig: unknown, key: unknown) => {
+    if (typeof key !== 'string') throw new TypeError('sync:transport:get-chunked 入参非法');
+    const config = parseTransportConfig(rawConfig);
+    const secrets = await resolveSecrets(config);
+    return getChunkedObject(createTransport(config, secrets), key);
   });
 
   ipcMain.handle(IPC.sync.transportList, async (_event, rawConfig: unknown, prefix: unknown) => {
@@ -140,7 +157,7 @@ export function registerSyncIpc(): void {
     if (typeof key !== 'string') throw new TypeError('sync:transport:remove 入参非法');
     const config = parseTransportConfig(rawConfig);
     const secrets = await resolveSecrets(config);
-    await createTransport(config, secrets).remove(key);
+    await removeChunkedObject(createTransport(config, secrets), key);
     return { ok: true };
   });
 }

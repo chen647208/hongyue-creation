@@ -326,7 +326,8 @@ const StepOutline: React.FC<StepOutlineProps> = ({ project }) => {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-hidden lg:grid-cols-12">
         {/* Left: Character & Story Reference */}
-        <div className="space-y-4 overflow-y-auto pr-1 lg:col-span-4">
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- 滚动容器需键盘可聚焦，满足 axe scrollable-region-focusable */}
+        <div className="space-y-4 overflow-y-auto pr-1 lg:col-span-4" role="region" tabIndex={0} aria-label={t('steps:outline.contextTitle')}>
           <Card className="p-5">
             <h4 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('steps:outline.contextTitle')}</h4>
             <div className="space-y-3">
@@ -472,6 +473,7 @@ const StepOutline: React.FC<StepOutlineProps> = ({ project }) => {
                   onChange={(v) => onUpdate({ outline: v })}
                   validTags={outlineTags}
                   placeholder={t('steps:outline.editorPlaceholder')}
+                  ariaLabel={t('steps:outline.editorPlaceholder')}
                   dark={isDark}
                   height="100%"
                   className="novel-dsl-editor h-full"

@@ -19,13 +19,15 @@
 import { parseSkillMd, type SkillCatalog } from '@core/ai';
 import type {
   BuildProfileRegistry,
+  CatalogParseResult,
+  CatalogSignatureVerifier,
   ContributionInstaller,
   EventBus,
   FormulaRegistry,
   PluginHostOptions,
   PluginStatus,
 } from '@core/plugin';
-import { formulaId, installFormulas, installHooks, installTypeTemplates, PermissionDenied, PluginHost, typeTemplateId } from '@core/plugin';
+import { formulaId, installFormulas, installHooks, installTypeTemplates, loadPluginCatalog, PermissionDenied, PluginHost, typeTemplateId } from '@core/plugin';
 import { adjudicateHandlerResult, checkPluginFileName, checkPluginRelPath, type SandboxRunResult } from '@core/plugin';
 import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
@@ -130,6 +132,16 @@ function readAllowedPluginSources(): string[] | undefined {
 export function saveAllowedPluginSources(sources: readonly string[]): void {
   localStore.setItem(STORAGE_KEYS.allowedPluginSources, JSON.stringify(sources));
   setAllowedPluginSources(sources);
+}
+
+/** 是否显式放行任意来源；缺省 false（空白名单即拒绝安装未认证来源）。 */
+export function readAllowAnyPluginSource(): boolean {
+  return localStore.getItem(STORAGE_KEYS.allowAnyPluginSource) === 'true';
+}
+
+/** 保存"允许任意来源"开关。 */
+export function saveAllowAnyPluginSource(allow: boolean): void {
+  localStore.setItem(STORAGE_KEYS.allowAnyPluginSource, allow ? 'true' : 'false');
 }
 
 function readStringArraySetting(key: string): string[] | undefined {
@@ -432,6 +444,47 @@ export async function bootstrapPlugins(deps: PluginDeps, hostVersion: string, di
 export function clearPluginSettings(pluginId: string): void {
   localStore.removeItem(`plugin.${pluginId}.settings`);
   localStore.removeItem(`plugin.${pluginId}.settings.corrupt`);
+}
+
+/**
+ * 读取并校验目录索引：结构校验后校验整份 payload 的 detached 签名（同级 `catalog.sig`，
+ * ed25519/cosign，主进程按信任清单验签）；验签失败拒绝使用该索引，不返回任何条目。
+ */
+export async function readPluginCatalog(catalogPath: string): Promise<CatalogParseResult> {
+  const api = electron();
+  const payloadText = await api.readFile(catalogPath);
+  const dir = catalogPath.replace(/[\\/][^\\/]*$/, '');
+  const sigText = await api.readFile(`${dir}/catalog.sig`).catch(() => undefined);
+  const signature = sigText === undefined ? undefined : parseSignatureEnvelope(sigText);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(payloadText);
+  } catch {
+    raw = null;
+  }
+  return loadPluginCatalog(raw, { payloadText, signature, verifier: catalogSignatureVerifier() });
+}
+
+/** 目录索引验签端口：ed25519 走主进程信任键清单，cosign 走主进程外部工具链；其余算法拒绝。 */
+function catalogSignatureVerifier(): CatalogSignatureVerifier {
+  return {
+    async verifyPayload(payloadText, envelope) {
+      const api = typeof window === 'undefined' ? undefined : window.electronAPI;
+      if (!api) return false;
+      if (envelope.algorithm === 'ed25519') {
+        return api.pluginVerifySignature(toBase64(payloadText), envelope.signature, envelope.publicKey);
+      }
+      if (envelope.algorithm === 'cosign') {
+        return api.pluginCosignVerify(toBase64(payloadText), {
+          bundle: envelope.bundle,
+          publicKey: envelope.publicKey,
+          certificateIdentity: envelope.certificateIdentity,
+          certificateOidcIssuer: envelope.certificateOidcIssuer,
+        });
+      }
+      return false;
+    },
+  };
 }
 
 /** 从已授权目录安装/更新插件（签名与来源由主进程校验）。 */

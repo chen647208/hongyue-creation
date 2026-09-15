@@ -298,12 +298,25 @@
     "tabRecords": "生成记录",
     "tabSessions": "会话事件流"
   },
+  "conversation": {
+    "listLabel": "对话列表",
+    "untitled": "新对话",
+    "new": "新建对话",
+    "delete": "删除对话",
+    "history": "历史会话",
+    "restore": "恢复为会话",
+    "historyEmpty": "暂无可恢复的会话",
+    "loading": "加载中…",
+    "noBook": "打开一本书后可恢复历史会话"
+  },
   "events": {
     "sessionStart": "▶ {{task}}",
     "turnStart": "— 轮次 {{turn}} —",
     "llmRequest": "LLM 请求（{{model}}，{{chars}} 字）",
     "llmDone": "LLM 完成（{{parts}}）",
     "llmError": "LLM 失败：{{error}}",
+    "userMessage": "用户：{{text}}",
+    "assistantMessage": "助手：{{text}}",
     "toolCall": "工具调用 {{toolId}}（{{args}}）",
     "toolApproval": "审批：{{verdict}}（{{by}}）",
     "toolResultOk": "工具执行成功",

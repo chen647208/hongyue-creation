@@ -21,6 +21,7 @@ export interface PluginInstallIpcRequest {
   sourceDir: string;
   hostVersion: string;
   allowedSources?: string[];
+  allowAnySource?: boolean;
   expectedDigest?: string;
   requireSignature?: boolean;
 }
@@ -42,6 +43,7 @@ export function registerPluginStoreIpc(): void {
       {
         hostVersion: request.hostVersion,
         allowedSources: request.allowedSources,
+        allowAnySource: request.allowAnySource,
         expectedDigest: request.expectedDigest,
         requireSignature: request.requireSignature,
       },

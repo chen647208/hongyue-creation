@@ -8,8 +8,9 @@
  */
 
 /** 会话归档读取：userData/ai-sessions/<bookId>/*.jsonl → 事件列表（事件浏览器消费）。 */
-import { type AiEvent,parseEventLine } from '@core/ai';
+import { type AiEvent,type Citation,parseEventLine } from '@core/ai';
 
+import type { ChatMessage } from '../types';
 import { readSessionMeta,type SessionMetaMap } from './sessionIndexService';
 
 export interface SessionArchiveEntry {
@@ -91,6 +92,61 @@ export async function listSessionArchives(bookId: string): Promise<SessionArchiv
 
   const withMeta = applySessionMeta(entries, readSessionMeta(bookId));
   return withMeta.sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+}
+
+/** 归档会话中的一条对话消息（事件流是唯一真源）。 */
+export interface SessionMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  at?: number;
+}
+
+/**
+ * 从事件流重建对话消息：优先取 `message` 事件（用户/助手各一条）；
+ * 旧归档无 `message` 事件时回落到 `session.start.task` 作为首条用户消息。
+ */
+export function extractSessionMessages(events: AiEvent[]): SessionMessage[] {
+  const messages: SessionMessage[] = [];
+  for (const event of events) {
+    if (event.t === 'message' && event.content.trim()) {
+      messages.push({ role: event.role, content: event.content, at: event.at });
+    }
+  }
+  if (messages.length > 0) return messages;
+  const start = events.find((e) => e.t === 'session.start');
+  if (start?.t === 'session.start' && start.task.trim()) {
+    return [{ role: 'user', content: start.task, at: start.at }];
+  }
+  return [];
+}
+
+/** 汇总归档会话中的检索引用（按 id 去重），附到最后一条助手消息。 */
+function collectArchiveCitations(events: AiEvent[]): Citation[] {
+  const seen = new Set<string>();
+  const citations: Citation[] = [];
+  for (const event of events) {
+    if (event.t !== 'tool.result' || !event.citations) continue;
+    for (const citation of event.citations) {
+      if (seen.has(citation.id)) continue;
+      seen.add(citation.id);
+      citations.push(citation);
+    }
+  }
+  return citations;
+}
+
+/** 把归档事件流转成可直接放进聊天区的消息（恢复为实时会话用）。 */
+export function toChatMessages(events: AiEvent[]): ChatMessage[] {
+  const sessionMessages = extractSessionMessages(events);
+  const citations = collectArchiveCitations(events);
+  const lastAssistantIndex = sessionMessages.map((m) => m.role).lastIndexOf('assistant');
+  return sessionMessages.map((message, index) => ({
+    id: `restored-${index}-${message.at ?? 0}`,
+    role: message.role,
+    content: message.content,
+    timestamp: message.at ?? Date.now(),
+    citations: index === lastAssistantIndex && citations.length > 0 ? citations : undefined,
+  }));
 }
 
 /** 单会话用量汇总（事件浏览器消费；缺字段事件按 0 计）。 */

@@ -70,6 +70,12 @@ function getDb(): Database.Database {
   return db;
 }
 
+/** 关闭长驻只读连接（进程退出与单测清理用）；下次访问重新打开。 */
+export function closeDb(): void {
+  db?.close();
+  db = null;
+}
+
 // ── 数据读取 ────────────────────────────────────────────────────────────
 
 interface NodeRow {
@@ -242,6 +248,46 @@ const TOOLS = [
     annotations: { readOnlyHint: true },
   },
   {
+    name: 'read_toc',
+    description: '读取单书目录（全部节点类型/标题/id 的文本清单，与 resources `book://{bookId}/toc` 同源）',
+    inputSchema: {
+      type: 'object',
+      properties: { bookId: { type: 'string', description: '书籍 id' } },
+      required: ['bookId'],
+    },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'read_entities',
+    description: '读取单书设定实体清单（角色/地点/势力等按类型分组，与 resources `book://{bookId}/entities` 同源）',
+    inputSchema: {
+      type: 'object',
+      properties: { bookId: { type: 'string', description: '书籍 id' } },
+      required: ['bookId'],
+    },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'read_stats',
+    description: '读取单书统计（节点类型计数与字数摘要，与 resources `book://{bookId}/stats` 同源）',
+    inputSchema: {
+      type: 'object',
+      properties: { bookId: { type: 'string', description: '书籍 id' } },
+      required: ['bookId'],
+    },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'read_chapter',
+    description: '读取单章正文（含标题与属性，与 resources `book://{bookId}/chapter/{chapterId}` 同源）',
+    inputSchema: {
+      type: 'object',
+      properties: { bookId: { type: 'string', description: '书籍 id' }, chapterId: { type: 'string', description: '章节节点 id' } },
+      required: ['bookId', 'chapterId'],
+    },
+    annotations: { readOnlyHint: true },
+  },
+  {
     name: 'propose_card_write',
     description: '提交卡片写入提案（角色/地点/势力等设定）；进入应用待审箱，用户批准后生效',
     inputSchema: {
@@ -394,6 +440,16 @@ function dispatch(method: string, params: Record<string, unknown>): Record<strin
         }
         case 'search_nodes':
           return textResult(JSON.stringify(searchNodes(String(args.bookId ?? ''), String(args.keyword ?? '')), null, 2));
+        case 'read_toc':
+          return textResult(tocText(getDb(), String(args.bookId ?? '')));
+        case 'read_entities':
+          return textResult(entitiesText(getDb(), String(args.bookId ?? '')));
+        case 'read_stats':
+          return textResult(statsText(getDb(), String(args.bookId ?? '')));
+        case 'read_chapter': {
+          const body = chapterText(getDb(), String(args.bookId ?? ''), String(args.chapterId ?? ''));
+          return body === null ? textResult('章节不存在或不属于该书籍', true) : textResult(body);
+        }
         case 'propose_card_write':
         case 'propose_chapter_write': {
           const r = appendProposal(name, args);

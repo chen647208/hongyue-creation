@@ -174,7 +174,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sync: {
     testTransport: (config: unknown) => ipcRenderer.invoke(IPC.sync.transportTest, config),
     put: (config: unknown, key: string, data: string) => ipcRenderer.invoke(IPC.sync.transportPut, config, key, data),
+    putChunked: (config: unknown, key: string, data: string) => ipcRenderer.invoke(IPC.sync.transportPutChunked, config, key, data),
     get: (config: unknown, key: string) => ipcRenderer.invoke(IPC.sync.transportGet, config, key),
+    getChunked: (config: unknown, key: string) => ipcRenderer.invoke(IPC.sync.transportGetChunked, config, key),
     list: (config: unknown, prefix?: string) => ipcRenderer.invoke(IPC.sync.transportList, config, prefix),
     remove: (config: unknown, key: string) => ipcRenderer.invoke(IPC.sync.transportRemove, config, key),
   },

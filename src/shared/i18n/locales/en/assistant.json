@@ -298,12 +298,25 @@
     "tabRecords": "Records",
     "tabSessions": "Session Events"
   },
+  "conversation": {
+    "listLabel": "Conversations",
+    "untitled": "New chat",
+    "new": "New chat",
+    "delete": "Delete chat",
+    "history": "Session history",
+    "restore": "Resume as chat",
+    "historyEmpty": "No sessions to resume",
+    "loading": "Loading…",
+    "noBook": "Open a book to resume past sessions"
+  },
   "events": {
     "sessionStart": "▶ {{task}}",
     "turnStart": "— Turn {{turn}} —",
     "llmRequest": "LLM request ({{model}}, {{chars}} chars)",
     "llmDone": "LLM done ({{parts}})",
     "llmError": "LLM failed: {{error}}",
+    "userMessage": "User: {{text}}",
+    "assistantMessage": "Assistant: {{text}}",
     "toolCall": "Tool call {{toolId}} ({{args}})",
     "toolApproval": "Approval: {{verdict}} ({{by}})",
     "toolResultOk": "Tool succeeded",

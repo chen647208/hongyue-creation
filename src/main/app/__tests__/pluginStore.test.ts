@@ -77,7 +77,7 @@ describe('pluginStore（磁盘安装/更新/卸载 + 签名拒绝）', () => {
   it('签名有效：安装落盘', async () => {
     const source = join(root, 'source');
     const { publicKey } = writePackage(source, manifest());
-    const result = await installPluginFromDirectory(optionsFor(publicKey), source, { hostVersion: HOST });
+    const result = await installPluginFromDirectory(optionsFor(publicKey), source, { hostVersion: HOST, allowAnySource: true });
     expect(result).toMatchObject({ ok: true, action: 'install', pluginId: 'com.example.store' });
     expect(existsSync(join(pluginsRoot, 'com.example.store', 'plugin.json'))).toBe(true);
   });
@@ -87,7 +87,7 @@ describe('pluginStore（磁盘安装/更新/卸载 + 签名拒绝）', () => {
     const { publicKey } = writePackage(source, manifest());
     // 签名后改写 manifest，签名不再匹配
     writeFileSync(join(source, 'plugin.json'), JSON.stringify(manifest({ name: 'evil' })), 'utf-8');
-    const result = await installPluginFromDirectory(optionsFor(publicKey), source, { hostVersion: HOST });
+    const result = await installPluginFromDirectory(optionsFor(publicKey), source, { hostVersion: HOST, allowAnySource: true });
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('签名');
     expect(existsSync(join(pluginsRoot, 'com.example.store'))).toBe(false);
@@ -96,7 +96,7 @@ describe('pluginStore（磁盘安装/更新/卸载 + 签名拒绝）', () => {
   it('公钥不受信任：拒装', async () => {
     const source = join(root, 'untrusted');
     writePackage(source, manifest());
-    const result = await installPluginFromDirectory(optionsFor('-----BEGIN PUBLIC KEY-----other'), source, { hostVersion: HOST });
+    const result = await installPluginFromDirectory(optionsFor('-----BEGIN PUBLIC KEY-----other'), source, { hostVersion: HOST, allowAnySource: true });
     expect(result.ok).toBe(false);
   });
 
@@ -115,8 +115,8 @@ describe('pluginStore（磁盘安装/更新/卸载 + 签名拒绝）', () => {
     const v2 = join(root, 'v2');
     const first = writePackage(v1, manifest());
     writePackage(v2, manifest({ version: '1.1.0' }), { keys: first });
-    await installPluginFromDirectory(optionsFor(first.publicKey), v1, { hostVersion: HOST });
-    const updated = await installPluginFromDirectory(optionsFor(first.publicKey), v2, { hostVersion: HOST });
+    await installPluginFromDirectory(optionsFor(first.publicKey), v1, { hostVersion: HOST, allowAnySource: true });
+    const updated = await installPluginFromDirectory(optionsFor(first.publicKey), v2, { hostVersion: HOST, allowAnySource: true });
     expect(updated).toMatchObject({ ok: true, action: 'update', version: '1.1.0' });
     const stored = JSON.parse(readFileSync(join(pluginsRoot, 'com.example.store', 'plugin.json'), 'utf-8')) as { version: string };
     expect(stored.version).toBe('1.1.0');
@@ -125,7 +125,7 @@ describe('pluginStore（磁盘安装/更新/卸载 + 签名拒绝）', () => {
   it('卸载：递归删除且列表不再出现', async () => {
     const source = join(root, 'source3');
     const { publicKey } = writePackage(source, manifest());
-    await installPluginFromDirectory(optionsFor(publicKey), source, { hostVersion: HOST });
+    await installPluginFromDirectory(optionsFor(publicKey), source, { hostVersion: HOST, allowAnySource: true });
     expect(await listInstalledPlugins(optionsFor(publicKey))).toHaveLength(1);
 
     const removed = await uninstallInstalledPlugin(optionsFor(publicKey), 'com.example.store');
@@ -137,12 +137,12 @@ describe('pluginStore（磁盘安装/更新/卸载 + 签名拒绝）', () => {
   it('未签名资源型：允许；未签名逻辑型：拒绝', async () => {
     const resource = join(root, 'resource');
     writePackage(resource, manifest(), { sign: false });
-    const resourceResult = await installPluginFromDirectory(optionsFor(''), resource, { hostVersion: HOST });
+    const resourceResult = await installPluginFromDirectory(optionsFor(''), resource, { hostVersion: HOST, allowAnySource: true });
     expect(resourceResult.ok).toBe(true);
 
     const logic = join(root, 'logic');
     writePackage(logic, manifest({ id: 'com.example.logic', contributes: { logic: ['./logic/'] } }), { sign: false });
-    const logicResult = await installPluginFromDirectory(optionsFor(''), logic, { hostVersion: HOST });
+    const logicResult = await installPluginFromDirectory(optionsFor(''), logic, { hostVersion: HOST, allowAnySource: true });
     expect(logicResult.ok).toBe(false);
     expect(logicResult.reason).toContain('签名');
   });

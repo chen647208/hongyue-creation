@@ -10,7 +10,7 @@
 /** 多视图面板：同一份作品数据可在表格/卡片/图之间切换，布局存入 ViewDefinition。 */
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import type { Project } from '@shared/types';
-import { BookmarkPlus, BookOpen, FileDown, LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2 } from 'lucide-react';
+import { BarChart3, BookmarkPlus, BookOpen, FileDown, LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2 } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { useGenericModelStore } from '@/app/stores/genericModelStore';
@@ -29,8 +29,9 @@ import { ViewModeToggle } from '@/shared/ui/ViewModeToggle';
 import { cn } from '@/shared/utils/cn';
 
 import { buildEntityView } from './buildEntityView';
-import type { AggregationKind, ConditionOperator, QueryLeaf, ViewColumn, ViewRow } from './types';
+import type { AggregationKind, ChartChannel, ChartMark, ConditionOperator, QueryLeaf, ViewColumn, ViewRow } from './types';
 import ViewCards from './ViewCards';
+import { DEFAULT_CHART_SPEC, projectChart } from './viewChart';
 import { serializeViewTable, type TableFormat } from './viewExport';
 import ViewGraph from './ViewGraph';
 import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from './viewLayout';
@@ -39,6 +40,12 @@ import { VIEW_PRESETS, type ViewPreset } from './viewPresets';
 import { aggregateRows, applyViewQuery } from './viewQuery';
 import ViewReader from './ViewReader';
 import ViewTable from './ViewTable';
+
+/** 图表渲染器按需加载：不进默认视图包。 */
+const LazyViewChart = React.lazy(() => import('./ChartView'));
+
+const CHART_MARKS: readonly ChartMark[] = ['bar', 'point', 'line', 'area'];
+const CHART_CHANNELS: readonly ChartChannel[] = ['x', 'y', 'color', 'size', 'shape'];
 
 interface MultiViewPanelProps {
   project: Project;
@@ -252,6 +259,17 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   );
   const displayColumns = projection.columns.map((column) => ({ ...column, label: columnLabel(column) }));
 
+  // 图表：轴与图例由「字段→通道」声明派生，投影为纯函数。
+  const chartSpec = layout.chart ?? DEFAULT_CHART_SPEC;
+  const chartProjection = useMemo(() => projectChart(projection, layout.chart), [projection, layout.chart]);
+  const chartBindingField = (channel: ChartChannel): string => chartSpec.bindings.find((binding) => binding.channel === channel)?.field ?? '';
+  const setChartMark = (mark: ChartMark) => setLayout({ chart: { mark, bindings: chartSpec.bindings } });
+  const setChartBinding = (channel: ChartChannel, field: string) => {
+    const bindings = chartSpec.bindings.filter((binding) => binding.channel !== channel);
+    if (field) bindings.push({ field, channel });
+    setLayout({ chart: { mark: chartSpec.mark, bindings } });
+  };
+
   const availableFields = useMemo(() => {
     const keys = new Set<string>();
     for (const row of data.rows) {
@@ -370,6 +388,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     { value: 'table' as const, icon: Table2, title: t('views.kind.table') },
     { value: 'card' as const, icon: LayoutGrid, title: t('views.kind.card') },
     { value: 'graph' as const, icon: Network, title: t('views.kind.graph') },
+    { value: 'chart' as const, icon: BarChart3, title: t('views.kind.chart') },
     { value: 'list' as const, icon: ListOrdered, title: t('views.kind.list') },
     { value: 'reader' as const, icon: BookOpen, title: t('views.kind.reader') },
   ];
@@ -532,7 +551,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
           <div className="mt-3 space-y-2 border-t border-border pt-3">
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">{t('views.query.conditions')}</span>
-              {conditionLeaves.length === 0 && <span className="text-muted-foreground/70">{t('views.query.noConditions')}</span>}
+              {conditionLeaves.length === 0 && <span className="text-foreground/70">{t('views.query.noConditions')}</span>}
             </div>
             {conditionLeaves.length > 0 && (
               <div className="flex flex-wrap items-center gap-1">
@@ -542,7 +561,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                     <button
                       type="button"
                       aria-label={t('views.query.removeCondition')}
-                      className="text-muted-foreground hover:text-destructive"
+                      className="touch-target text-muted-foreground hover:text-destructive"
                       onClick={() => removeCondition(index)}
                     >
                       <Trash2 className="size-3" />
@@ -595,7 +614,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
             </div>
             <div className="flex flex-wrap items-center gap-1 border-t border-border pt-2">
               <span className="text-muted-foreground">{t('views.computed.title')}</span>
-              {computedColumns.length === 0 && <span className="text-muted-foreground/70">{t('views.computed.empty')}</span>}
+              {computedColumns.length === 0 && <span className="text-foreground/70">{t('views.computed.empty')}</span>}
               {computedColumns.map((column) => (
                 <span key={column.key} className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5">
                   <span>{columnLabel({ key: column.key, label: column.label })}</span>
@@ -641,6 +660,30 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                 </DropdownMenu>
               )}
             </div>
+            <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+              <span className="text-muted-foreground">{t('views.chart.title')}</span>
+              <Select value={chartSpec.mark} onChange={(event) => setChartMark(event.target.value as ChartMark)} className="h-7 w-auto text-2xs" aria-label={t('views.chart.mark')}>
+                {CHART_MARKS.map((mark) => (
+                  <option key={mark} value={mark}>{t(`views.chart.marks.${mark}`)}</option>
+                ))}
+              </Select>
+              {CHART_CHANNELS.map((channel) => (
+                <label key={channel} className="flex items-center gap-1">
+                  <span className="text-muted-foreground">{t(`views.chart.channels.${channel}`)}</span>
+                  <Select
+                    value={chartBindingField(channel)}
+                    onChange={(event) => setChartBinding(channel, event.target.value)}
+                    className="h-7 w-auto text-2xs"
+                    aria-label={t(`views.chart.channels.${channel}`)}
+                  >
+                    <option value="">{t('views.chart.unbound')}</option>
+                    {availableFields.map((field) => (
+                      <option key={field} value={field}>{queryFieldLabel(field)}</option>
+                    ))}
+                  </Select>
+                </label>
+              ))}
+            </div>
           </div>
         </details>
         {aggregations.length > 0 && (
@@ -679,6 +722,11 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
           )}
           {layout.kind === 'graph' && (
             <ViewGraph rows={rows} links={data.links} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />
+          )}
+          {layout.kind === 'chart' && (
+            <React.Suspense fallback={<p className="py-10 text-center text-sm text-muted-foreground">{t('views.chart.loading')}</p>}>
+              <LazyViewChart projection={chartProjection} emptyText={t('views.empty')} />
+            </React.Suspense>
           )}
           {layout.kind === 'list' && (
             <ViewOutline rows={rows} kindLabel={kindLabel} emptyText={t('views.empty')} onSelectRow={handleSelectRow} />

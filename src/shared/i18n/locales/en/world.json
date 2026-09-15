@@ -21,10 +21,30 @@
       "tablet": "Tablet",
       "phone": "Phone"
     },
+    "chart": {
+      "title": "Chart",
+      "mark": "Mark",
+      "unbound": "Unbound",
+      "loading": "Loading chart…",
+      "marks": {
+        "point": "Points",
+        "bar": "Bars",
+        "line": "Line",
+        "area": "Area"
+      },
+      "channels": {
+        "x": "X axis",
+        "y": "Y axis",
+        "color": "Color",
+        "size": "Size",
+        "shape": "Shape"
+      }
+    },
     "kind": {
       "table": "Table",
       "card": "Cards",
       "graph": "Graph",
+      "chart": "Chart",
       "list": "Outline",
       "reader": "Reader",
       "character": "Character",

@@ -4,6 +4,7 @@
     "src/main/main.ts",
     "src/main/app/pluginSandbox/sandboxChild.ts",
     "src/renderer/shared/ui/PluginFrame.tsx",
+    "src/renderer/sw.ts",
     "sdk/src/index.ts",
     "scripts/**/*.mjs",
     "e2e/**/*.spec.ts",

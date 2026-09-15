@@ -24,6 +24,7 @@ import type {
   SessionSink,
   SkillCatalog,
   ToolRegistry,
+  ViewContextScope,
 } from '@core/ai';
 import {
   AiSession,
@@ -43,6 +44,7 @@ import type { AIMessageImage, CardPromptTemplate, ConsistencyCheckPromptTemplate
 
 import { useSettingsStore } from '@/app/stores/settingsStore';
 import { aiGatewayClient } from '@/shared/services/ai/gatewayClient.js';
+import { resolveEffectiveModel } from '@/shared/services/localInferenceService';
 import { syncMcpTools } from '@/shared/services/mcpClient';
 import { runPluginLogic } from '@/shared/services/pluginService';
 
@@ -139,6 +141,8 @@ export interface RunSessionInput {
   cardTemplate?: CardPromptTemplate;
   /** 上下文装配目标（章节/选中实体/视图）；缺席时由任务文本推断。 */
   contextTarget?: ContextTarget;
+  /** 当前视图范围（按 bookId 查询视图定义并投影）；提供时按视图可见实体注入。 */
+  viewContext?: ViewContextScope;
   /** 自动注入总开关；false 时回到纯手动（不注入任何上下文）。 */
   injectionEnabled?: boolean;
   /** 单条关闭的注入条目 id。 */
@@ -217,6 +221,8 @@ export class AiSessionManager {
     if (!gate.allowed) {
       return { ok: false, reply: '', turns: 0, error: gate.reason ?? 'AI 请求被发行档策略拒绝', sessionId };
     }
+    // 实际生成路径的模型选择：本地推理启用且可达即走本地，否则回落远程（契约不变）
+    const sessionModel = (await resolveEffectiveModel(input.model)) ?? input.model;
     const sink = window.electronAPI ? new FileSessionSink(sessionId, input.bookId) : undefined;
 
     // 渐进注入：触发词命中即激活全文（scope=sessionId，并行会话互不覆盖），会话结束在 finally 中卸载
@@ -273,6 +279,7 @@ export class AiSessionManager {
     const injection = assembleContextInjection({
       project: input.project,
       target: input.contextTarget ?? inferContextTarget(input.project, input.task),
+      view: input.viewContext,
       enabled: input.injectionEnabled !== false,
       disabledIds: input.disabledInjectionIds,
       extraEntries: await this.collectRetrievalEntries(input.project, input.task),
@@ -287,7 +294,7 @@ export class AiSessionManager {
           registry: this.registry,
           router,
           session,
-          model: input.model,
+          model: sessionModel,
           images: input.images,
           context: () => ({
             project: input.project,
@@ -295,7 +302,7 @@ export class AiSessionManager {
             activeSkill: this.catalog.getActive(sessionId),
             activeSkillTools: this.catalog.getActive(sessionId)?.tools,
             // 工具执行上下文：模型配置与宿主服务在此注入（缺失则需模型的工具直接失败）
-            modelConfig: input.model,
+            modelConfig: sessionModel,
             services: {
               consistencyTemplates: toConsistencyRecord(useSettingsStore.getState().consistencyPrompts),
               cardTemplate: input.cardTemplate,
@@ -351,7 +358,7 @@ export class AiSessionManager {
       complete: async (model, prompt, retries) => {
         const primary = await aiGatewayClient.complete(model, prompt, { retries, signal: input.signal, images: input.images, feature: 'assistant' });
         // 主模型失败（非取消）且有备用模型且不同款时，按备用模型重试一次
-        if (primary.error && !input.signal?.aborted && input.fallbackModel && input.fallbackModel.id !== model.id) {
+        if (primary.error && !input.signal?.aborted && input.fallbackModel && input.fallbackModel.id !== sessionModel.id) {
           const fallback = await aiGatewayClient.complete(input.fallbackModel, prompt, { retries, signal: input.signal, images: input.images, feature: 'assistant' });
           if (!fallback.error) return fallback;
         }

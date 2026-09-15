@@ -18,8 +18,8 @@ export default defineConfig({
     snapshotPathTemplate: '{testDir}/__screenshots__/{platform}/{testFilePath}/{arg}{ext}',
   },
   webServer: {
-    command: 'npx vite --port 5199 --strictPort',
-    port: 5199,
+    command: 'npx vite --port 5310 --strictPort',
+    port: 5310,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
   },

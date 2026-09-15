@@ -21,6 +21,7 @@ import {
   MAX_INJECTION_ENTRY_CHARS,
   MAX_INJECTION_TIMELINE_EVENTS,
   MAX_RETRIEVAL_INJECTION_ENTRIES,
+  MAX_VIEW_INJECTION_ENTRIES,
   MIN_INJECTION_KEEP_CHARS,
 } from '../../shared/constants/aiContext';
 import type { Character, Faction, KnowledgeItem, Location, Project } from '../../shared/types';
@@ -76,13 +77,34 @@ export interface ContextTarget {
   entityKind?: InjectionSourceKind;
   /** 当前视图名（用于标注装配范围）。 */
   viewName?: string;
+  /** 当前视图 id（与 views 中的定义对应）。 */
+  viewId?: string;
   /** 自由文本：任务原文或选中片段，用于关键词匹配相关设定。 */
   query?: string;
+}
+
+/**
+ * 当前视图的装配范围：由渲染端按 bookId 查询视图定义并做纯函数投影得到，
+ * 核心只消费可见实体 id 与可读摘要，不依赖渲染层类型与存储。
+ */
+export interface ViewContextScope {
+  id: string;
+  name: string;
+  /** 视图当前可见的实体 id（章节正文/实体/清单项/时间线事件）。 */
+  entityIds?: readonly string[];
+  /** 视图限定的实体类型（kindFilter）。 */
+  kindFilter?: string;
+  /** 视图当前可见列 key。 */
+  columns?: readonly string[];
+  /** 视图筛选条件的可读摘要。 */
+  conditionSummary?: string;
 }
 
 export interface ContextInjectionInput {
   project: Project | null | undefined;
   target?: ContextTarget;
+  /** 当前视图范围；提供时按其可见实体装配上下文。 */
+  view?: ViewContextScope;
   /** 总开关：false 时不做任何自动注入（回到纯手动）。 */
   enabled?: boolean;
   /** 单条关闭的 entry id。 */
@@ -237,6 +259,102 @@ function entityEntry(project: Project, kind: InjectionSourceKind, id: string, tr
   return undefined;
 }
 
+/** 按 id 在作品各域中找实体并生成注入条目；视图范围装配用。 */
+function viewEntityEntry(project: Project, id: string, trigger: string): InjectionEntry | undefined {
+  const character = findCharacter(project, id);
+  if (character) {
+    return {
+      id: `character:${id}`,
+      title: `角色：${character.name}`,
+      text: cutText(characterText(character), MAX_INJECTION_ENTRY_CHARS),
+      source: { kind: 'character', refId: id, title: character.name, locator: '视图范围' },
+      trigger,
+      priority: 60,
+      scope: 'book',
+    };
+  }
+  const location = findLocation(project, id);
+  if (location) {
+    return {
+      id: `location:${id}`,
+      title: `地点：${location.name}`,
+      text: cutText(locationText(location), MAX_INJECTION_ENTRY_CHARS),
+      source: { kind: 'location', refId: id, title: location.name, locator: '视图范围' },
+      trigger,
+      priority: 60,
+      scope: 'book',
+    };
+  }
+  const faction = findFaction(project, id);
+  if (faction) {
+    return {
+      id: `faction:${id}`,
+      title: `势力：${faction.name}`,
+      text: cutText(factionText(faction), MAX_INJECTION_ENTRY_CHARS),
+      source: { kind: 'faction', refId: id, title: faction.name, locator: '视图范围' },
+      trigger,
+      priority: 60,
+      scope: 'book',
+    };
+  }
+  const knowledge = findKnowledge(project, id);
+  if (knowledge) {
+    return {
+      id: `knowledge:${id}`,
+      title: `资料：${knowledge.name}`,
+      text: cutText(knowledgeText(knowledge), MAX_INJECTION_ENTRY_CHARS),
+      source: { kind: 'knowledge', refId: id, title: knowledge.name, locator: '视图范围' },
+      trigger,
+      priority: 60,
+      scope: 'book',
+    };
+  }
+  const event = (project.timeline?.events ?? []).find((item) => item.id === id);
+  if (event) {
+    return {
+      id: `timeline:${id}`,
+      title: `时间线：${event.title}`,
+      text: cutText([event.title, event.description].filter(Boolean).join('：'), MAX_INJECTION_ENTRY_CHARS),
+      source: { kind: 'timeline', refId: id, title: event.title, locator: '视图范围' },
+      trigger,
+      priority: 58,
+      scope: 'book',
+    };
+  }
+  const chapter = (project.chapters ?? []).find((item) => item.id === id);
+  if (chapter) {
+    const text = [chapter.summary, cutText(chapter.content ?? '', MAX_INJECTION_ENTRY_CHARS)].filter(Boolean).join('\n');
+    if (!text.trim()) return undefined;
+    return {
+      id: `chapter:${id}:view`,
+      title: `第${chapter.order + 1}章《${chapter.title}》`,
+      text: cutText(text, MAX_INJECTION_ENTRY_CHARS),
+      source: { kind: 'chapter', refId: id, title: chapter.title, locator: '视图范围' },
+      trigger,
+      priority: 60,
+      scope: 'book',
+    };
+  }
+  return undefined;
+}
+
+/** 视图范围的说明条目：视图名、类型筛选、条件与列。 */
+function viewScopeEntry(view: ViewContextScope): InjectionEntry {
+  const lines = [`视图：${view.name}`];
+  if (view.kindFilter) lines.push(`类型筛选：${view.kindFilter}`);
+  if (view.conditionSummary) lines.push(`筛选条件：${view.conditionSummary}`);
+  if (view.columns?.length) lines.push(`可见列：${view.columns.join('、')}`);
+  return {
+    id: `view:${view.id}`,
+    title: `当前视图：${view.name}`,
+    text: cutText(lines.join('\n'), MAX_INJECTION_ENTRY_CHARS),
+    source: { kind: 'knowledge', refId: view.id, title: view.name, locator: '当前视图' },
+    trigger: `视图：${view.name}`,
+    priority: 55,
+    scope: 'book',
+  };
+}
+
 /**
  * 从任务文本推断装配目标：命中「第 N 章」或章节标题取章节；
  * 命中实体名取实体；未命中时只带 query（关键词装配仍可命中相关设定）。
@@ -312,12 +430,13 @@ export function composeContextTarget(
 }
 
 /**
- * 规划注入候选（未做预算）：当前章节正文片段与细纲、前情、选中实体、关键词相关设定、时间线。
+ * 规划注入候选（未做预算）：当前章节正文片段与细纲、前情、选中实体、关键词相关设定、时间线、当前视图范围。
  * 结果按优先级不排序，交由装配阶段统一裁剪。
  */
 export function planContextInjection(
   project: Project | null | undefined,
   target: ContextTarget = {},
+  view?: ViewContextScope,
 ): InjectionEntry[] {
   if (!project) return [];
   const entries: InjectionEntry[] = [];
@@ -455,6 +574,20 @@ export function planContextInjection(
   }
   entries.push(...timelineEntries.slice(0, MAX_INJECTION_TIMELINE_EVENTS));
 
+  // 视图范围：注入视图说明与当前可见实体（已在场的实体不重复）。
+  if (view) {
+    const present = new Set(entries.map((entry) => entry.id));
+    const viewEntries: InjectionEntry[] = [];
+    for (const entityId of view.entityIds ?? []) {
+      if (viewEntries.length >= MAX_VIEW_INJECTION_ENTRIES) break;
+      const entry = viewEntityEntry(project, entityId, `视图：${view.name}`);
+      if (!entry || present.has(entry.id)) continue;
+      present.add(entry.id);
+      viewEntries.push(entry);
+    }
+    entries.push(viewScopeEntry(view), ...viewEntries);
+  }
+
   return entries;
 }
 
@@ -473,12 +606,12 @@ export function assembleContextInjection(input: ContextInjectionInput): ContextI
     budgetChars,
     truncated: false,
     enabled,
-    viewName: input.target?.viewName,
+    viewName: input.target?.viewName ?? input.view?.name,
   };
   if (!enabled) return empty;
 
   const planned = [
-    ...planContextInjection(input.project, input.target),
+    ...planContextInjection(input.project, input.target, input.view),
     ...(input.extraEntries ?? []),
   ];
   const disabled = new Set(input.disabledIds ?? []);
@@ -535,7 +668,7 @@ export function assembleContextInjection(input: ContextInjectionInput): ContextI
     budgetChars,
     truncated,
     enabled,
-    viewName: input.target?.viewName,
+    viewName: input.target?.viewName ?? input.view?.name,
   };
 }
 

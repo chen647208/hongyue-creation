@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import type { RevisionEntity } from '@core/entities';
+import type { AttributeEntity, EdgeEntity, NodeEntity, RevisionEntity } from '@core/entities';
 
 import type { SqlId } from '../../../../shared/sql/catalog';
 import type {
@@ -252,6 +252,17 @@ export interface StorageRepository {
 
   /** 读取某本书的修订统计（节点、时间、正文长度），用于码字日历。 */
   loadRevisionStats?(bookId: string): Promise<RevisionStat[]>;
+
+  /**
+   * 读取某本书用于同步合并的实体快照（nodes/attrs/edges）。
+   * 仅 SQLite 后端提供；JSON 后端返回 null。
+   */
+  readSyncEntities?(bookId: string): Promise<{ nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] }>;
+  /**
+   * 按 id 落库同步合并结果（upsert，不写修订日志）。
+   * 仅 SQLite 后端提供；JSON 后端不实现。
+   */
+  applySyncEntities?(input: { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] }): Promise<void>;
 
   /** 全文检索（SQLite 走 FTS5；JSON 后端走内存过滤） */
   search(query: string, options?: SearchOptions): Promise<SearchHit[]>;

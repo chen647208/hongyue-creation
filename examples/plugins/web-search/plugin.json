@@ -1,0 +1,18 @@
+{
+  "$schema": "https://hongyue.dev/schema/plugin-v0.json",
+  "id": "com.hongyue.example-web-search",
+  "name": "联网搜索/翻译示例插件",
+  "version": "1.0.0",
+  "description": "官方示例：资源型插件，演示如何经受控网络门 core.net.fetch 取外部资料做搜索/翻译；默认拒绝，需在联网白名单显式放行。",
+  "keywords": ["示例", "联网", "搜索", "翻译"],
+  "host": "^1.0.0",
+  "license": "MIT",
+  "contributes": {
+    "skills": ["skills/web-search"]
+  },
+  "permissions": {
+    "read": ["manuscript"],
+    "network": true
+  },
+  "activation": "onDemand"
+}

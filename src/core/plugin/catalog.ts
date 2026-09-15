@@ -86,6 +86,52 @@ function validateEntry(raw: unknown, path: string, issues: ManifestIssue[]): voi
   }
 }
 
+/**
+ * 索引验签端口：主进程按信任键清单验证整个索引 payload 的 detached 签名。
+ * 与 installer 的包签名端口同形，测试注入内存实现即可，本层不触达 crypto。
+ */
+export interface CatalogSignatureVerifier {
+  verifyPayload(payloadText: string, envelope: PluginSignatureEnvelope): Promise<boolean>;
+}
+
+/** 索引可用的来源认证算法：ed25519/cosign；sha256 仅完整性，不足以认证来源。 */
+export function isIndexSignatureAlgorithm(algorithm: PluginSignatureEnvelope['algorithm']): boolean {
+  return algorithm === 'ed25519' || algorithm === 'cosign';
+}
+
+/**
+ * 校验整个索引 payload 的 detached 签名：通过返回 undefined，否则返回可读拒绝原因。
+ * `requireSignature` 缺省为 true（fail-closed）：索引未带签名即拒绝使用。
+ */
+export async function verifyCatalogIndexSignature(
+  payloadText: string,
+  envelope: PluginSignatureEnvelope | undefined,
+  verifier: CatalogSignatureVerifier | undefined,
+  options: { requireSignature?: boolean } = {},
+): Promise<string | undefined> {
+  const requireSignature = options.requireSignature !== false;
+  if (!envelope) {
+    return requireSignature ? '索引缺少签名（catalog.sig 缺失）：拒绝使用未认证的目录索引' : undefined;
+  }
+  if (!isIndexSignatureAlgorithm(envelope.algorithm)) {
+    return `索引签名算法 ${envelope.algorithm} 仅提供完整性，不能认证来源；请改用 ed25519 或 cosign`;
+  }
+  if (!verifier) return '索引验签端口缺失：无法校验索引签名，拒绝使用';
+  const verified = await verifier.verifyPayload(payloadText, envelope);
+  return verified ? undefined : '索引签名校验失败（索引被篡改或签名公钥不受信任）：拒绝使用';
+}
+
+export interface LoadCatalogOptions {
+  /** 索引文件原文（catalog.json 字节）；detached 签名以它为准。 */
+  payloadText: string;
+  /** 分离签名信封（来自同级 catalog.sig）；缺省表示索引未签名。 */
+  signature?: PluginSignatureEnvelope;
+  /** 验签端口；缺省且要求签名时拒绝使用。 */
+  verifier?: CatalogSignatureVerifier;
+  /** 是否要求索引必须带来源认证签名；缺省 true。 */
+  requireSignature?: boolean;
+}
+
 /** 解析目录索引；全部问题一次报出，带 JSON 路径。 */
 export function parsePluginCatalog(raw: unknown): CatalogParseResult {
   const issues: ManifestIssue[] = [];
@@ -103,6 +149,20 @@ export function parsePluginCatalog(raw: unknown): CatalogParseResult {
   }
   if (issues.length) return { ok: false, issues };
   return { ok: true, catalog: { schema: 1, entries: root.entries as PluginCatalogEntry[] } };
+}
+
+/**
+ * 解析并校验目录索引：结构校验通过后，再校验整个 payload 的 detached 签名；
+ * 验签失败即拒绝使用该索引（不返回任何条目）。
+ */
+export async function loadPluginCatalog(raw: unknown, options: LoadCatalogOptions): Promise<CatalogParseResult> {
+  const parsed = parsePluginCatalog(raw);
+  if (!parsed.ok) return parsed;
+  const reason = await verifyCatalogIndexSignature(options.payloadText, options.signature, options.verifier, {
+    requireSignature: options.requireSignature,
+  });
+  if (reason) return { ok: false, issues: [{ path: 'signature', message: reason }] };
+  return parsed;
 }
 
 /** 解析语义化版本的数值三元组（忽略预发布/构建后缀）。 */

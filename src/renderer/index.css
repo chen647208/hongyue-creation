@@ -266,6 +266,17 @@
   .z-popover { z-index: 10002; }
   /* 全局提示/确认：始终盖在功能弹窗之上 */
   .z-alert { z-index: 10003; }
+  /*
+   * 触控命中区：窄视口下主要交互图标按钮不小于 --min-touch-target。
+   * 变量值由 MIN_TOUCH_TARGET_PX（shared/utils/layout.ts）在启动时写入 :root；
+   * 断点 639 对应 MOBILE_MAX_WIDTH。表格、时间线等固有横滚不受此限。
+   */
+  @media (max-width: 639px) {
+    .touch-target {
+      min-height: var(--min-touch-target, 44px);
+      min-width: var(--min-touch-target, 44px);
+    }
+  }
   /* 小说 DSL 富文本画布：TipTap ProseMirror 排版基线 + 语义节点样式 */
   .novel-canvas .ProseMirror {
     min-height: 100%;
@@ -403,6 +414,11 @@
   .novel-dsl-editor .cm-content {
     font-family: var(--font-serif, ui-serif, Georgia, serif);
     padding: 0.5rem 0.75rem;
+  }
+  /* 占位符对比度：改用语义变量，浅色下 >= 4.5:1 */
+  .novel-dsl-editor .cm-placeholder {
+    color: var(--color-muted-foreground);
+    font-style: italic;
   }
   .novel-dsl-editor .cm-gutters {
     background: transparent;

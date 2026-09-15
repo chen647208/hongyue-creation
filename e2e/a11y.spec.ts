@@ -41,13 +41,6 @@ const summary = (label: string, violations: AxeViolation[]) =>
  */
 type PanelDebt = Record<string, number>;
 
-/** 结构页（大纲/细纲编辑器）既有欠账。 */
-const STRUCTURE_KNOWN_DEBT: PanelDebt = {
-  'aria-input-field-name': 1,
-  'color-contrast': 1,
-  'scrollable-region-focusable': 1,
-};
-
 /** 设置面板既有欠账（测于默认的模型提供商页签，各页签共用为上界）。 */
 const SETTINGS_KNOWN_DEBT: PanelDebt = {};
 
@@ -75,8 +68,8 @@ const PANEL_DEBT: Record<string, PanelDebt> = {
   'world.views': {},
   'world.timeline': {},
   characters: {},
-  'structure.outline': STRUCTURE_KNOWN_DEBT,
-  'structure.chapters': STRUCTURE_KNOWN_DEBT,
+  'structure.outline': { 'color-contrast': 1 },
+  'structure.chapters': {},
   writing: {},
   ...Object.fromEntries(SETTINGS_TABS.map((tab) => [`settings.${tab.zh}`, SETTINGS_KNOWN_DEBT])),
 };

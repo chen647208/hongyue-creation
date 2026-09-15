@@ -22,16 +22,23 @@ import {
   buildWebDavAuthHeader,
   buildWebDavDirUrl,
   buildWebDavUrl,
+  chunkManifestKey,
+  chunkPartKey,
   createLocalTransport,
   createS3Transport,
   createWebDavTransport,
   type FileSystemLike,
   formatAmzDate,
+  getChunkedObject,
   parseS3ListXml,
   parseWebDavHrefs,
+  putChunkedObject,
+  removeChunkedObject,
   sanitizeTransportKey,
   sha256Hex,
   signAwsV4,
+  splitIntoChunks,
+  type SyncTransport,
   uriEncode,
 } from '../transport.js';
 
@@ -149,6 +156,96 @@ function memoryFs(seed: Record<string, string> = {}) {
   };
   return { fs, files, directories };
 }
+
+function memoryTransport(seed: Record<string, string> = {}) {
+  const store = new Map(Object.entries(seed));
+  const transport: SyncTransport = {
+    async test() {
+      return undefined;
+    },
+    async put(key, data) {
+      store.set(key, data);
+    },
+    async get(key) {
+      return store.get(key) ?? null;
+    },
+    async list(prefix) {
+      return [...store.keys()]
+        .filter((key) => !prefix || key.startsWith(prefix))
+        .map((key) => ({ key, size: store.get(key)?.length ?? 0 }));
+    },
+    async remove(key) {
+      store.delete(key);
+    },
+  };
+  return { transport, store };
+}
+
+describe('分片与断点续传', () => {
+  it('切分与键格式：分片保留 .json 后缀，清单单独成键', () => {
+    expect(splitIntoChunks('abcdef', 2)).toEqual(['ab', 'cd', 'ef']);
+    expect(splitIntoChunks('', 2)).toEqual(['']);
+    expect(chunkPartKey('hongyue-sync/b1.json', 3)).toBe('hongyue-sync/b1.json.part-000003.json');
+    expect(chunkManifestKey('hongyue-sync/b1.json')).toBe('hongyue-sync/b1.json.manifest.json');
+  });
+
+  it('分片上传/下载往返一致，删除清理分片与清单', async () => {
+    const { transport, store } = memoryTransport();
+    const data = 'x'.repeat(25);
+    const manifest = await putChunkedObject(transport, 'hongyue-sync/b1.json', data, { chunkSize: 10 });
+    expect(manifest.total).toBe(3);
+    expect(store.has('hongyue-sync/b1.json.part-000000.json')).toBe(true);
+    expect(store.has('hongyue-sync/b1.json.manifest.json')).toBe(true);
+
+    expect(await getChunkedObject(transport, 'hongyue-sync/b1.json')).toBe(data);
+
+    await removeChunkedObject(transport, 'hongyue-sync/b1.json');
+    expect(store.size).toBe(0);
+    expect(await getChunkedObject(transport, 'hongyue-sync/b1.json')).toBeNull();
+  });
+
+  it('失败重试从已完成分片继续，不重传已完成分片', async () => {
+    const { transport, store } = memoryTransport();
+    let calls = 0;
+    const putKeys: string[] = [];
+    const flaky: SyncTransport = {
+      ...transport,
+      async put(key, value) {
+        calls += 1;
+        if (calls === 3) throw new Error('boom');
+        putKeys.push(key);
+        await transport.put(key, value);
+      },
+    };
+    const data = 'y'.repeat(25);
+    await expect(putChunkedObject(flaky, 'hongyue-sync/b1.json', data, { chunkSize: 10 })).rejects.toThrow('boom');
+    expect(putKeys).toEqual(['hongyue-sync/b1.json.part-000000.json', 'hongyue-sync/b1.json.part-000001.json']);
+
+    putKeys.length = 0;
+    await putChunkedObject(flaky, 'hongyue-sync/b1.json', data, { chunkSize: 10 });
+    expect(putKeys).toEqual(['hongyue-sync/b1.json.part-000002.json', 'hongyue-sync/b1.json.manifest.json']);
+    expect(await getChunkedObject(transport, 'hongyue-sync/b1.json')).toBe(data);
+    expect(store.has('hongyue-sync/b1.json.manifest.json')).toBe(true);
+  });
+
+  it('分片缺失或摘要不符时给出可读错误', async () => {
+    const { transport, store } = memoryTransport();
+    const data = 'z'.repeat(25);
+    await putChunkedObject(transport, 'hongyue-sync/b1.json', data, { chunkSize: 10 });
+
+    store.delete('hongyue-sync/b1.json.part-000001.json');
+    await expect(getChunkedObject(transport, 'hongyue-sync/b1.json')).rejects.toThrow('分片缺失');
+
+    await putChunkedObject(transport, 'hongyue-sync/b1.json', data, { chunkSize: 10 });
+    store.set('hongyue-sync/b1.json.part-000000.json', 'corrupted');
+    await expect(getChunkedObject(transport, 'hongyue-sync/b1.json')).rejects.toThrow('摘要校验失败');
+  });
+
+  it('无清单时回落整体对象（兼容既有远端包）', async () => {
+    const { transport } = memoryTransport({ 'hongyue-sync/legacy.json': '{"legacy":true}' });
+    expect(await getChunkedObject(transport, 'hongyue-sync/legacy.json')).toBe('{"legacy":true}');
+  });
+});
 
 describe('本地目录传输（注入 fs）', () => {
   it('put/get/list/remove 与键净化', async () => {

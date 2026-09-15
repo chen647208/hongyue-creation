@@ -13,6 +13,9 @@ const state = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => any>(),
   vaultGet: vi.fn(),
   createTransport: vi.fn(),
+  putChunkedObject: vi.fn(),
+  getChunkedObject: vi.fn(),
+  removeChunkedObject: vi.fn(),
   warn: vi.fn(),
 }));
 
@@ -28,7 +31,12 @@ vi.mock('../../logger.js', () => ({
   logger: { warn: state.warn, info: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('../transport.js', () => ({ createTransport: state.createTransport }));
+vi.mock('../transport.js', () => ({
+  createTransport: state.createTransport,
+  putChunkedObject: state.putChunkedObject,
+  getChunkedObject: state.getChunkedObject,
+  removeChunkedObject: state.removeChunkedObject,
+}));
 
 vi.mock('../../app/secureStore.js', () => ({ vaultGet: state.vaultGet }));
 
@@ -52,16 +60,21 @@ describe('registerSyncIpc（同步传输 IPC）', () => {
     state.handlers.clear();
     state.vaultGet.mockReset().mockResolvedValue('secret-value');
     state.warn.mockClear();
+    state.putChunkedObject.mockReset().mockResolvedValue({ version: 1, key: 'key', chunkSize: 1024, total: 2, size: 10, digest: 'abc' });
+    state.getChunkedObject.mockReset().mockResolvedValue('chunked-content');
+    state.removeChunkedObject.mockReset().mockResolvedValue(undefined);
     transport = makeTransport();
     state.createTransport.mockReset().mockReturnValue(transport);
     registerSyncIpc();
   });
 
-  it('注册五个传输通道', () => {
+  it('注册七个传输通道', () => {
     for (const channel of [
       IPC.sync.transportTest,
       IPC.sync.transportPut,
+      IPC.sync.transportPutChunked,
       IPC.sync.transportGet,
+      IPC.sync.transportGetChunked,
       IPC.sync.transportList,
       IPC.sync.transportRemove,
     ]) {
@@ -201,6 +214,24 @@ describe('registerSyncIpc（同步传输 IPC）', () => {
     expect(transport.get).toHaveBeenCalledWith('key');
   });
 
+  it('putChunked 走分片上传并返回清单摘要', async () => {
+    const putChunked = state.handlers.get(IPC.sync.transportPutChunked)!;
+    await expect(putChunked(null, { kind: 'local', directory: '/d' }, null, 'data')).rejects.toThrow(TypeError);
+    await expect(putChunked(null, { kind: 'local', directory: '/d' }, 'key', 'data')).resolves.toEqual({
+      ok: true,
+      total: 2,
+      digest: 'abc',
+    });
+    expect(state.putChunkedObject).toHaveBeenCalledWith(transport, 'key', 'data');
+  });
+
+  it('getChunked 走分片下载并校验入参', async () => {
+    const getChunked = state.handlers.get(IPC.sync.transportGetChunked)!;
+    await expect(getChunked(null, { kind: 'local', directory: '/d' }, 5)).rejects.toThrow(TypeError);
+    await expect(getChunked(null, { kind: 'local', directory: '/d' }, 'key')).resolves.toBe('chunked-content');
+    expect(state.getChunkedObject).toHaveBeenCalledWith(transport, 'key');
+  });
+
   it('list 允许缺省 prefix，非法 prefix 拒绝', async () => {
     const list = state.handlers.get(IPC.sync.transportList)!;
     await expect(list(null, { kind: 'local', directory: '/d' }, 5)).rejects.toThrow(TypeError);
@@ -210,10 +241,10 @@ describe('registerSyncIpc（同步传输 IPC）', () => {
     expect(transport.list).toHaveBeenNthCalledWith(2, 'p');
   });
 
-  it('remove 校验 key 并删除', async () => {
+  it('remove 校验 key 并清理分片与整体对象', async () => {
     const remove = state.handlers.get(IPC.sync.transportRemove)!;
     await expect(remove(null, { kind: 'local', directory: '/d' }, 5)).rejects.toThrow(TypeError);
     await expect(remove(null, { kind: 'local', directory: '/d' }, 'key')).resolves.toEqual({ ok: true });
-    expect(transport.remove).toHaveBeenCalledWith('key');
+    expect(state.removeChunkedObject).toHaveBeenCalledWith(transport, 'key');
   });
 });

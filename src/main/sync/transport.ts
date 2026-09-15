@@ -19,11 +19,24 @@ import { createHash, createHmac } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import { SYNC_CHUNK_PART_INFIX, SYNC_CHUNK_SIZE_CHARS } from '../../shared/constants/sync.js';
+import {
+  chunkKeyDir as cleanChunkKeyDir,
+  type ChunkManifest,
+  chunkManifestKey as cleanChunkManifestKey,
+  chunkPartKey as cleanChunkPartKey,
+  parseChunkManifest,
+  splitIntoChunks,
+  verifyChunkedData as sharedVerifyChunkedData,
+} from '../../shared/sync/chunkManifest.js';
 import type {
   SyncS3TransportConfig,
   SyncTransportConfig,
   SyncWebDavTransportConfig,
 } from '../../shared/types.js';
+
+export type { ChunkManifest };
+export { parseChunkManifest, splitIntoChunks };
 
 export interface TransportObject {
   key: string;
@@ -74,6 +87,117 @@ export function sanitizeTransportKey(key: string): string {
     throw new Error(`非法对象键：${key}`);
   }
   return normalized;
+}
+
+// ── 分片与断点续传（三后端通用） ─────────────────────────────────────────────
+
+/** 清单对象键（净化入参）。 */
+export function chunkManifestKey(key: string): string {
+  return cleanChunkManifestKey(sanitizeTransportKey(key));
+}
+
+/** 分片对象键：`<key>.part-000000.json`（净化入参）。 */
+export function chunkPartKey(key: string, index: number): string {
+  return cleanChunkPartKey(sanitizeTransportKey(key), index);
+}
+
+/** 对象键所属目录前缀（无目录时为 undefined）。 */
+export function chunkKeyDir(key: string): string | undefined {
+  return cleanChunkKeyDir(sanitizeTransportKey(key));
+}
+
+export function buildChunkManifest(key: string, data: string, chunkSize: number): ChunkManifest {
+  const size = Math.max(1, Math.floor(chunkSize));
+  return {
+    version: 1,
+    key: sanitizeTransportKey(key),
+    chunkSize: size,
+    total: splitIntoChunks(data, size).length,
+    size: data.length,
+    digest: sha256Hex(data),
+  };
+}
+
+/** 合并后校验：总长度与总摘要都一致才算完整。 */
+export function verifyChunkedData(manifest: ChunkManifest, data: string): boolean {
+  return sharedVerifyChunkedData(manifest, data, sha256Hex(data));
+}
+
+/** 列出已完成分片键；后端列举不可用时返回空集（退化为整体重传，不报错）。 */
+async function listChunkParts(transport: SyncTransport, key: string): Promise<Set<string>> {
+  const prefix = `${sanitizeTransportKey(key)}${SYNC_CHUNK_PART_INFIX}`;
+  try {
+    const objects = await transport.list(chunkKeyDir(key));
+    return new Set(objects.filter((object) => object.key.startsWith(prefix)).map((object) => object.key));
+  } catch {
+    return new Set();
+  }
+}
+
+export interface ChunkedTransferOptions {
+  chunkSize?: number;
+}
+
+/**
+ * 分片上传：先写各分片，最后写清单（提交点）。已有且内容一致的分片跳过，
+ * 失败重试时从已完成分片继续；清单未写入前不会有半套对象被当成完整包。
+ */
+export async function putChunkedObject(
+  transport: SyncTransport,
+  key: string,
+  data: string,
+  options: ChunkedTransferOptions = {},
+): Promise<ChunkManifest> {
+  const chunkSize = options.chunkSize ?? SYNC_CHUNK_SIZE_CHARS;
+  const manifest = buildChunkManifest(key, data, chunkSize);
+  const chunks = splitIntoChunks(data, manifest.chunkSize);
+  const existing = await listChunkParts(transport, key);
+  for (let index = 0; index < chunks.length; index += 1) {
+    const partKey = chunkPartKey(key, index);
+    if (existing.has(partKey)) {
+      const remote = await transport.get(partKey);
+      if (remote !== null && remote === chunks[index]) continue;
+    }
+    await transport.put(partKey, chunks[index] ?? '');
+  }
+  await transport.put(chunkManifestKey(key), JSON.stringify(manifest));
+  return manifest;
+}
+
+/**
+ * 分片下载：有清单即按分片取回并按总摘要校验；无清单回落到整体对象（兼容既有远端对象）。
+ * 分片缺失或摘要不符时抛出可读错误。
+ */
+export async function getChunkedObject(
+  transport: SyncTransport,
+  key: string,
+  _options: ChunkedTransferOptions = {},
+): Promise<string | null> {
+  const manifest = parseChunkManifest(await transport.get(chunkManifestKey(key)));
+  if (!manifest) return transport.get(sanitizeTransportKey(key));
+  const parts: string[] = [];
+  for (let index = 0; index < manifest.total; index += 1) {
+    const partKey = chunkPartKey(key, index);
+    const part = await transport.get(partKey);
+    if (part === null) throw new Error(`分片缺失：${partKey}，请重新上传同步包`);
+    parts.push(part);
+  }
+  const data = parts.join('');
+  if (!verifyChunkedData(manifest, data)) {
+    throw new Error(`同步包摘要校验失败：${sanitizeTransportKey(key)}`);
+  }
+  return data;
+}
+
+/** 删除分片对象、清单与整体对象（清理旧格式残留）。 */
+export async function removeChunkedObject(transport: SyncTransport, key: string): Promise<void> {
+  const manifest = parseChunkManifest(await transport.get(chunkManifestKey(key)));
+  const total = manifest?.total ?? 0;
+  for (let index = 0; index < total; index += 1) {
+    await transport.remove(chunkPartKey(key, index));
+  }
+  await transport.remove(chunkManifestKey(key));
+  await transport.remove(sanitizeTransportKey(key));
 }
 
 // ── 本地目录 ────────────────────────────────────────────────────────────────
@@ -242,13 +366,15 @@ export function createWebDavTransport(
     },
 
     async list(prefix) {
-      const response = await doFetch(dirUrl, { method: 'PROPFIND', headers: { ...authHeaders(), Depth: '1' } });
+      const cleanPrefix = prefix ? sanitizeTransportKey(prefix) : '';
+      const listUrl = cleanPrefix ? buildWebDavUrl(config.baseUrl, config.remoteDir, cleanPrefix) : buildWebDavDirUrl(config.baseUrl, config.remoteDir);
+      const response = await doFetch(listUrl, { method: 'PROPFIND', headers: { ...authHeaders(), Depth: '1' } });
       if (response.status === 404) return [];
       if (response.status !== 207 && !response.ok) {
         throw new Error(`WebDAV 列举失败：${response.status} ${response.statusText}`);
       }
       const xml = await response.text();
-      const dirPath = new URL(dirUrl).pathname.replace(/\/+$/, '');
+      const dirPath = new URL(listUrl).pathname.replace(/\/+$/, '');
       const objects: TransportObject[] = [];
       for (const href of parseWebDavHrefs(xml)) {
         let pathname: string;
@@ -260,7 +386,7 @@ export function createWebDavTransport(
         if (!pathname.endsWith('.json')) continue;
         const relative = pathname.startsWith(`${dirPath}/`) ? pathname.slice(dirPath.length + 1) : pathname.replace(/^\/+/, '');
         if (!relative || relative.includes('/')) continue;
-        objects.push({ key: prefix ? `${sanitizeTransportKey(prefix)}/${relative}` : relative, size: 0 });
+        objects.push({ key: cleanPrefix ? `${cleanPrefix}/${relative}` : relative, size: 0 });
       }
       return objects;
     },

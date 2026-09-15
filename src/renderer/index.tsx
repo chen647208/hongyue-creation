@@ -14,8 +14,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import App from './app/App';
+import { registerServiceWorker } from './app/registerServiceWorker';
 import { bootstrapI18n } from './i18n';
 import ErrorBoundary from './shared/components/ErrorBoundary';
+import { MIN_TOUCH_TARGET_PX } from './shared/utils/layout';
 import { logger } from './shared/utils/logger';
 
 // 渲染进程兜底：未捕获异常与未处理 Promise 记入日志，避免静默丢失现场
@@ -34,8 +36,11 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 
 async function main(): Promise<void> {
+  // 命中区常量单源：样式表统一经 --min-touch-target 取用，避免各处散落 44。
+  document.documentElement.style.setProperty('--min-touch-target', `${MIN_TOUCH_TARGET_PX}px`);
   // 先初始化 i18n（检测初始语言），再首帧渲染，避免未翻译内容闪烁。
   await bootstrapI18n();
+  registerServiceWorker();
   root.render(
     <React.StrictMode>
       {/* 根边界即应用整体：不传 scope，回落到 errorBoundary.appError 文案 */}

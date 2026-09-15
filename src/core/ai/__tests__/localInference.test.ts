@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   inferLocalFlavor,
+  localModelConfig,
   localModelsUrl,
   normalizeLocalEndpoint,
   parseLocalModels,
@@ -75,5 +76,25 @@ describe('localInference（本地推理探测与回落）', () => {
       .toEqual({ kind: 'remote', reason: '本地端点不可达' });
     expect(resolveInferenceTarget({ local: { enabled: true, endpoint: 'http://127.0.0.1:11434/', model: 'llama3' }, localAvailable: true }))
       .toEqual({ kind: 'local', endpoint: 'http://127.0.0.1:11434', model: 'llama3' });
+  });
+
+  it('可达但未选模型：回落远程', () => {
+    expect(resolveInferenceTarget({ local: { enabled: true, endpoint: 'http://127.0.0.1:11434' }, localAvailable: true }))
+      .toEqual({ kind: 'remote', reason: '未选择本地模型' });
+  });
+
+  it('本地目标转 ModelConfig：Ollama 补 /v1，OpenAI 兼容原样', () => {
+    expect(localModelConfig({ enabled: true, endpoint: 'http://127.0.0.1:11434/', model: 'llama3' }))
+      .toMatchObject({
+        id: 'local:ollama:llama3',
+        provider: 'ollama',
+        endpoint: 'http://127.0.0.1:11434/v1',
+        modelName: 'llama3',
+        supportsStreaming: true,
+      });
+    expect(localModelConfig({ enabled: true, endpoint: 'http://127.0.0.1:8080/v1', model: 'qwen' }))
+      .toMatchObject({ id: 'local:openai:qwen', provider: 'openai-chat', endpoint: 'http://127.0.0.1:8080/v1' });
+    expect(localModelConfig({ enabled: true, endpoint: '', model: 'x' })).toBeNull();
+    expect(localModelConfig({ enabled: true, endpoint: 'http://127.0.0.1:8080/v1' })).toBeNull();
   });
 });

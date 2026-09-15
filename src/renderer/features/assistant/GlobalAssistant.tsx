@@ -26,6 +26,7 @@ import { type Character, type KnowledgeItem, type OutputMode, type Project } fro
 import { asRecord, asStr,type LooseRecord } from '../../shared/utils/loose';
 import AssistantChatWorkspace from './components/AssistantChatWorkspace';
 import AssistantContextPanel from './components/AssistantContextPanel';
+import AssistantConversationBar from './components/AssistantConversationBar';
 import AssistantEditPanel from './components/AssistantEditPanel';
 import AssistantInjectionPanel from './components/AssistantInjectionPanel';
 import TrialSnapshotButton from './components/TrialSnapshotButton';
@@ -90,7 +91,8 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
     pendingImages, setPendingImages, pendingFiles, setPendingFiles, lastToolChain,
     streamingMessageId, cardPromptTemplates, selectedCardTemplateId, setSelectedCardTemplateId,
     sendMessageInternal, handleSendMessage, handleStopStreaming, handleRetry, handleClearChat, lastUserText,
-    lastInjection,
+    lastInjection, conversations, activeConversationId, handleSelectConversation, handleNewConversation,
+    handleDeleteConversation, handleRestoreConversation,
   } = chat;
 
   const [outputMode, setOutputMode] = useState<OutputMode>('streaming');
@@ -521,6 +523,16 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
           )}
         </div>
       </div>
+
+      <AssistantConversationBar
+        conversations={conversations}
+        activeId={activeConversationId}
+        onSelect={handleSelectConversation}
+        onNew={handleNewConversation}
+        onDelete={handleDeleteConversation}
+        onRestore={handleRestoreConversation}
+        bookId={project?.id ?? null}
+      />
 
       <>
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/20 px-4 py-2 text-xs">

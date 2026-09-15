@@ -1384,6 +1384,8 @@ export interface PluginInstallRequest {
   sourceDir: string;
   hostVersion: string;
   allowedSources?: string[];
+  /** 显式放行任意来源；缺省 false（空白名单即拒绝安装未认证来源）。 */
+  allowAnySource?: boolean;
   expectedDigest?: string;
   requireSignature?: boolean;
 }
@@ -1625,7 +1627,9 @@ export interface ElectronAPI {
   sync: {
     testTransport: (config: SyncTransportConfig) => Promise<SyncTransportTestResult>;
     put: (config: SyncTransportConfig, key: string, data: string) => Promise<{ ok: boolean }>;
+    putChunked: (config: SyncTransportConfig, key: string, data: string) => Promise<{ ok: boolean; total: number; digest: string }>;
     get: (config: SyncTransportConfig, key: string) => Promise<string | null>;
+    getChunked: (config: SyncTransportConfig, key: string) => Promise<string | null>;
     list: (config: SyncTransportConfig, prefix?: string) => Promise<SyncTransportObject[]>;
     remove: (config: SyncTransportConfig, key: string) => Promise<{ ok: boolean }>;
   };

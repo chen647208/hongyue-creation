@@ -507,9 +507,11 @@
     },
     "sources": {
       "title": "插件来源白名单",
-      "hint": "每行一个 manifest.source 标识。非空时，来源不在清单的插件拒载；空清单表示不限制来源，仍按签名校验。",
+      "hint": "每行一个 manifest.source 标识。非空时，来源不在清单的插件拒载；空清单默认拒绝安装，需在下方显式开启「允许任意来源」。",
       "save": "保存白名单",
-      "saved": "已保存"
+      "saved": "已保存",
+      "allowAny": "允许任意来源",
+      "allowAnyHint": "安装 manifest.source 不在白名单内的插件。默认关闭，仅对你信任的来源开启。"
     },
     "panel": {
       "title": "插件界面"
@@ -540,6 +542,11 @@
       "hint": "接入自备本地运行时（OpenAI 兼容或 Ollama 端点），运行时不经包分发。关闭或不可达时自动回落远程网关。",
       "enabled": "启用",
       "endpoint": "本地端点",
+      "command": "启动命令",
+      "commandPlaceholder": "如 llama-server / ollama",
+      "args": "启动参数",
+      "argsPlaceholder": "--port 8080（空格分隔）",
+      "commandHint": "启动命令留空表示运行时由外部托管；填写后「启动运行时」以子进程拉起（数组传参，不经过 shell）。",
       "probe": "探测",
       "start": "启动运行时",
       "stop": "停止运行时",
@@ -599,7 +606,7 @@
   },
   "syncTransfer": {
     "title": "同步传输",
-    "subtitle": "把同步包送到本地目录、WebDAV 或 S3 兼容存储。密码与密钥存入系统钥匙串，配置只保留引用。",
+    "subtitle": "把同步包送到本地目录、WebDAV 或 S3 兼容存储。桌面端凭据存入系统钥匙串，浏览器端存本机浏览器存储；配置只保留引用。",
     "backendLabel": "传输方式",
     "backend": {
       "local": "本地目录",
@@ -644,6 +651,11 @@
     "remoteFailed": "读取失败：{{error}}",
     "remoteRemove": "删除",
     "remoteRemoveConfirm": "确定删除远端对象 {{key}}？此操作不可撤销。",
-    "desktopOnly": "同步传输仅在桌面端可用。"
+    "localBrowserUnsupported": "浏览器端不支持本地目录，请改用 WebDAV 或 S3。",
+    "browserSecretNote": "浏览器端没有系统钥匙串，凭据保存在本机浏览器存储中，仅本设备可见。",
+    "mergeTitle": "跨设备导入与合并",
+    "mergeHint": "从已配置的传输后端下载同步包并合并到本地库；冲突按保留副本 / 应用远端 / 待处理三选。",
+    "mergeOpen": "打开同步面板",
+    "desktopOnly": "本地目录选择与退出导出仅在桌面端可用。"
   }
 }

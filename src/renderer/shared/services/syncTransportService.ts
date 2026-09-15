@@ -13,9 +13,12 @@
  * 收发一律经主进程 IPC（renderer 不直连网络/文件系统）。
  */
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
+import { SYNC_CHUNK_MANIFEST_SUFFIX, SYNC_CHUNK_PART_INFIX } from '@shared/constants/sync';
+import { VAULT_REF_PREFIX } from '@shared/constants/vault';
 import type { SyncTransportConfig, SyncTransportObject, SyncTransportTestResult } from '@shared/types';
 
 import { localStore } from './localStore';
+import { type BrowserTransportSecrets, createBrowserTransport, getChunkedBrowser, putChunkedBrowser, removeChunkedBrowser } from './syncTransportBrowser';
 
 /** 保险库 id：每个后端一个固定槽位，重存即覆盖。 */
 export const SYNC_SECRET_IDS = {
@@ -56,23 +59,89 @@ export function isTransportReady(config: SyncTransportConfig | null): boolean {
   return !!config.endpoint.trim() && !!config.bucket.trim() && !!config.accessKeyId.trim() && !!config.secretRef;
 }
 
-function api(): NonNullable<Window['electronAPI']> {
-  const value = typeof window === 'undefined' ? undefined : window.electronAPI;
-  if (!value?.sync) throw new Error('同步传输仅桌面端可用');
-  return value;
+/** 浏览器端无系统钥匙串：密钥暂存 localStorage（同设备同浏览器可见，明文，仅在浏览器预览/PWA 生效）。 */
+function readBrowserSecrets(): Record<string, string> {
+  const raw = localStore.getItem(STORAGE_KEYS.syncSecrets);
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
 }
 
-/** 存密钥并返回可直接写入配置的引用；明文不落配置。 */
+function browserSecretFor(ref: string | undefined): string | undefined {
+  if (!ref) return undefined;
+  const id = ref.startsWith(VAULT_REF_PREFIX) ? ref.slice(VAULT_REF_PREFIX.length) : ref;
+  return readBrowserSecrets()[id];
+}
+
+function browserSecretsFor(config: SyncTransportConfig): BrowserTransportSecrets {
+  if (config.kind === 'webdav') return { password: browserSecretFor(config.credentialRef) };
+  if (config.kind === 's3') return { secretAccessKey: browserSecretFor(config.secretRef) };
+  return {};
+}
+
+/** 传输操作接缝：桌面走主进程 IPC（分片在主进程完成），浏览器用 fetch 直连并本地分片。 */
+interface SyncTransportApi {
+  test(config: SyncTransportConfig): Promise<SyncTransportTestResult>;
+  putChunked(config: SyncTransportConfig, key: string, data: string): Promise<void>;
+  getChunked(config: SyncTransportConfig, key: string): Promise<string | null>;
+  list(config: SyncTransportConfig, prefix?: string): Promise<SyncTransportObject[]>;
+  remove(config: SyncTransportConfig, key: string): Promise<void>;
+}
+
+function desktopTransportApi(target: NonNullable<Window['electronAPI']>): SyncTransportApi {
+  return {
+    test: (config) => target.sync.testTransport(config),
+    putChunked: (config, key, data) => target.sync.putChunked(config, key, data).then(() => undefined),
+    getChunked: (config, key) => target.sync.getChunked(config, key),
+    list: (config, prefix) => target.sync.list(config, prefix),
+    remove: (config, key) => target.sync.remove(config, key).then(() => undefined),
+  };
+}
+
+function browserTransportApi(): SyncTransportApi {
+  return {
+    async test(config) {
+      try {
+        await createBrowserTransport(config, browserSecretsFor(config)).test();
+        return { ok: true, message: '' };
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    putChunked: async (config, key, data) => {
+      await putChunkedBrowser(createBrowserTransport(config, browserSecretsFor(config)), key, data);
+    },
+    getChunked: (config, key) => getChunkedBrowser(createBrowserTransport(config, browserSecretsFor(config)), key),
+    list: (config, prefix) => createBrowserTransport(config, browserSecretsFor(config)).list(prefix),
+    remove: (config, key) => removeChunkedBrowser(createBrowserTransport(config, browserSecretsFor(config)), key),
+  };
+}
+
+function transportApi(): SyncTransportApi {
+  const value = typeof window === 'undefined' ? undefined : window.electronAPI;
+  return value?.sync ? desktopTransportApi(value) : browserTransportApi();
+}
+
+/** 存密钥并返回可直接写入配置的引用；桌面走系统钥匙串，浏览器落 localStorage。 */
 export async function storeSyncTransportSecret(id: string, secret: string): Promise<string> {
-  await api().vault.set(id, secret);
-  return `vault:${id}`;
+  const vault = typeof window === 'undefined' ? undefined : window.electronAPI?.vault;
+  if (vault) {
+    await vault.set(id, secret);
+    return `${VAULT_REF_PREFIX}${id}`;
+  }
+  const map = readBrowserSecrets();
+  map[id] = secret;
+  localStore.setItem(STORAGE_KEYS.syncSecrets, JSON.stringify(map));
+  return `${VAULT_REF_PREFIX}${id}`;
 }
 
-/** 连通测试：返回可读结果，不抛错；桌面端缺失时给出提示。 */
+/** 连通测试：返回可读结果，不抛错。 */
 export async function testSyncTransport(config: SyncTransportConfig): Promise<SyncTransportTestResult> {
-  const value = typeof window === 'undefined' ? undefined : window.electronAPI;
-  if (!value?.sync) return { ok: false, message: '同步传输仅桌面端可用' };
-  return value.sync.testTransport(config);
+  return transportApi().test(config);
 }
 
 export interface RetryOptions {
@@ -102,33 +171,41 @@ export async function retryAsync<T>(run: () => Promise<T>, options: RetryOptions
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
+/**
+ * 上传对象：按分片写入（桌面在主进程、浏览器用 WebCrypto），失败按 retry 选项重试；
+ * 重试会跳过已完成分片，实现断点续传。
+ */
 export async function putSyncObject(
   config: SyncTransportConfig,
   key: string,
   data: string,
   options?: RetryOptions,
 ): Promise<void> {
-  const target = api();
-  await retryAsync(() => target.sync.put(config, key, data), options);
+  await retryAsync(() => transportApi().putChunked(config, key, data), options);
 }
 
+/** 下载对象：有分片清单则按分片取回并校验总摘要，无清单回落到整体对象。 */
 export async function getSyncObject(
   config: SyncTransportConfig,
   key: string,
   options?: RetryOptions,
 ): Promise<string | null> {
-  const target = api();
-  return retryAsync(() => target.sync.get(config, key), options);
+  return retryAsync(() => transportApi().getChunked(config, key), options);
 }
 
-/** 列出传输后端上的对象（远端目录查看），失败按 retry 选项重试。 */
+/** 分片/清单对象是传输内部产物，列举时不展示。 */
+function isInternalTransferObject(key: string): boolean {
+  return key.includes(SYNC_CHUNK_PART_INFIX) || key.endsWith(SYNC_CHUNK_MANIFEST_SUFFIX);
+}
+
+/** 列出传输后端上的对象（远端目录查看），内部对象被过滤；失败按 retry 选项重试。 */
 export async function listSyncObjects(
   config: SyncTransportConfig,
   prefix?: string,
   options?: RetryOptions,
 ): Promise<SyncTransportObject[]> {
-  const target = api();
-  return retryAsync(() => target.sync.list(config, prefix), options);
+  const objects = await retryAsync(() => transportApi().list(config, prefix), options);
+  return objects.filter((object) => !isInternalTransferObject(object.key));
 }
 
 /** 删除传输后端上的对象（远端目录清理），失败按 retry 选项重试。 */
@@ -137,8 +214,7 @@ export async function removeSyncObject(
   key: string,
   options?: RetryOptions,
 ): Promise<void> {
-  const target = api();
-  await retryAsync(() => target.sync.remove(config, key), options);
+  await retryAsync(() => transportApi().remove(config, key), options);
 }
 
 /** 给任意 Promise 套超时：超时抛可读错误，原 Promise 继续但结果被忽略。 */

@@ -21,10 +21,30 @@
       "tablet": "平板",
       "phone": "手机"
     },
+    "chart": {
+      "title": "图表",
+      "mark": "图形",
+      "unbound": "未绑定",
+      "loading": "正在加载图表…",
+      "marks": {
+        "point": "散点",
+        "bar": "柱状",
+        "line": "折线",
+        "area": "面积"
+      },
+      "channels": {
+        "x": "横轴",
+        "y": "纵轴",
+        "color": "颜色",
+        "size": "大小",
+        "shape": "形状"
+      }
+    },
     "kind": {
       "table": "表格",
       "card": "卡片",
       "graph": "关系图",
+      "chart": "图表",
       "list": "大纲",
       "reader": "读者预览",
       "character": "角色",

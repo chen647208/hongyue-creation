@@ -33,13 +33,18 @@ export {
   type CatalogInstallContext,
   type CatalogInstallDecision,
   type CatalogParseResult,
+  type CatalogSignatureVerifier,
   compareSemver,
   decideCatalogInstall,
+  isIndexSignatureAlgorithm,
   isSafeCatalogPath,
+  type LoadCatalogOptions,
+  loadPluginCatalog,
   parsePluginCatalog,
   parseSemverParts,
   type PluginCatalog,
   type PluginCatalogEntry,
+  verifyCatalogIndexSignature,
 } from './catalog.js';
 export {
   createPluginContext,

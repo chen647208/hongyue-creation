@@ -63,7 +63,7 @@ const ViewCards: React.FC<ViewCardsProps> = ({ rows, kindLabel, emptyText, onSel
                       <span className="truncate text-sm font-medium">{row.title}</span>
                     </div>
                     {row.cells.summary && <p className="truncate text-xs text-muted-foreground">{row.cells.summary}</p>}
-                    {row.cells.detail && <p className="line-clamp-2 text-xs text-muted-foreground/80">{row.cells.detail}</p>}
+                    {row.cells.detail && <p className="line-clamp-2 text-xs text-foreground/80">{row.cells.detail}</p>}
                   </CardContent>
                 </Card>
               ))}

@@ -11,8 +11,8 @@ import type { FormulaExpr } from '@shared/formulaScript';
 
 export type { FormulaExpr, FormulaFunction } from '@shared/formulaScript';
 
-/** 视图引擎的类型：同一份行数据可由表格/卡片/图/大纲/读者五种视图呈现。 */
-export type ViewKind = 'table' | 'card' | 'graph' | 'list' | 'reader';
+/** 视图引擎的类型：同一份行数据可由表格/卡片/图/大纲/读者/图表六种视图呈现。 */
+export type ViewKind = 'table' | 'card' | 'graph' | 'list' | 'reader' | 'chart';
 
 /** 一列：key 决定取 row.cells[key]，label 为 i18n 键或计算列的用户标签。 */
 export interface ViewColumn {
@@ -117,6 +117,34 @@ export interface ViewLink {
   label?: string;
 }
 
+/** 图表图形类型。 */
+export type ChartMark = 'point' | 'bar' | 'line' | 'area';
+
+/** 图形的视觉通道。 */
+export type ChartChannel = 'x' | 'y' | 'size' | 'color' | 'shape';
+
+/** 通道取值的数据类型；缺省按行值推断（全数值即 quantitative）。 */
+export type ChartValueType = 'nominal' | 'ordinal' | 'quantitative' | 'temporal';
+
+/** 量化通道的聚合方式。 */
+export type ChartAggregate = 'count' | 'sum' | 'avg' | 'min' | 'max';
+
+/** 一条「字段 → 通道」声明。 */
+export interface ChartFieldBinding {
+  /** 行字段 key（可指向计算列写入的 cells key）。 */
+  field: string;
+  channel: ChartChannel;
+  type?: ChartValueType;
+  /** 量化通道聚合：y 通道按 x 分组时使用。 */
+  aggregate?: ChartAggregate;
+}
+
+/** 图表声明：图形类型 + 字段到通道的映射；轴与图例由声明派生。 */
+export interface ChartSpec {
+  mark: ChartMark;
+  bindings: ChartFieldBinding[];
+}
+
 /** 待展示的数据集：列、行与关系边。 */
 export interface EntityViewData {
   columns: ViewColumn[];
@@ -146,4 +174,6 @@ export interface ViewLayout {
   aggregations?: ViewAggregation[];
   /** 字段别名：目标字段为空时用来源字段补值，映射方向为 来源 → 目标。 */
   fieldAliases?: Record<string, string>;
+  /** 图表声明：字段→通道映射与图形类型（kind=chart 时使用）。 */
+  chart?: ChartSpec;
 }

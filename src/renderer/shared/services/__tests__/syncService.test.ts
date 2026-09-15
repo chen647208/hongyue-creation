@@ -100,8 +100,8 @@ function stubApi(options: { rows?: Record<string, unknown[]>; fileContent?: { va
   });
   const sync = {
     testTransport: vi.fn(async () => ({ ok: true, message: 'ok' })),
-    put: vi.fn(async (_config: unknown, _key: string, _data: string) => ({ ok: true })),
-    get: vi.fn(async (_config: unknown, _key: string): Promise<string | null> => fileContent.value),
+    putChunked: vi.fn(async (_config: unknown, _key: string, _data: string) => ({ ok: true, total: 1, digest: 'digest' })),
+    getChunked: vi.fn(async (_config: unknown, _key: string): Promise<string | null> => fileContent.value),
     list: vi.fn(async () => []),
     remove: vi.fn(async (_config: unknown, _key: string) => ({ ok: true })),
   };
@@ -325,7 +325,7 @@ describe('prepareBundlePlan（重解已登记冲突）', () => {
 
     expect(plan.conflicts).toHaveLength(1);
     expect(writes).toHaveLength(0);
-    expect(sync.get).not.toHaveBeenCalled();
+    expect(sync.getChunked).not.toHaveBeenCalled();
   });
 });
 
@@ -372,7 +372,7 @@ describe('uploadSyncBundle', () => {
     expect(result).toEqual({ key: 'hongyue-sync/b1.json', changeCount: 3 });
     expect(syncObjectKey('b1')).toBe('hongyue-sync/b1.json');
     expect(writeFile).not.toHaveBeenCalled();
-    const [config, key, data] = sync.put.mock.calls[0]!;
+    const [config, key, data] = sync.putChunked.mock.calls[0]!;
     expect(config).toEqual({ kind: 'local', directory: '/x' });
     expect(key).toBe('hongyue-sync/b1.json');
     expect((JSON.parse(data) as { bookId: string }).bookId).toBe('b1');
@@ -401,12 +401,12 @@ describe('prepareDownloadBundle', () => {
 
     expect(report.applied).toBe(1);
     expect(writes.map((w) => w.id)).toEqual(['nodes.upsert']);
-    expect(sync.get).toHaveBeenCalledWith({ kind: 'local', directory: '/x' }, 'hongyue-sync/b1.json');
+    expect(sync.getChunked).toHaveBeenCalledWith({ kind: 'local', directory: '/x' }, 'hongyue-sync/b1.json');
   });
 
   it('远端对象缺失时抛可读错误', async () => {
     const { sync } = stubApi();
-    sync.get.mockResolvedValueOnce(null);
+    sync.getChunked.mockResolvedValueOnce(null);
 
     await expect(
       prepareDownloadBundle({ kind: 'local', directory: '/x' }, 'missing.json', { maxAttempts: 1 }),
@@ -421,11 +421,11 @@ describe('prepareDownloadBundle', () => {
     const { sync } = stubApi({
       rows: { 'nodes.selectByBook': [nodeRow], 'attrs.selectByBook': [], 'edges.selectByBook': [] },
     });
-    sync.get.mockRejectedValueOnce(new Error('网络抖动')).mockResolvedValueOnce(JSON.stringify(bundle));
+    sync.getChunked.mockRejectedValueOnce(new Error('网络抖动')).mockResolvedValueOnce(JSON.stringify(bundle));
 
     const plan = await prepareDownloadBundle({ kind: 'local', directory: '/x' }, 'k.json', { maxAttempts: 2, delayMs: 0 });
 
-    expect(sync.get).toHaveBeenCalledTimes(2);
+    expect(sync.getChunked).toHaveBeenCalledTimes(2);
     expect(plan.applied).toBe(3);
   });
 });

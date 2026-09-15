@@ -13,6 +13,12 @@ import { validateFormulaExpr } from '@shared/formulaScript';
 import { ENTITY_VIEW_COLUMNS } from './buildEntityView';
 import type {
   AggregationKind,
+  ChartAggregate,
+  ChartChannel,
+  ChartFieldBinding,
+  ChartMark,
+  ChartSpec,
+  ChartValueType,
   ComputedColumn,
   ConditionOperator,
   FormulaOperator,
@@ -24,7 +30,12 @@ import type {
   ViewLayout,
 } from './types';
 
-const KINDS: readonly ViewKind[] = ['table', 'card', 'graph', 'list', 'reader'];
+const KINDS: readonly ViewKind[] = ['table', 'card', 'graph', 'list', 'reader', 'chart'];
+
+const CHART_MARKS: readonly ChartMark[] = ['point', 'bar', 'line', 'area'];
+const CHART_CHANNELS: readonly ChartChannel[] = ['x', 'y', 'size', 'color', 'shape'];
+const CHART_VALUE_TYPES: readonly ChartValueType[] = ['nominal', 'ordinal', 'quantitative', 'temporal'];
+const CHART_AGGREGATES: readonly ChartAggregate[] = ['count', 'sum', 'avg', 'min', 'max'];
 
 const CONDITION_OPERATORS: readonly ConditionOperator[] = [
   'eq',
@@ -131,6 +142,33 @@ function parseFieldAliases(value: unknown): Record<string, string> | undefined {
   return Object.keys(aliases).length > 0 ? aliases : undefined;
 }
 
+function parseChartBinding(value: unknown): ChartFieldBinding | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const record = value as Record<string, unknown>;
+  if (typeof record.field !== 'string' || record.field === '') return undefined;
+  if (typeof record.channel !== 'string' || !(CHART_CHANNELS as readonly string[]).includes(record.channel)) return undefined;
+  const binding: ChartFieldBinding = { field: record.field, channel: record.channel as ChartChannel };
+  if (typeof record.type === 'string' && (CHART_VALUE_TYPES as readonly string[]).includes(record.type)) binding.type = record.type as ChartValueType;
+  if (typeof record.aggregate === 'string' && (CHART_AGGREGATES as readonly string[]).includes(record.aggregate)) binding.aggregate = record.aggregate as ChartAggregate;
+  return binding;
+}
+
+function parseChartSpec(value: unknown): ChartSpec | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const mark = typeof record.mark === 'string' && (CHART_MARKS as readonly string[]).includes(record.mark) ? (record.mark as ChartMark) : 'bar';
+  const bindings: ChartFieldBinding[] = [];
+  const seen = new Set<ChartChannel>();
+  for (const item of Array.isArray(record.bindings) ? record.bindings : []) {
+    const binding = parseChartBinding(item);
+    // 同一通道只保留首条声明，避免投影出现歧义。
+    if (!binding || seen.has(binding.channel)) continue;
+    seen.add(binding.channel);
+    bindings.push(binding);
+  }
+  return bindings.length > 0 ? { mark, bindings } : undefined;
+}
+
 function parseAggregations(value: unknown): ViewAggregation[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const aggregations: ViewAggregation[] = [];
@@ -177,6 +215,7 @@ export function parseViewLayout(config: Record<string, unknown> | undefined): Vi
     computed: parseComputedColumns(config.computed),
     aggregations: parseAggregations(config.aggregations),
     fieldAliases: parseFieldAliases(config.fieldAliases),
+    chart: parseChartSpec(config.chart),
   };
 }
 
@@ -195,5 +234,6 @@ export function serializeViewLayout(layout: ViewLayout): Record<string, unknown>
     computed: layout.computed,
     aggregations: layout.aggregations,
     fieldAliases: layout.fieldAliases,
+    chart: layout.chart,
   };
 }

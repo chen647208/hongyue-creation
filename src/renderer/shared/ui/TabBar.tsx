@@ -39,7 +39,7 @@ export function TabBar<T extends string>({ value, onChange, items, className, va
             aria-selected={value === id}
             onClick={() => onChange(id)}
             className={cn(
-              'flex min-w-[60px] flex-1 flex-col items-center gap-1 border-b-2 py-3 text-2xs transition-colors',
+              'touch-target flex min-w-[60px] flex-1 flex-col items-center gap-1 border-b-2 py-3 text-2xs transition-colors',
               value === id
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -63,7 +63,7 @@ export function TabBar<T extends string>({ value, onChange, items, className, va
           aria-selected={value === id}
           onClick={() => onChange(id)}
           className={cn(
-            '-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+            'touch-target -mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
             value === id
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',

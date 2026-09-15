@@ -13,7 +13,7 @@
  * 关键字高亮 + @tag 引用波浪线校验。正文创作仍走 TipTap 画布。
  */
 import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
-import { EditorView } from '@codemirror/view';
+import { EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view';
 import CodeMirror from '@uiw/react-codemirror';
 import { useMemo, useRef } from 'react';
 
@@ -26,6 +26,8 @@ export interface DslEditorProps {
   /** 合法标签集（主名 + 别名），驱动波浪线校验与 [[链接]] 补全。 */
   validTags?: Iterable<string>;
   placeholder?: string;
+  /** 编辑区可访问名（读屏用）；缺省回落到 placeholder。 */
+  ariaLabel?: string;
   /** 是否启用 @tag 校验波浪线（默认 true）。 */
   validate?: boolean;
   /** 是否启用 [[链接]] / @ 自动补全（默认 true）。 */
@@ -37,6 +39,27 @@ export interface DslEditorProps {
   height?: string;
   className?: string;
   autoFocus?: boolean;
+}
+
+/** 给可聚焦编辑区补可访问名，并让滚动容器进入 Tab 序（axe aria-input-field-name / scrollable-region-focusable）。 */
+function accessibleEditor(label: string) {
+  return [
+    EditorView.contentAttributes.of({ 'aria-label': label }),
+    ViewPlugin.fromClass(
+      class {
+        constructor(view: EditorView) {
+          this.apply(view);
+        }
+        update(update: ViewUpdate): void {
+          if (update.docChanged || update.viewportChanged) this.apply(update.view);
+        }
+        private apply(view: EditorView): void {
+          view.scrollDOM.tabIndex = 0;
+          view.scrollDOM.setAttribute('aria-label', label);
+        }
+      },
+    ),
+  ];
 }
 
 /** 补全触发：`[[` 后或 `@` 后，用标签集补全。 */
@@ -64,6 +87,7 @@ export function DslEditor({
   onChange,
   validTags,
   placeholder,
+  ariaLabel,
   validate = true,
   complete = true,
   dark = false,
@@ -76,8 +100,10 @@ export function DslEditor({
   const tagsRef = useRef<string[]>([]);
   tagsRef.current = validTags ? Array.from(validTags) : [];
 
+  const editableLabel = ariaLabel ?? placeholder ?? '编辑器';
+
   const extensions = useMemo(() => {
-    const ext = [...novelDslExtensions(), EditorView.lineWrapping];
+    const ext = [...novelDslExtensions(), EditorView.lineWrapping, ...accessibleEditor(editableLabel)];
     if (validate) ext.push(tagValidation(() => new Set(tagsRef.current)));
     if (complete) {
       ext.push(
@@ -88,7 +114,7 @@ export function DslEditor({
       );
     }
     return ext;
-  }, [validate, complete]);
+  }, [validate, complete, editableLabel]);
 
   return (
     <CodeMirror

@@ -12,8 +12,10 @@ import { describe, expect, it } from 'vitest';
 import {
   compareSemver,
   decideCatalogInstall,
+  loadPluginCatalog,
   parsePluginCatalog,
   type PluginCatalogEntry,
+  verifyCatalogIndexSignature,
 } from '../catalog.js';
 
 const baseEntry: PluginCatalogEntry = {
@@ -74,5 +76,61 @@ describe('catalog（目录索引解析与安装决策）', () => {
     expect(compareSemver('1.2.0-beta.1', '1.2.0')).toBe(0);
     expect(compareSemver('1.3.0', '1.2.9')).toBeGreaterThan(0);
     expect(compareSemver('1.2.0', '2.0.0')).toBeLessThan(0);
+  });
+});
+
+describe('catalog（整个索引 payload 的 detached 签名校验）', () => {
+  const raw = { schema: 1, entries: [baseEntry] };
+  const payloadText = JSON.stringify(raw);
+  const ed25519 = { algorithm: 'ed25519' as const, signature: 'sig', publicKey: 'pem' };
+  const verifier = (result: boolean) => ({ verifyPayload: async (): Promise<boolean> => result });
+
+  it('签名有效：返回目录', async () => {
+    const result = await loadPluginCatalog(raw, { payloadText, signature: ed25519, verifier: verifier(true) });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.catalog.entries).toHaveLength(1);
+  });
+
+  it('签名校验失败：拒绝使用该索引', async () => {
+    const result = await loadPluginCatalog(raw, { payloadText, signature: ed25519, verifier: verifier(false) });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues[0]?.path).toBe('signature');
+      expect(result.issues[0]?.message).toContain('拒绝使用');
+    }
+  });
+
+  it('索引未签名：fail-closed 拒绝', async () => {
+    const result = await loadPluginCatalog(raw, { payloadText, verifier: verifier(true) });
+    expect(result.ok).toBe(false);
+  });
+
+  it('显式 requireSignature=false：允许未签名索引', async () => {
+    const result = await loadPluginCatalog(raw, { payloadText, requireSignature: false });
+    expect(result.ok).toBe(true);
+  });
+
+  it('sha256 信封仅完整性，不足以认证索引来源：拒绝', async () => {
+    const reason = await verifyCatalogIndexSignature(
+      payloadText,
+      { algorithm: 'sha256', digest: 'abc' },
+      verifier(true),
+    );
+    expect(reason).toContain('不能认证来源');
+  });
+
+  it('缺少验签端口：拒绝', async () => {
+    const reason = await verifyCatalogIndexSignature(payloadText, ed25519, undefined);
+    expect(reason).toContain('验签端口');
+  });
+
+  it('结构非法：不进入验签，直接报结构问题', async () => {
+    const result = await loadPluginCatalog({ schema: 1, entries: [{ id: 'bad' }] }, {
+      payloadText,
+      signature: ed25519,
+      verifier: verifier(true),
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.issues.some((i) => i.path === 'entries[0].name')).toBe(true);
   });
 });

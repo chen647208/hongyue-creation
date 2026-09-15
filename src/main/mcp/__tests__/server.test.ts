@@ -14,7 +14,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { afterEach,beforeEach, describe, expect, it } from 'vitest';
 
-import { chapterText,dispatch,entitiesText,querySearchNodes,statsText,tocText } from '../server.js';
+import { chapterText,closeDb,dispatch,entitiesText,querySearchNodes,statsText,tocText } from '../server.js';
 
 let dir = '';
 let prevEnv: string | undefined;
@@ -91,6 +91,44 @@ describe('mcp dispatch', () => {
 
   it('未知方法抛错', () => {
     expect(() => dispatch('nope/method', {})).toThrow('未知方法');
+  });
+
+  it('资源读取工具以只读形态宣告（read_toc/read_entities/read_stats/read_chapter）', () => {
+    const out = dispatch('tools/list', {}) as { tools: Array<{ name: string; annotations?: { readOnlyHint?: boolean } }> };
+    for (const name of ['read_toc', 'read_entities', 'read_stats', 'read_chapter']) {
+      expect(out.tools.find((t) => t.name === name)?.annotations?.readOnlyHint).toBe(true);
+    }
+  });
+
+  it('资源读取工具经 dispatch 复用资源实现（与外部客户端同源）', () => {
+    const dbFile = path.join(dir, 'hongyue.db');
+    const db = new Database(dbFile);
+    db.exec(`CREATE TABLE nodes (
+      id TEXT PRIMARY KEY, book_id TEXT, type TEXT, title TEXT, body TEXT, updated_at INTEGER, erased INTEGER NOT NULL DEFAULT 0
+    )`);
+    db.exec(`CREATE TABLE attrs (
+      node_id TEXT, name TEXT, value TEXT, position INTEGER, erased INTEGER NOT NULL DEFAULT 0
+    )`);
+    const ins = db.prepare('INSERT INTO nodes(id, book_id, type, title, body, updated_at, erased) VALUES(?,?,?,?,?,?,0)');
+    ins.run('ch1', 'book1', 'novel.chapter', '第一章', '正文一', 1);
+    ins.run('card1', 'book1', 'world.character', '林渊', '', 1);
+    db.prepare('INSERT INTO attrs(node_id, name, value, position, erased) VALUES(?,?,?,?,0)').run('ch1', 'pov', '第一人称', 0);
+    db.close();
+
+    try {
+      const text = (name: string, args: Record<string, unknown>): string => {
+        const out = dispatch('tools/call', { name, arguments: args }) as { content: Array<{ text: string }> };
+        return out.content[0]!.text;
+      };
+      expect(text('read_toc', { bookId: 'book1' })).toContain('[novel.chapter] 第一章 (ch1)');
+      expect(text('read_entities', { bookId: 'book1' })).toContain('林渊');
+      expect(text('read_stats', { bookId: 'book1' })).toContain('节点总数：2');
+      expect(text('read_chapter', { bookId: 'book1', chapterId: 'ch1' })).toContain('正文一');
+      expect(text('read_chapter', { bookId: 'book1', chapterId: 'missing' })).toContain('章节不存在');
+    } finally {
+      // 主进程只读连接按单例缓存；测试结束显式关闭，Windows 上才能删除临时目录
+      closeDb();
+    }
   });
 });
 

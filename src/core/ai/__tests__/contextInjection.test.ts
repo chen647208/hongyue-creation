@@ -207,3 +207,54 @@ describe('renderContextInjection', () => {
     expect(renderContextInjection({ ...result, entries: [], dropped: [] })).toBeUndefined();
   });
 });
+
+describe('按视图范围的上下文注入', () => {
+  it('注入视图说明与可见实体，并标注视图名', () => {
+    const result = assembleContextInjection({
+      project: stubProject(''),
+      view: {
+        id: 'v1',
+        name: '角色卡',
+        entityIds: ['char1', 'loc1', 'fac1', 'k1', 'ev1'],
+        kindFilter: 'character',
+        columns: ['title', 'summary'],
+        conditionSummary: 'kind = character',
+      },
+    });
+    const ids = result.entries.map((entry) => entry.id);
+    expect(ids).toContain('view:v1');
+    expect(ids).toContain('character:char1');
+    expect(ids).toContain('location:loc1');
+    expect(ids).toContain('faction:fac1');
+    expect(ids).toContain('knowledge:k1');
+    expect(ids).toContain('timeline:ev1');
+    expect(result.viewName).toBe('角色卡');
+    const scope = result.entries.find((entry) => entry.id === 'view:v1');
+    expect(scope?.text).toContain('kind = character');
+    expect(scope?.text).toContain('title、summary');
+  });
+
+  it('已在场的选中实体不重复注入', () => {
+    const result = assembleContextInjection({
+      project: stubProject(''),
+      target: { entityId: 'char1', entityKind: 'character' },
+      view: { id: 'v1', name: '角色卡', entityIds: ['char1'] },
+    });
+    expect(result.entries.filter((entry) => entry.id === 'character:char1')).toHaveLength(1);
+  });
+
+  it('视图可见实体超过上限时截断', () => {
+    const project = stubProject('');
+    project.characters = Array.from({ length: 30 }, (_, index) => ({
+      ...(project.characters?.[0] ?? {}),
+      id: `bulk${index}`,
+      name: `角色${index}`,
+    })) as typeof project.characters;
+    const result = assembleContextInjection({
+      project,
+      view: { id: 'v1', name: '角色卡', entityIds: (project.characters ?? []).map((item) => item.id) },
+    });
+    const injected = result.entries.filter((entry) => entry.source.kind === 'character');
+    expect(injected).toHaveLength(12);
+  });
+});

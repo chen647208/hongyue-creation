@@ -11,7 +11,9 @@ export default defineConfig({
   base: './',
   publicDir: path.resolve(__dirname, 'src/assets'),
   server: {
-    port: 5199,
+    // 默认 5310：避开 Windows 动态保留端口区间（常见 5141–5240 会拦截 5199/5200）；
+    // 需要改端口用 HONGYUE_DEV_SERVER_PORT，主进程候选端口同名单源。
+    port: Number(process.env.HONGYUE_DEV_SERVER_PORT) || 5310,
     host: '127.0.0.1',
   },
   plugins: [react(), tailwindcss()],

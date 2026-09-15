@@ -64,7 +64,7 @@ const ed = (): PluginPackage['signature'] => ({ algorithm: 'ed25519', signature:
 describe('installer（安装/更新/卸载与签名拒绝）', () => {
   it('签名有效：安装成功并落盘', async () => {
     const port = new FakePort(makePackage({}, ed()));
-    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, requireSignature: true });
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, requireSignature: true, allowAnySource: true });
     expect(result).toMatchObject({ ok: true, action: 'install', pluginId: 'com.example.p', version: '1.0.0' });
     expect(port.committed).toHaveLength(1);
   });
@@ -72,7 +72,7 @@ describe('installer（安装/更新/卸载与签名拒绝）', () => {
   it('签名校验失败（篡改）：拒装且不落盘', async () => {
     const port = new FakePort(makePackage({}, ed()));
     port.verifyResult = false;
-    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, requireSignature: true });
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, requireSignature: true, allowAnySource: true });
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('签名');
     expect(port.committed).toHaveLength(0);
@@ -81,7 +81,7 @@ describe('installer（安装/更新/卸载与签名拒绝）', () => {
   it('摘要不匹配（篡改）：拒装', async () => {
     const port = new FakePort(makePackage({}, ed()));
     port.digestResult = false;
-    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, expectedDigest: 'deadbeef' });
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, expectedDigest: 'deadbeef', allowAnySource: true });
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('摘要');
     expect(port.committed).toHaveLength(0);
@@ -89,14 +89,14 @@ describe('installer（安装/更新/卸载与签名拒绝）', () => {
 
   it('可执行贡献未签名：fail-closed', async () => {
     const port = new FakePort(makePackage({ contributes: { logic: ['./logic/'] } }));
-    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST });
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('签名');
   });
 
   it('资源型未签名：允许安装', async () => {
     const port = new FakePort(makePackage());
-    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST });
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });
     expect(result.ok).toBe(true);
   });
 
@@ -110,23 +110,37 @@ describe('installer（安装/更新/卸载与签名拒绝）', () => {
     expect(result.reason).toContain('来源');
   });
 
+  it('空白名单未显式放行：fail-closed 拒绝且不落盘', async () => {
+    const port = new FakePort(makePackage());
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('来源白名单');
+    expect(port.committed).toHaveLength(0);
+  });
+
+  it('显式 allowAnySource：空白名单也放行', async () => {
+    const port = new FakePort(makePackage());
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });
+    expect(result.ok).toBe(true);
+  });
+
   it('宿主版本不满足：拒绝', async () => {
     const port = new FakePort(makePackage());
-    const result = await installPackage(port, '/src/com.example.p', { hostVersion: '1.0.0' });
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: '1.0.0', allowAnySource: true });
     expect(result.ok).toBe(false);
   });
 
   it('更新：更高版本走 update', async () => {
     const port = new FakePort(makePackage({ version: '1.1.0' }));
     port.installed.set('com.example.p', '1.0.0');
-    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST });
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });
     expect(result).toMatchObject({ ok: true, action: 'update' });
   });
 
   it('同版本：up-to-date 且不重复落盘', async () => {
     const port = new FakePort(makePackage({ version: '1.0.0' }));
     port.installed.set('com.example.p', '1.0.0');
-    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST });
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });
     expect(result).toMatchObject({ ok: true, action: 'up-to-date' });
     expect(port.committed).toHaveLength(0);
   });
@@ -134,7 +148,7 @@ describe('installer（安装/更新/卸载与签名拒绝）', () => {
   it('降级：拒绝', async () => {
     const port = new FakePort(makePackage({ version: '0.9.0' }));
     port.installed.set('com.example.p', '1.0.0');
-    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST });
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('降级');
   });
@@ -142,7 +156,7 @@ describe('installer（安装/更新/卸载与签名拒绝）', () => {
   it('落盘失败：上报已回滚', async () => {
     const port = new FakePort(makePackage());
     port.commitError = new Error('disk full');
-    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST });
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('回滚');
   });

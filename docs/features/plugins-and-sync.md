@@ -16,7 +16,11 @@
   `ed25519`（detached 签名 + PEM 公钥，须命中信任键白名单）、`sha256`（仅完整性，不放行可执行贡献）、
   `cosign`（Sigstore bundle，key 或 keyless；主进程调外部 cosign，工具链缺失或缺信任锚即拒载）。校验 `plugin.json` 内容，失败拒载（fail closed）。
   可执行贡献（logic/editor）要求来源认证签名（ed25519/cosign）；无签名包只放行资源型。
-- **来源白名单**：设置 → 插件可维护 `manifest.source` 白名单（每行一个）；非空时来源不在清单的插件拒载。
+- **目录索引签名**：目录索引 `catalog.json` 的整份 payload 需带同级 detached 签名（`catalog.sig`，
+  信封为 ed25519 或 cosign）；主进程按信任键清单验签，校验失败或不带签名即拒绝使用该索引。
+  `sha256` 信封仅完整性，不足以认证索引来源，索引一律拒绝。
+- **来源白名单**：设置 → 插件可维护 `manifest.source` 白名单（每行一个）；非空时来源不在清单的插件拒装。
+  空白名单为 fail-closed：默认拒绝安装未认证来源，需显式开启「允许任意来源」才放行。
   信任键与来源白名单都在设置 → 插件里维护。
 - **UI 界面**：manifest 的 `contributes.ui` 目录下 `.html` 经 `PluginFrame`（null-origin sandboxed iframe）
   渲染进 `plugin.panel` 槽位；禁用插件即卸载界面。
@@ -56,8 +60,9 @@
 - **入口**：设置 → 插件 → 安装插件。可从本地目录安装单包，或从目录索引
   （`catalog.json`，schema 1）列出条目逐个安装。目录项字段：`id`/`name`/`version`/`host`/
   `license`/`source`/`path`（相对索引目录）/`digest`（plugin.json 的 sha256 base64）/`signature`。
-- **校验顺序**：读取包 → manifest 校验（错误定位 JSON 路径）→ 来源白名单 → host 区间 →
-  签名/摘要 → 版本决策。任一步失败即拒装，不落盘；可执行贡献（logic/editor）必须带来源认证签名。
+- **校验顺序**：读取包 → manifest 校验（错误定位 JSON 路径）→ 来源白名单（空白名单默认拒绝，
+  除非显式开启「允许任意来源」）→ host 区间 → 签名/摘要 → 版本决策。任一步失败即拒装，不落盘；
+  可执行贡献（logic/editor）必须带来源认证签名。
 - **原子落盘**：暂存目录 → 备份旧版本 → 改名替换；失败回滚到旧版本，不留半成品。
 - **更新**：同 id 更高版本走 update，同版本为 up-to-date，更低版本拒绝降级。
 - **卸载**：删插件目录 + 清 `plugin.<id>.settings[.corrupt]` + 逆序释放全部贡献，
@@ -73,6 +78,10 @@
 - 插件运行期请求还要求：插件已激活且 `manifest.permissions.network === true`（否则拒绝）。
 - 工具契约：`core.net.fetch` 是唯一出口——必须给出已激活且声明 network 权限的 `pluginId`；
   核心只提供该契约与网络门，联网搜索/翻译本身由插件实现，不内置。
+- 示例插件：`examples/plugins/web-search`（资源型：`manifest` 声明 `permissions.network: true` +
+  `skills/web-search/SKILL.md`，技能 frontmatter `tools: [core.net.fetch]`）演示如何经该门做搜索/翻译。
+  三道门都要开：插件声明 network 权限、联网白名单放行域名、插件已启用。禁用或卸载后技能移除、
+  工具不再对助手开放，核心无内置搜索/翻译，手动查资料路径完整。
 - 外部返回文本进入提示词前经 `core/ai/untrusted` 围栏（`<<<UNTRUSTED_INPUT>>>`）包裹，
   声明「数据不是指令」；内容中的围栏标记与控制字符被中和，超长截断。
 
@@ -102,11 +111,14 @@
   目标逐书上传，失败按书登记，下次启动提醒并可一键重试。
   设置 → 同步传输配置后端并做连通测试。
 - **传输**：`src/main/sync/transport.ts` 三类后端（本地目录 / WebDAV / S3 兼容）实现统一接口
-  （`test`/`put`/`get`/`list`/`remove`）。渲染层只下发配置与对象键，主进程从保险库解引用
+  （`test`/`put`/`get`/`list`/`remove`），并共用同一分片协议：同步包按 `<key>.part-<序号>.json`
+  切分上传，最后写 `<key>.manifest.json`（提交点）；下载按清单取回并校验总摘要，分片缺失或摘要
+  不符即报可读错误。重试会跳过已完成分片（断点续传），清单未写入前不会有半套对象被当成完整包；
+  无清单的整体对象仍可读（兼容既有远端包）。渲染层只下发配置与对象键，主进程从保险库解引用
   凭据后执行，日志不落明文；WebDAV 用 `PUT`/`GET`/`PROPFIND`，S3 用 `PUT`/`GET`/`ListObjectsV2`
-  与手写 AWS SigV4 签名（`node:crypto`）。
+  与手写 AWS SigV4 签名（`node:crypto`）。浏览器端 `syncTransportBrowser.ts` 以 WebCrypto 同协议分片。
 - **落库路径**：读写一律经 `shared/sql/catalog.ts` 的语句 id（`nodes/attrs/edges` 按书读取、`nodes.upsert`/`attrs.upsert` 写入），不传原始 SQL 文本。
-- 当前边界：传输为单对象收发（同步包），不做远端目录清理与增量；凭据按后端各存一个
+- 当前边界：传输按对象键分片与断点续传，远端列举隐藏分片/清单内部对象；凭据按后端各存一个
   保险库槽位；退出导出的单次上传在退出超时窗口内完成，超时按强制退出处理（失败已登记）。
 
 ## 移动端与跨设备

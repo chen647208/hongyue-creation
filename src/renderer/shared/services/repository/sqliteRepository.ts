@@ -356,6 +356,40 @@ export class SqliteRepository implements StorageRepository {
     return rows.map((row) => ({ nodeId: row.node_id, createdAt: Number(row.created_at), length: Number(row.len) }));
   }
 
+  // ========== 同步合并（design/36）==========
+
+  /** 读取某本书用于同步合并的实体快照。 */
+  async readSyncEntities(bookId: string): Promise<{ nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] }> {
+    await this.ready;
+    const nodeRows = await this.driver.all<NodeRow>('nodes.selectByBook', [bookId]);
+    const attrRows = await this.driver.all<AttrRow>('attrs.selectByBook', [bookId]);
+    const edgeRows = await this.driver.all<EdgeRow>('edges.selectByBook', [bookId]);
+    return {
+      nodes: nodeRows.map(rowToNode),
+      attrs: attrRows.map(rowToAttr),
+      edges: edgeRows.map(rowToEdge),
+    };
+  }
+
+  /** 按 id upsert 同步合并结果（单事务；不写修订与变更日志，与手动导入语义一致）。 */
+  async applySyncEntities(input: { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] }): Promise<void> {
+    await this.ready;
+    await this.driver.transaction(async (tx) => {
+      for (const node of input.nodes) {
+        const hash = await hashEntity('nodes', node);
+        await tx.run('nodes.upsert', [node.id, node.bookId, node.type, node.title, node.body, node.path ?? null, node.createdAt, node.updatedAt, node.erased ? 1 : 0, hash]);
+      }
+      for (const attr of input.attrs) {
+        const hash = await hashEntity('attrs', attr);
+        await tx.run('attrs.upsert', [attr.id, attr.nodeId, attr.type, attr.name, attr.value, attr.inheritable ? 1 : 0, attr.position, attr.erased ? 1 : 0, hash]);
+      }
+      for (const edge of input.edges) {
+        const hash = await hashEntity('edges', edge);
+        await tx.run('edges.upsert', [edge.id, edge.fromId, edge.toId, edge.kind, edge.role ?? null, edge.position, edge.bookId, edge.erased ? 1 : 0, hash]);
+      }
+    });
+  }
+
   // ========== 文档附件（attachments + blobs）==========
   async listAttachments(nodeId: string): Promise<AttachmentMeta[]> {
     await this.ready;

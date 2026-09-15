@@ -60,6 +60,7 @@ AI 调用采用「主进程网关 + 渲染端客户端 + 工具/审批/会话」
 - 可信检索 `grounding.ts`：检索命中规范化为带出处的引用（锚点 `chapter:<id>` / `knowledge:<id>`）；空结果返回明确「未找到」措辞，禁止编造。工具 `core.text.search` / `core.text.semanticSearch` 返回 `found` / `citations` / `text`。
 - 界面：助手答复的引用与正文分栏呈现，出处可点跳回来源；自动注入面板列出条目、来源与预算占用，可整体关闭或逐条取消。
 - 事件：`context.injection` 记录本次注入条数、预算占用与被裁条数。
-- 当前章节目标由会话入参 `contextTarget` 传入；助手按任务文本推断（`inferContextTarget`）。编辑器未向助手暴露活动章节，跨面板选择待接。
+- 当前章节目标由会话入参 `contextTarget` 传入；助手按任务文本推断（`inferContextTarget`），编辑器活动章节与选中文本经 `composeContextTarget` 优先覆盖文本推断。
+- 按视图范围注入：注入时由 app 层按 bookId 查询视图定义（`app/viewContext.ts`），用与视图面板同源的纯函数投影出可见实体、类型筛选、条件摘要与列，写入 `ContextInjectionInput.view`；核心只消费结果，不依赖渲染层类型与存储。
 
 详细交互规范见 `design/05-ai-layer.md` 与 `design/04 §3.1`。
