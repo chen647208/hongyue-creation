@@ -40,6 +40,10 @@
   能力按当前 manifest 权限回查 → 入口存在 → 输入 schema」放行，任一不过即拒绝；入口文件经既有插件沙箱
   （主进程 QuickJS + utilityProcess 隔离）执行，输出按描述符 `output` 顶层 `type` 校验。超时、内存、输出上限
   单源在 `shared/constants/pluginExecution.ts`；未配置执行端口即拒绝执行。
+- **脚本事件触发（`PluginHost.emit`）**：宿主声明的事件挂点单源在 `HOST_SCRIPT_EVENTS`
+  （`project.open` / `chapter.open` / `chapter.save`）。事件触发时遍历已注册且已激活、`on` 对齐的脚本逐一执行；
+  未知事件直接返回，单脚本失败只记日志、不阻断其余脚本与主流程。应用触发点为打开项目、切换章节、
+  章节落盘成功；触发异步非阻塞，无脚本订阅时零开销。
 - **能力通道与工具提议**：宿主只把描述符声明且过权限回查的能力名交执行端口，未声明能力不可见；
   脚本返回的工具调用按能力白名单裁决，经 `tool:propose` 提议后交注入的 `ToolProposalPort`
   进提案/审批管线，脚本无直接写路径。端口缺省即拒绝（fail-closed）。

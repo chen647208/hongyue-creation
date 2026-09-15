@@ -39,8 +39,10 @@ import { PluginEditorFrame } from '@/shared/ui/PluginEditorFrame';
 import { PluginFrame } from '@/shared/ui/PluginFrame';
 
 import { logger } from '../utils/logger';
+import { setBuildRendererHost } from './buildRendererPort';
 import { localStore } from './localStore';
 import { type CapabilityHostBindings, createPluginToolProposalPort } from './pluginCapabilityPort';
+import { bindPluginEventHost } from './pluginEventBus';
 import { createRendererExecutionPort } from './rendererExecutionPort';
 import { uiSlotRegistry } from './uiSlots';
 
@@ -465,10 +467,16 @@ export async function bootstrapPlugins(
       scriptExecution: scriptExecutionPort,
       rendererExecution: rendererExecutionPort,
       toolProposal: createPluginToolProposalPort(capabilityBindings),
+      onScriptEventError: (failure) => {
+        logger.warn(`插件事件 ${failure.event} 脚本 ${failure.scriptId}（${failure.pluginId}）执行失败：${failure.message}`);
+      },
     },
     createContributionInstaller(deps),
   );
   activeHost = host;
+  bindPluginEventHost(host);
+  // 构建管线消费插件渲染器：把宿主门控后的同步执行装配为 core/build 端口（缺省即无）。
+  setBuildRendererHost(host);
   try {
     const storedKeys = readTrustedPluginKeys();
     if (storedKeys) setTrustedPluginKeys(storedKeys);

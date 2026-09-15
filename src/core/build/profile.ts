@@ -120,6 +120,11 @@ export interface BuildProfile {
   description?: string;
   /** 渲染器 id（md/txt/html 内置；插件可贡献） */
   format: string;
+  /**
+   * 显式选择的插件渲染器 id（命名空间化，如 `<插件短名>.renderer.<声明 id>`）。
+   * 命中已注册插件渲染器时优先于同格式内置渲染器；端口缺省时忽略（回落内置）。
+   */
+  renderer?: string;
   selection: BuildSelection;
   transform: BuildTransform;
   render: BuildRender;
@@ -245,6 +250,9 @@ export function validateProfile(profile: BuildProfile | null | undefined): strin
   if (!profile || typeof profile !== 'object') return ['编译档案必须是对象'];
   if (typeof profile.name !== 'string' || profile.name.trim() === '') errors.push('缺少档案名称 name');
   if (typeof profile.format !== 'string' || profile.format.trim() === '') errors.push('缺少导出格式 format');
+  if (profile.renderer !== undefined && (typeof profile.renderer !== 'string' || profile.renderer.trim() === '')) {
+    errors.push('插件渲染器 renderer 必须是非空字符串');
+  }
   if (!Array.isArray(profile.selection?.includeTypes)) errors.push('selection.includeTypes 必须是数组');
 
   const policy = profile.selection?.materialPolicy;

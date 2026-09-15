@@ -110,7 +110,13 @@ export {
   type CapabilityMap,
   capabilityName,
   type CapabilityResolution,
+  type ChapterOpenPayload,
+  type ChapterSavePayload,
   checkDescriptorSchema,
+  HOST_SCRIPT_EVENTS,
+  type HostScriptEvent,
+  isHostScriptEvent,
+  type ProjectOpenPayload,
   rendererDenied,
   type RendererExecutionPort,
   type RendererRunOutcome,
@@ -118,6 +124,7 @@ export {
   type RendererRunResult,
   resolveCapabilities,
   scriptDenied,
+  type ScriptEventPayload,
   type ScriptExecutionPort,
   type ScriptRunError,
   type ScriptRunErrorKind,
@@ -198,6 +205,7 @@ export {
   type PluginHostOptions,
   type PluginState,
   type PluginStatus,
+  type ScriptEventFailure,
 } from './runtime.js';
 export { adjudicateHandlerResult } from './sandbox/capabilities.js';
 export {

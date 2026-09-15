@@ -14,8 +14,7 @@
  * 约定插件定义 `function run(input)`，其返回值即输出。
  */
 
-import { getQuickJS } from 'quickjs-emscripten';
-
+import { getQuickJS } from '../../../shared/quickjs.js';
 import {
   DEFAULT_SANDBOX_LIMITS,
   type SandboxError,

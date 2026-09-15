@@ -612,21 +612,164 @@ registerRenderer({ id: 'md', description: 'Markdown', render: (b, p) => renderMd
 registerRenderer({ id: 'html', description: 'HTML（内联样式，可直接打印）', render: (b, p) => renderHtml(b, p) });
 registerRenderer({ id: 'rtf', description: 'RTF（Word/WPS 可直接打开）', render: (b, p) => renderRtf(b, p) });
 
-/** 渲染入口：按 profile.format 找渲染器，未注册则报错。 */
-export function renderDoc(blocks: DocBlock[], profile: BuildProfile): string {
-  const renderer = renderers.get(profile.format);
-  if (!renderer) {
-    throw new Error(`未注册的渲染器: ${profile.format}（可用: ${listRenderers().map((r) => r.id).join(', ')}）`);
-  }
-  return renderer.render(blocks, profile);
+// ── 插件渲染器端口（design/49：沙箱执行·渲染器面）────────────────────
+
+/**
+ * 已注册插件渲染器的只读信息。宿主（渲染层装配处）经端口交给 `core/build`，
+ * 本层只消费 id/format/pluginId，不持有描述符、不执行代码。
+ */
+export interface PluginRendererInfo {
+  /** 命名空间化渲染器 id（如 `<插件短名>.renderer.<声明 id>`）。 */
+  id: string;
+  /** 导出格式 id（如 rtf）。 */
+  format: string;
+  /** 所属插件 id。 */
+  pluginId: string;
 }
 
-/** 完整管线一步调用；同时返回成稿文本供字数统计共用（单一口径）。 */
-export function runBuild(profile: BuildProfile, entities: { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] }): { text: string; blocks: DocBlock[]; nodes: SelectedNode[] } {
+/** 插件渲染调用请求：同步纯函数契约（design/49 §4 选型 B），入参为管线块与档案。 */
+export interface PluginRendererRequest {
+  /** 命名空间化渲染器 id。 */
+  rendererId: string;
+  pluginId: string;
+  format: string;
+  blocks: DocBlock[];
+  profile: BuildProfile;
+}
+
+/** 插件渲染错误：种类沿用沙箱（timeout/memory/runtime/...），失败必带可读原因。 */
+export interface PluginRendererError {
+  kind: string;
+  message: string;
+}
+
+export type PluginRendererResult =
+  | { ok: true; text: string }
+  | { ok: false; error: PluginRendererError };
+
+/**
+ * 插件渲染器端口（宿主注入）。
+ *
+ * `core/build` 只声明契约，实现归渲染层装配处：把宿主门控后的同步执行适配进来。
+ * 缺省 undefined 即只用内置渲染器，行为与仅内置逐字一致。
+ */
+export interface PluginRendererPort {
+  /** 只读列出已注册插件渲染器；不执行代码。 */
+  list(): PluginRendererInfo[];
+  /** 同步调用插件渲染器产出文本。 */
+  render(request: PluginRendererRequest): PluginRendererResult;
+}
+
+/** 构建注入项：端口与显式选择；缺省 undefined 即走内置渲染器。 */
+export interface BuildOptions {
+  /** 插件渲染器端口；缺省即只用内置渲染器。 */
+  rendererPort?: PluginRendererPort;
+  /** 显式选择的插件渲染器 id；命中已注册渲染器时优先于同格式内置渲染器。 */
+  rendererId?: string;
+}
+
+/** 渲染报告：标明本次实际使用的渲染器，便于导出侧展示与排查。 */
+export interface RenderReport {
+  /** 实际使用的渲染器 id：内置即注册 id，插件渲染器即命名空间化 id。 */
+  renderer: string;
+  /** 渲染器来源。 */
+  source: 'builtin' | 'plugin';
+  /** 插件渲染器所属插件 id；内置时缺席。 */
+  pluginId?: string;
+}
+
+type SelectedRenderer =
+  | { kind: 'builtin'; renderer: Renderer }
+  | { kind: 'plugin'; info: PluginRendererInfo; port: PluginRendererPort };
+
+/**
+ * 选择本次渲染所用渲染器。
+ *
+ * 规则：显式 `options.rendererId`（或 `profile.renderer`）命中已注册插件渲染器即优先；
+ * 未显式指定时，同格式有内置渲染器即保持内置；内置缺失且仅一个插件渲染器命中格式即用它；
+ * 多插件渲染器同名格式又未显式指定即报错（不静默择一）。端口缺省时整体回落内置路径，
+ * `profile.renderer` 不参与解析（缺省零回归）。
+ */
+function selectRenderer(profile: BuildProfile, options?: BuildOptions): SelectedRenderer | undefined {
+  const builtin = renderers.get(profile.format);
+  const port = options?.rendererPort;
+  if (port) {
+    const infos = port.list();
+    const explicit = options?.rendererId ?? profile.renderer;
+    if (explicit) {
+      const info = infos.find((item) => item.id === explicit);
+      if (!info) {
+        throw new Error(`未注册的插件渲染器: ${explicit}（可用: ${infos.map((i) => i.id).join(', ') || '无'}）`);
+      }
+      return { kind: 'plugin', info, port };
+    }
+    const matches = infos.filter((item) => item.format === profile.format);
+    if (!builtin) {
+      const only = matches[0];
+      if (matches.length === 1 && only) return { kind: 'plugin', info: only, port };
+      if (matches.length > 1) {
+        throw new Error(`格式 ${profile.format} 对应多个插件渲染器，须显式选择：${matches.map((i) => i.id).join(', ')}`);
+      }
+    }
+  }
+  return builtin ? { kind: 'builtin', renderer: builtin } : undefined;
+}
+
+/**
+ * 渲染并返回报告：按 `profile.format`（或显式插件渲染器）产出文本。
+ *
+ * 插件渲染器失败时抛可读错误（不静默回落成空文件）；内置缺失且无插件命中亦报错。
+ */
+export function renderDocWithReport(
+  blocks: DocBlock[],
+  profile: BuildProfile,
+  options?: BuildOptions,
+): { text: string; report: RenderReport } {
+  const selected = selectRenderer(profile, options);
+  if (!selected) {
+    const available = [
+      ...listRenderers().map((r) => r.id),
+      ...(options?.rendererPort?.list().map((i) => i.id) ?? []),
+    ];
+    throw new Error(`未注册的渲染器: ${profile.format}（可用: ${available.join(', ')}）`);
+  }
+  if (selected.kind === 'builtin') {
+    return {
+      text: selected.renderer.render(blocks, profile),
+      report: { renderer: selected.renderer.id, source: 'builtin' },
+    };
+  }
+  const result = selected.port.render({
+    rendererId: selected.info.id,
+    pluginId: selected.info.pluginId,
+    format: selected.info.format,
+    blocks,
+    profile,
+  });
+  if (!result.ok) {
+    throw new Error(`插件渲染器 ${selected.info.id} 渲染失败（${result.error.kind}）：${result.error.message}`);
+  }
+  return {
+    text: result.text,
+    report: { renderer: selected.info.id, source: 'plugin', pluginId: selected.info.pluginId },
+  };
+}
+
+/** 渲染入口：按 profile.format 找渲染器（显式插件选择优先），未注册则报错。 */
+export function renderDoc(blocks: DocBlock[], profile: BuildProfile, options?: BuildOptions): string {
+  return renderDocWithReport(blocks, profile, options).text;
+}
+
+/** 完整管线一步调用；同时返回成稿文本供字数统计共用（单一口径）与渲染报告。 */
+export function runBuild(
+  profile: BuildProfile,
+  entities: { nodes: NodeEntity[]; attrs: AttributeEntity[]; edges: EdgeEntity[] },
+  options?: BuildOptions,
+): { text: string; blocks: DocBlock[]; nodes: SelectedNode[]; report: RenderReport } {
   const nodes = select(profile, entities);
   // 来源条目从全量实体收集（不受选段影响），引文编号按正文出现顺序统一分配。
   const sources = collectReferenceSources(entities.nodes, entities.attrs);
   const blocks = transform(profile, nodes, sources);
-  const text = renderDoc(blocks, profile);
-  return { text, blocks, nodes };
+  const { text, report } = renderDocWithReport(blocks, profile, options);
+  return { text, blocks, nodes, report };
 }

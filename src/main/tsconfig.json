@@ -24,6 +24,7 @@
     "../types/**/*.d.ts",
     "../shared/types.ts",
     "../shared/sandbox.ts",
+    "../shared/quickjs.ts",
     "../shared/sql/**/*.ts",
     "../shared/constants/**/*.ts",
     "../shared/i18n/**/*.ts"

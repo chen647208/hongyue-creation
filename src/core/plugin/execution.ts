@@ -227,3 +227,43 @@ export interface ToolProposalResult {
  * 未配置端口即拒绝全部提议（fail-closed）；本层不执行任何写操作。
  */
 export type ToolProposalPort = (request: ToolProposalRequest) => Promise<ToolProposalResult>;
+
+// ── 宿主脚本事件（design/49 沙箱执行：事件触发）────────────────────────
+
+/**
+ * 宿主声明的脚本事件挂点：脚本描述符的 `on` 只允许取本集合，宿主也只按本集合分发。
+ * 事件名与宿主触发点一一对应；插件声明未导出的事件不会被触发。
+ */
+export const HOST_SCRIPT_EVENTS = ['project.open', 'chapter.open', 'chapter.save'] as const;
+export type HostScriptEvent = (typeof HOST_SCRIPT_EVENTS)[number];
+
+/** 未知事件判定：`PluginHost.emit` 据此直接返回，不触发任何脚本。 */
+export function isHostScriptEvent(value: string): value is HostScriptEvent {
+  return (HOST_SCRIPT_EVENTS as readonly string[]).includes(value);
+}
+
+/** 打开项目载荷。 */
+export interface ProjectOpenPayload {
+  bookId: string;
+  title: string;
+}
+
+/** 打开章节载荷。 */
+export interface ChapterOpenPayload {
+  bookId: string;
+  chapterId: string;
+  title: string;
+}
+
+/** 章节落盘成功载荷。 */
+export interface ChapterSavePayload {
+  bookId: string;
+  chapterId: string;
+  title: string;
+}
+
+/**
+ * 事件载荷：只带定位所需的 id 与标题，不带整篇正文——正文经脚本声明的能力按需读取，
+ * 避免把正文成本压到每次编辑的事件通道。执行前按描述符 `input` schema 校验形状。
+ */
+export type ScriptEventPayload = ProjectOpenPayload | ChapterOpenPayload | ChapterSavePayload;

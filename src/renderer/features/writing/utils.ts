@@ -13,6 +13,7 @@ import { builtinRegistry } from '@core/types-registry';
 import { Bot, Brain, Cpu, Feather, type LucideIcon,Server } from 'lucide-react';
 
 import { i18n } from '@/i18n';
+import { getBuildRendererPort } from '@/shared/services/buildRendererPort';
 
 import type { AIHistoryRecord, Chapter, Project } from '../../../shared/types';
 import {
@@ -254,7 +255,8 @@ export const buildExportContent = (project: Project, selectedChapterIds: Set<str
   // 编译覆盖项（对话框即时设置）优先于档案缺省
   if (compileOptions) profile = applyExportCompileOptions(profile, compileOptions);
 
-  const { text } = runBuild(profile, { nodes, attrs, edges: [] });
+  // 插件渲染器经宿主端口注入；未装配宿主时 getBuildRendererPort 返回 undefined，只用内置渲染器。
+  const { text } = runBuild(profile, { nodes, attrs, edges: [] }, { rendererPort: getBuildRendererPort() });
 
   // RTF 是完整文档（首行文档头 + 尾行括号）：书名块插在首行之后，保持管线纯净
   if (format === 'rtf') {

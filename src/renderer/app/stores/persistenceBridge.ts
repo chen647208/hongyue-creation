@@ -18,14 +18,15 @@
 import { dt } from '@/i18n';
 
 import { APP_STATE_VERSION } from '../../../shared/constants/versions';
-import { type AppState, type StorageConfig } from '../../../shared/types';
+import { type AppState, type Project, type StorageConfig } from '../../../shared/types';
 import { autoBackupService } from '../../shared/services/autoBackupService';
+import { emitPluginEvent, hasPluginScriptSubscribers } from '../../shared/services/pluginEventBus';
 import { repository } from '../../shared/services/repository';
 import { createExitExportDeps, runExitExport } from '../../shared/services/syncExitService';
 import { TaskScheduler } from '../../shared/services/taskScheduler';
 import { toast } from '../../shared/services/toastService';
 import { logger } from '../../shared/utils/logger';
-import { persistDiff } from '../persistDiff';
+import { persistDiff,type PersistOp } from '../persistDiff';
 import { commitMetaOf,useProjectStore } from './projectStore';
 import { useSettingsStore } from './settingsStore';
 
@@ -96,16 +97,35 @@ export function seedPersistBaseline(base: AppState | null): void {
   lastPersisted = base;
 }
 
+/**
+ * 章节落盘成功后派发 `chapter.save`：只对引用变化的章节发事件，载荷带 id 与标题（不带正文）。
+ * 无已激活脚本订阅时直接返回，不计算载荷（缺省零开销）。
+ */
+function emitChapterSaveEvents(ops: PersistOp[], previous: Project[]): void {
+  if (!hasPluginScriptSubscribers('chapter.save')) return;
+  for (const op of ops) {
+    if (op.kind !== 'saveProject') continue;
+    const before = new Map((previous.find((p) => p.id === op.project.id)?.chapters ?? []).map((c) => [c.id, c]));
+    for (const chapter of op.project.chapters) {
+      if (before.get(chapter.id) === chapter) continue;
+      emitPluginEvent('chapter.save', { bookId: op.project.id, chapterId: chapter.id, title: chapter.title });
+    }
+  }
+}
+
 async function doFlush(): Promise<void> {
   try {
     const next = composeAppState();
     const prev = lastPersisted;
+    let ops: PersistOp[] = [];
     if (prev === null) {
       await repository.saveAll(next);
     } else {
       // 归因随新引用绑定传入（WeakMap）：AI 落笔帧带 agentId/cause，手写帧无绑定即 user
-      await persistDiff(repository, prev, next, commitMetaOf);
+      ops = await persistDiff(repository, prev, next, commitMetaOf);
     }
+    // 落盘成功后才派发章节保存事件（异步非阻塞；无插件订阅时零开销）
+    emitChapterSaveEvents(ops, prev?.projects ?? []);
     // 仅在成功后才推进基线：失败时保持旧基线，重试会重算同一份差分
     lastPersisted = next;
     dirty = false;

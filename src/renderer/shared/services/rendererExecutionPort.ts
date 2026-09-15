@@ -13,8 +13,8 @@
  * 生产实现：首次激活含 `renderers` 的插件时 `preheat` 异步加载 QuickJS 模块、在独立
  * runtime/context 内编译入口并缓存；随后 `render` 在渲染进程内**同步**调用已编译纯函数。
  *
- * 沿用主进程 `pluginSandbox/quickjsRunner.ts` 的同一 `quickjs-emscripten` 变体（RELEASE_SYNC），
- * 不引入第二套引擎。模块经动态 `import('quickjs-emscripten')` 懒加载：只有真正预热逻辑插件时才
+ * 沿用主进程 `pluginSandbox/quickjsRunner.ts` 的同一 RELEASE_SYNC 变体（单源 `@shared/quickjs`），
+ * 不引入第二套引擎。模块经动态 `import('@shared/quickjs')` 懒加载：只有真正预热逻辑插件时才
  * 载入沙箱 chunk，未安装逻辑插件时主包不含它。
  *
  * 隔离取舍（design/49 §4）：执行落在渲染进程内，故只接受 `pure + sync` 描述符、不向沙箱注入
@@ -24,7 +24,7 @@
 
 import type { RendererExecutionPort, RendererRunResult, ScriptRunError } from '@core/plugin';
 import { PLUGIN_SCRIPT_MAX_OUTPUT_BYTES, PLUGIN_SCRIPT_MEMORY_BYTES } from '@shared/constants/pluginExecution';
-import type { QuickJSContext, QuickJSHandle, QuickJSRuntime } from 'quickjs-emscripten';
+import type { QuickJSContext, QuickJSHandle, QuickJSRuntime } from 'quickjs-emscripten-core';
 
 const encoder = new TextEncoder();
 
@@ -49,9 +49,9 @@ function warmKey(pluginId: string, entry: string): string {
   return `${pluginId}\u0000${entry}`;
 }
 
-/** 动态载入 QuickJS 沙箱模块（与主进程 quickjsRunner 同一 RELEASE_SYNC 变体）。 */
+/** 动态载入 QuickJS 沙箱模块（与主进程 quickjsRunner 共用 `@shared/quickjs` 同一 RELEASE_SYNC 变体）。 */
 async function loadQuickJSModule() {
-  const { getQuickJS } = await import('quickjs-emscripten');
+  const { getQuickJS } = await import('@shared/quickjs');
   return getQuickJS();
 }
 

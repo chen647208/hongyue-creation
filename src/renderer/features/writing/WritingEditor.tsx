@@ -23,6 +23,7 @@ import { resetEditorContext, setEditorContext } from '@/shared/services/editorCo
 import { onEditorOps } from '@/shared/services/editorOps';
 import { openForeshadows, overdueForeshadows } from '@/shared/services/foreshadowService';
 import { localStore } from '@/shared/services/localStore';
+import { emitPluginEvent } from '@/shared/services/pluginEventBus';
 import { Button } from '@/shared/ui/Button';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { FeaturePanel } from '@/shared/ui/FeaturePanel';
@@ -275,6 +276,14 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
   // ===== 手动编辑快照：定时捕获，防误删/误覆盖（调度见 useChapterSnapshots） =====
   const projectRef = useRef(project);
   projectRef.current = project;
+
+  // 打开章节：切换活动章时派发 chapter.open（异步非阻塞，无脚本订阅时零开销）。
+  useEffect(() => {
+    if (!activeChapterId) return;
+    const chapter = projectRef.current.chapters.find((c) => c.id === activeChapterId);
+    if (!chapter) return;
+    emitPluginEvent('chapter.open', { bookId: projectRef.current.id, chapterId: chapter.id, title: chapter.title });
+  }, [activeChapterId, project.id]);
 
   const { handleManualSnapshot, snapshotChapterIfDue } = useChapterSnapshots({
     project,

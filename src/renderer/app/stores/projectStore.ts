@@ -19,6 +19,7 @@ import { create } from 'zustand';
 
 import { type Project } from '../../../shared/types';
 import { i18n } from '../../i18n';
+import { emitPluginEvent } from '../../shared/services/pluginEventBus';
 import { repository } from '../../shared/services/repository';
 import type { CommitOptions } from '../../shared/services/repository/types';
 
@@ -59,10 +60,14 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   activeProjectId: null,
   hydrate: (projects, activeProjectId) => set({ projects, activeProjectId }),
   setActiveProject: (bookId) => {
+    const previousId = get().activeProjectId;
     set({ activeProjectId: bookId });
     // 惰性载入：打开未 hydrate 的书时补载正文（等值写回，不会产生变更/修订）。
     if (!bookId) return;
     const book = get().projects.find((project) => project.id === bookId);
+    if (book && bookId !== previousId) {
+      emitPluginEvent('project.open', { bookId, title: book.title });
+    }
     if (!book || book.hydrated !== false) return;
     void repository
       .loadBookContent?.(bookId)

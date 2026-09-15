@@ -36,6 +36,7 @@ import {
   buildScriptRunCode,
   capabilityName,
   checkDescriptorSchema,
+  isHostScriptEvent,
   rendererDenied,
   type RendererExecutionPort,
   type RendererRunOutcome,
@@ -126,6 +127,14 @@ export interface ContributionSink {
 
 export type ContributionInstaller = (plugin: DiscoveredPlugin, sink: ContributionSink) => void;
 
+/** 事件分发失败回执：`emit` 单脚本失败时上报，不阻断其它脚本（应用层接日志）。 */
+export interface ScriptEventFailure {
+  event: string;
+  pluginId: string;
+  scriptId: string;
+  message: string;
+}
+
 export interface PluginHostOptions {
   /** 禁用清单（配置级，不碰文件） */
   disabled?: string[];
@@ -141,6 +150,8 @@ export interface PluginHostOptions {
   rendererExecution?: RendererExecutionPort;
   /** 工具提议端口（design/49 §2）：接既有提案/审批管线；缺省即拒绝全部提议。 */
   toolProposal?: ToolProposalPort;
+  /** 脚本事件失败回执（可选）：`emit` 单脚本失败时调用；缺省静默，不影响其它脚本。 */
+  onScriptEventError?: (failure: ScriptEventFailure) => void;
 }
 
 
@@ -163,6 +174,8 @@ export class PluginHost {
   private readonly rendererExecution?: RendererExecutionPort;
   /** 工具提议端口：缺省即拒绝提议（fail-closed）。 */
   private readonly toolProposal?: ToolProposalPort;
+  /** 脚本事件失败回执：缺省静默。 */
+  private readonly onScriptEventError?: (failure: ScriptEventFailure) => void;
   /** 已预热渲染器入口（`<插件 id>:<entry>` 去重，避免重复预热）。 */
   private readonly preheated = new Set<string>();
   /** 激活失败退避：连续失败的插件在退避窗内跳过激活（§13.1）。 */
@@ -176,6 +189,7 @@ export class PluginHost {
     this.scriptExecution = options.scriptExecution;
     this.rendererExecution = options.rendererExecution;
     this.toolProposal = options.toolProposal;
+    this.onScriptEventError = options.onScriptEventError;
   }
 
   private readonly hostVersion: string;
@@ -512,6 +526,60 @@ export class PluginHost {
       return { ok: false, error: adjudicated.error };
     }
     return { ok: true, output: adjudicated.output, toolCalls: adjudicated.toolCalls };
+  }
+
+  /**
+   * 是否存在订阅该事件的已激活脚本：调用方据此在无订阅时跳过事件载荷计算（零开销）。
+   * 未知事件、无脚本注册表或无匹配脚本一律 false。
+   */
+  hasEventSubscribers(event: string): boolean {
+    if (!isHostScriptEvent(event)) return false;
+    const reader = this.executableReaders.scripts;
+    if (!reader) return false;
+    return reader
+      .list()
+      .some((entry) => entry.descriptor.on === event && this.statuses.get(entry.pluginId)?.state === 'active');
+  }
+
+  /**
+   * 按事件分发脚本（design/49 沙箱执行）。
+   *
+   * 遍历已注册脚本描述符中 `on === event` 且所属插件已激活者，逐一走 `runScript`：
+   * 能力门、输入 schema、资源限额与 fail-closed 全部沿用。未知事件、无注册表或无
+   * 匹配脚本直接返回，不产生执行开销。异步、非阻塞：调用立即返回，单脚本失败只经
+   * `onScriptEventError` 上报，不阻断其它脚本，也不进入调用方主流程。
+   */
+  emit(event: string, payload?: unknown): void {
+    if (!isHostScriptEvent(event)) return;
+    const reader = this.executableReaders.scripts;
+    if (!reader) return;
+    for (const entry of reader.list()) {
+      if (entry.descriptor.on !== event) continue;
+      if (this.statuses.get(entry.pluginId)?.state !== 'active') continue;
+      void this.runScript(entry.pluginId, entry.id, event, payload).then(
+        (outcome) => {
+          if (!outcome.ok) {
+            this.reportScriptEventFailure(event, entry, outcome.error?.message ?? '脚本执行失败');
+          }
+        },
+        (error) => {
+          this.reportScriptEventFailure(event, entry, error instanceof Error ? error.message : String(error));
+        },
+      );
+    }
+  }
+
+  /** 上报单脚本事件失败：回执自身异常不影响其它脚本。 */
+  private reportScriptEventFailure(
+    event: string,
+    entry: RegisteredExecutable<ScriptDescriptor>,
+    message: string,
+  ): void {
+    try {
+      this.onScriptEventError?.({ event, pluginId: entry.pluginId, scriptId: entry.id, message });
+    } catch {
+      // 回执异常不扩散
+    }
   }
 
   /**

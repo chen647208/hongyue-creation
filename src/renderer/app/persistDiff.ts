@@ -67,13 +67,16 @@ export function computePersistDiff(
   return ops;
 }
 
-/** 执行差分：把变化增量落到 repository（SQLite 走按行写，JSON 后端内部串行化）。串行保序：同书 revisions seq 依赖提交顺序。 */
+/**
+ * 执行差分：把变化增量落到 repository（SQLite 走按行写，JSON 后端内部串行化）。串行保序：同书 revisions seq 依赖提交顺序。
+ * 返回本次实际执行的操作集，供调用方在落盘成功后派发事件（如 chapter.save）。
+ */
 export async function persistDiff(
   repo: StorageRepository,
   prev: AppState,
   next: AppState,
   metaOf?: (project: Project) => CommitOptions | undefined,
-): Promise<void> {
+): Promise<PersistOp[]> {
   const ops = computePersistDiff(prev, next, metaOf);
   for (const op of ops) {
     switch (op.kind) {
@@ -82,4 +85,5 @@ export async function persistDiff(
       case 'saveSettings': await repo.saveSettings(op.patch); break;
     }
   }
+  return ops;
 }
