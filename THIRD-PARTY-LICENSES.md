@@ -4,7 +4,7 @@
 收录运行期依赖（package-lock.json 中排除 dev/link）的许可证声明；
 各依赖的完整许可证文本随发行包内 `node_modules` 一并分发。
 
-共 404 个运行期依赖。
+共 400 个运行期依赖。
 
 | 依赖 | 版本 | 许可证 |
 | --- | --- | --- |
@@ -26,9 +26,6 @@
 | @grpc/proto-loader | 0.8.1 | Apache-2.0 |
 | @isaacs/cliui | 8.0.2 | ISC |
 | @jitl/quickjs-ffi-types | 0.32.0 | MIT |
-| @jitl/quickjs-wasmfile-debug-asyncify | 0.32.0 | MIT |
-| @jitl/quickjs-wasmfile-debug-sync | 0.32.0 | MIT |
-| @jitl/quickjs-wasmfile-release-asyncify | 0.32.0 | MIT |
 | @jitl/quickjs-wasmfile-release-sync | 0.32.0 | MIT |
 | @js-sdsl/ordered-map | 4.4.2 | MIT |
 | @lezer/common | 1.5.2 | MIT |
@@ -316,7 +313,6 @@
 | prosemirror-view | 1.42.3 | MIT |
 | protobufjs | 7.6.6 | BSD-3-Clause |
 | protobufjs | 8.8.0 | BSD-3-Clause |
-| quickjs-emscripten | 0.32.0 | MIT |
 | quickjs-emscripten-core | 0.32.0 | MIT |
 | react | 19.3.0 | MIT |
 | react-dom | 19.3.0 | MIT |
