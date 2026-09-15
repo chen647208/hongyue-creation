@@ -13,7 +13,7 @@
 
 ## 阶段 0 收口与地基
 
-本阶段已收口：工具参数 JSON Schema 校验（0.4）、发行档 webnovel/literary 差异化（0.5）、MCP 检索走 FTS + 标题回退（0.6）、插件逻辑贡献权限门与清单校验（0.3）、覆盖率门线阶梯上调（0.7）。`contributes.renderers` 因协议缺失挂起（见文末）。0.1/0.2 判定不做（见文末）。
+本阶段已收口：工具参数 JSON Schema 校验（0.4）、发行档 webnovel/literary 差异化（0.5）、MCP 检索走 FTS + 标题回退（0.6）、插件逻辑贡献权限门与清单校验（0.3）、覆盖率门线阶梯上调（0.7）。`contributes.renderers` 的描述符协议已立项（见 49）。0.1/0.2 判定不做（见文末）。
 
 ## 阶段 1 查询、块引用与素材隔离（45，推荐先做）
 
@@ -57,7 +57,7 @@
 
 已落地：跨域投影（`buildEntityView` 从六实体扩为任意域：章节、知识库/伏笔/计划/分组、规则、世界观、`Project.extensions` 扩展类型；章节 DSL 关键字 `# @键: 值` 抽取为行字段；`ViewLayout.fieldAliases` 对齐跨域字段名）；脚本层（`shared/formulaScript.ts` 表达式树：字段/参数/字面量/白名单函数，无网络/文件/`eval`/成员访问，深度与参数配额，deny-by-default；`contributes.formulas` + `FormulaRegistry` 插件公式，命名空间强制、可回退）；图表视图（视图类型 `chart`，`ChartSpec` 声明「字段→通道」，轴/图例/比例尺由声明派生，渲染器按需加载懒加载）；协作收敛不变量（`features/collaboration/elementConvergence.ts` 纯函数封装版本号/随机决胜/墓碑/分数排序，配契约单测；运行时收敛仍由 Yjs 提供）。
 
-未做：无。画布视图开放格式、脚本命令管道/循环/子程序/事件触发仍属有意挂起（待可执行沙箱描述符协议，见文末）。
+未做：无。画布视图开放格式仍属有意挂起；脚本命令管道/循环/子程序/事件触发的描述符协议已立项（见 49）。
 
 ## 阶段 9 创作域 A 档补齐
 
@@ -85,7 +85,7 @@
 
 - 卡片服务从 `shared/services/cards` 迁入 `features/cards`：会重新引入 `assistant→cards`、`settings→cards` 跨 feature 依赖债（与 02 的边界规则和既有清理方向相反）；卡片服务属跨功能共享，保留在 `shared/services/cards`，`features/cards` 目录仅在未来出现卡片专属 UI 时使用。
 - `foreshadowing`/`consistency` 服务从 `shared/services` 迁入功能域：同卡片，属跨功能共享逻辑，迁入会引入跨 feature 依赖债；保留在 `shared/services`，域目录只承载 UI。
-- `contributes.renderers` 接线：现有渲染器契约为同步 `render()`，而插件可执行逻辑只能经异步沙箱；在补出 `renderers.json` 描述符协议（函数引用 + 同步渲染方案）前不改动。
+- `contributes.renderers` 接线：描述符协议已立项（见 49），渲染器同步契约与 `renderers.json`/`scripts.json` 声明形态以 49 为准；宿主接线与沙箱执行在 49 的后续阶段。
 - 正文以文件为源、追加式事件日志（用户已明确暂缓，见 28）。
 - 协作 B/C 档的评论权限与工作流（协作只留缝，见 29）。
 - 平台化：发布、社区、收益、全勤、平台合规预审。

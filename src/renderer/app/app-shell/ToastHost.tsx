@@ -41,7 +41,7 @@ export default function ToastHost() {
             <p className="min-w-0 flex-1 whitespace-pre-wrap break-words">{item.message}</p>
             <button
               onClick={() => toast.dismiss(item.id)}
-              className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="touch-target shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               aria-label="dismiss"
             >
               <X className="size-3.5" />

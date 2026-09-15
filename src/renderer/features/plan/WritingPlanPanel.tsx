@@ -72,7 +72,7 @@ const WritingPlanPanel: React.FC = () => {
                     <div className="flex items-start gap-1.5">
                       <Checkbox checked={item.status === 'done'} onChange={() => setPlan(togglePlanStatus(plan, item.id))} className="mt-0.5" />
                       <span className={cn('min-w-0 flex-1 break-words', item.status === 'done' && 'text-muted-foreground line-through')}>{item.title}</span>
-                      <button type="button" aria-label={t('plan.remove')} onClick={() => setPlan(removePlanItem(plan, item.id))} className="text-muted-foreground hover:text-destructive">
+                      <button type="button" aria-label={t('plan.remove')} onClick={() => setPlan(removePlanItem(plan, item.id))} className="touch-target text-muted-foreground hover:text-destructive">
                         <Trash2 className="size-3" />
                       </button>
                     </div>

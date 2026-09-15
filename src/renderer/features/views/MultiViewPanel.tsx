@@ -633,7 +633,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                   <button
                     type="button"
                     aria-label={t('views.computed.remove')}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="touch-target text-muted-foreground hover:text-destructive"
                     onClick={() => removeComputed(column.key)}
                   >
                     <Trash2 className="size-3" />
@@ -694,7 +694,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                 <button
                   type="button"
                   aria-label={t('views.query.removeAggregation')}
-                  className="text-muted-foreground hover:text-destructive"
+                  className="touch-target text-muted-foreground hover:text-destructive"
                   onClick={() => removeAggregation(index)}
                 >
                   <Trash2 className="size-3" />

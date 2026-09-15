@@ -65,7 +65,10 @@ export interface PluginContribution {
   editor?: string[];
   /** 逻辑贡献目录（.js，导出具名函数；调用时进沙箱，design/22 §3）。 */
   logic?: string[];
+  /** 导出渲染器描述符目录（.json；函数引用 + 纯/同步声明，见 design/49）。 */
   renderers?: string[];
+  /** 脚本描述符目录（.json；函数引用 + 触发挂点 + 能力白名单，见 design/49）。 */
+  scripts?: string[];
   /** 视图公式目录（.json，可序列化派生字段；纯函数沙箱求值，无代码执行）。 */
   formulas?: string[];
 }
@@ -178,7 +181,7 @@ export function validateManifest(raw: unknown): ManifestValidateResult {
       }
       // 目录/文件清单贡献必须是字符串数组（字符串会被逐字符误读为多个路径）。
       const c = m.contributes as Record<string, unknown>;
-      for (const key of ['skills', 'types', 'buildProfiles', 'commands', 'ui', 'logic', 'renderers', 'editor', 'formulas'] as const) {
+      for (const key of ['skills', 'types', 'buildProfiles', 'commands', 'ui', 'logic', 'renderers', 'scripts', 'editor', 'formulas'] as const) {
         const value = c[key];
         if (value !== undefined && (!Array.isArray(value) || value.some((x) => !str(x)))) {
           fail(`contributes.${key}`, '必须是字符串数组');

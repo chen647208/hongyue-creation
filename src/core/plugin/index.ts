@@ -65,6 +65,26 @@ export {
   installTypeTemplates,
 } from './contributions.js';
 export {
+  type CapabilityCheck,
+  type DescriptorIssue,
+  type DescriptorKind,
+  type DescriptorMode,
+  type DescriptorPurity,
+  type DescriptorSchema,
+  type DescriptorValidation,
+  HOST_CAPABILITY_KINDS,
+  type HostCapability,
+  type HostCapabilityKind,
+  parseHostCapability,
+  type RendererDescriptor,
+  rendererId,
+  type ScriptDescriptor,
+  scriptId,
+  TOOL_CAPABILITY_ACTIONS,
+  validateRendererDescriptor,
+  validateScriptDescriptor,
+} from './descriptors.js';
+export {
   EventBus,
   type InterceptHandler,
   type ObserveHandler,
@@ -73,7 +93,6 @@ export {
   type VetoResult,
 } from './events.js';
 export {
-  type InstallOptions,
   installPackage,
   type InstallResult,
   type PluginInstallPort,
@@ -120,6 +139,16 @@ export {
   PLUGIN_DENY_SEGMENTS,
   type PluginPathCheck,
 } from './pathGate.js';
+export {
+  type ExecutableContributionSource,
+  ExecutableRegistry,
+  installExecutableDescriptors,
+  type InstallExecutableOptions,
+  type InstallExecutableResult,
+  type RegisteredExecutable,
+  RendererRegistry,
+  ScriptRegistry,
+} from './registries.js';
 export {
   checkContributionLimits,
   type ContributionInstaller,

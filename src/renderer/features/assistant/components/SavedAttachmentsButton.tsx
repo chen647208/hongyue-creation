@@ -96,7 +96,7 @@ const SavedAttachmentsButton: React.FC<SavedAttachmentsButtonProps> = ({ bookId,
               <span className="min-w-0 flex-1 truncate">{meta.name}</span>
               <button
                 type="button"
-                className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
+                className="touch-target shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
                 aria-label={t('attachments.remove')}
                 onClick={(event) => {
                   event.stopPropagation();

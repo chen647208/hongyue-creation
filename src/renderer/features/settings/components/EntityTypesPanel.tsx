@@ -118,7 +118,7 @@ const EntityTypesPanel: React.FC = () => {
                         {field.label} · {field.dataType}
                         <button
                           type="button"
-                          className="text-muted-foreground hover:text-destructive"
+                          className="touch-target text-muted-foreground hover:text-destructive"
                           aria-label={t('entities.removeField')}
                           onClick={() => void useGenericModelStore.getState().deleteField(field.id)}
                         >

@@ -94,6 +94,14 @@ describe('installer（安装/更新/卸载与签名拒绝）', () => {
     expect(result.reason).toContain('签名');
   });
 
+  it('渲染器/脚本描述符未签名：fail-closed', async () => {
+    const port = new FakePort(makePackage({ contributes: { renderers: ['./renderers/'], scripts: ['./scripts/'] } }));
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('签名');
+    expect(port.committed).toHaveLength(0);
+  });
+
   it('资源型未签名：允许安装', async () => {
     const port = new FakePort(makePackage());
     const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });

@@ -75,7 +75,7 @@ export const KnowledgeSearchBar: React.FC<KnowledgeSearchBarProps> = ({
               onClick={() => onModeChange(itemMode)}
               title={title}
               className={cn(
-                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                'touch-target flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                 mode === itemMode
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground',

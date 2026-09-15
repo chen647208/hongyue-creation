@@ -68,7 +68,7 @@ const PANEL_DEBT: Record<string, PanelDebt> = {
   'world.views': {},
   'world.timeline': {},
   characters: {},
-  'structure.outline': { 'color-contrast': 1 },
+  'structure.outline': {},
   'structure.chapters': {},
   writing: {},
   ...Object.fromEntries(SETTINGS_TABS.map((tab) => [`settings.${tab.zh}`, SETTINGS_KNOWN_DEBT])),

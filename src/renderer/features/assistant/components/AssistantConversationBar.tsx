@@ -107,7 +107,7 @@ const AssistantConversationBar: React.FC<AssistantConversationBarProps> = ({
                     onClick={() => onDelete(conversation.id)}
                     aria-label={t('conversation.delete')}
                     title={t('conversation.delete')}
-                    className="ml-0.5 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 group-hover:opacity-100"
+                    className="touch-target ml-0.5 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 group-hover:opacity-100"
                   >
                     <X className="size-3" />
                   </button>

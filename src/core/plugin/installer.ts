@@ -113,9 +113,11 @@ export async function installPackage(
     return failure(`宿主版本 ${options.hostVersion} 不满足插件要求 ${manifest.host}`);
   }
 
-  // 可执行贡献（logic/editor）必须来源认证，避免未签名代码进入沙箱。
+  // 可执行贡献（logic/editor/scripts/renderers）必须来源认证，避免未签名代码进入沙箱。
   const executable = (manifest.contributes?.logic?.length ?? 0) > 0
-    || (manifest.contributes?.editor?.length ?? 0) > 0;
+    || (manifest.contributes?.editor?.length ?? 0) > 0
+    || (manifest.contributes?.scripts?.length ?? 0) > 0
+    || (manifest.contributes?.renderers?.length ?? 0) > 0;
   const requireSignature = options.requireSignature === true || executable;
 
   if (pkg.signature) {

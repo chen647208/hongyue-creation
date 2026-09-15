@@ -415,11 +415,6 @@
     font-family: var(--font-serif, ui-serif, Georgia, serif);
     padding: 0.5rem 0.75rem;
   }
-  /* 占位符对比度：改用语义变量，浅色下 >= 4.5:1 */
-  .novel-dsl-editor .cm-placeholder {
-    color: var(--color-muted-foreground);
-    font-style: italic;
-  }
   .novel-dsl-editor .cm-gutters {
     background: transparent;
     border: none;
@@ -461,6 +456,19 @@
     font-family: var(--font-mono, ui-monospace, monospace);
     font-size: 0.85em;
   }
+}
+
+/*
+ * CodeMirror 占位符配色：必须放在层外（unlayered）。
+ * CodeMirror 运行时注入的基础主题不带 @layer，按 CSS 级联层规则，层外普通声明
+ * 优先于 @layer 内声明；若写在 @layer components 里会被其默认 .cm-placeholder{color:#888}
+ * 压过，浅色下 #888 于 #ffffff 仅 3.54:1。
+ * 取 --color-muted-foreground（浅色 #6b6560）于编辑区底色 #ffffff 为 5.74:1、
+ * 深色 #a39e97 于 oneDark #282c34 为 5.26:1，均达 WCAG AA 4.5:1。
+ */
+.novel-dsl-editor .cm-placeholder {
+  color: var(--color-muted-foreground);
+  font-style: italic;
 }
 
 /* 长列表项：视口外跳过渲染与样式（轻量虚拟化，无需额外依赖） */

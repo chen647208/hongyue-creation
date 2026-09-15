@@ -45,7 +45,7 @@ export const KnowledgeSearchResults: React.FC<KnowledgeSearchResultsProps> = ({ 
           type="button"
           onClick={onClose}
           aria-label={t('center.closeSearchResults')}
-          className="text-muted-foreground transition-colors hover:text-foreground"
+          className="touch-target text-muted-foreground transition-colors hover:text-foreground"
         >
           <X className="size-4" />
         </button>
