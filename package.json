@@ -157,7 +157,7 @@
     "lucide-react": "^1.40.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.4",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.8.3",
