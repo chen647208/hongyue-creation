@@ -47,7 +47,7 @@
 ## 导出与成稿字数
 
 - 导出统一走 `src/core/build` 三段式管线（选择→变换→渲染）：
-  `utils.ts` 的 `buildExportContent` 是管线适配器，txt/md/html/rtf 由渲染器注册表产出
+  `utils.ts` 的 `buildExportContent` 是管线适配器，txt/md/html/rtf/pdf/ePub/DOCX/ODT 由渲染器注册表产出
   （渲染器与变换器均为插件贡献点）；`pdf/ePub/DOCX/ODT` 复用 HTML 管线产出后打包
   （`buildExportPackage` → 主进程 STORE zip，`core/build/package.ts` 与 `core/build/odt.ts`
   只产出文件集）。ODT 为最小 ODF：mimetype 首项无压缩 + manifest + content + styles，

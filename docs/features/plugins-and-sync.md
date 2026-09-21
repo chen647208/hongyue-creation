@@ -171,7 +171,7 @@
 
 - `src/core/build` 三段式管线：selection（类型通配/单点排除/整类开关/
   状态过滤）→ transform（`%N %T` 标题模板、重编号、stripTags、引用替换）
-  → render（txt/md/html 内置；变换器与渲染器为插件贡献点）。
+  → render（txt/md/html/rtf/pdf/ePub/DOCX/ODT 内置；变换器与渲染器为插件贡献点）。
 - 写作编辑器导出弹窗即管线适配器：含导出预览（md 渲染/html iframe/txt）
   与成稿字数——统计面板 `builtCharCount` 与导出同源（单一口径）。
 - Profile 支持 JSON/YAML 双序列化（`.yml` 可 diff 可分享）。
