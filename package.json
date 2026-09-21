@@ -160,7 +160,7 @@
     "sharp": "^0.35.4",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.1.18",
-    "typescript": "~5.8.3",
+    "typescript": "~7.0.2",
     "typescript-eslint": "^8.70.0",
     "vite": "^8.2.2",
     "vitepress": "^1.6.4",
