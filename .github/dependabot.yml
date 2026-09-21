@@ -9,6 +9,10 @@ updates:
       # Electron 大版本升级需人工评估（运行时契约、沙箱、Node 版本）
       - dependency-name: electron
         update-types: ['version-update:semver-major']
+      # TypeScript 大版本受生态限制：typescript-eslint 目前 peer 上限 <6.1，
+      # 升级会令类型感知 lint 失效；待生态支持后再人工评估。
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: '/'
     schedule:
