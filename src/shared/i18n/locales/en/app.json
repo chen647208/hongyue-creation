@@ -122,8 +122,8 @@
     "guidedNext": "Suggested next: {{step}}",
     "guidedGoTip": "Go to this step",
     "guidedDismiss": "Dismiss suggestion",
-    "toggleAssistantTip": "Toggle AI sidebar (Ctrl+J)",
-    "expandAssistant": "Expand AI sidebar (Ctrl+J)"
+    "toggleAssistantTip": "Toggle AI sidebar (rebindable in Settings)",
+    "expandAssistant": "Expand AI sidebar"
   },
   "reset": {
     "factoryTitle": "Factory Reset",

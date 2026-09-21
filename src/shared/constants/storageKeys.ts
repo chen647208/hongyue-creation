@@ -27,6 +27,7 @@ export const STORAGE_KEYS = {
   storageBackend: 'storage.backend',
   storageLegacyBackup: 'storage.legacyBackup',
   viewsSelected: 'views.selected',
+  keybindings: 'keymap.bindings',
   collabEnabled: 'collab.enabled',
   collabServerUrl: 'collab.serverUrl',
   syncTransport: 'sync.transport',

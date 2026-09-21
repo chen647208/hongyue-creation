@@ -16,7 +16,7 @@
 
 import { create } from 'zustand';
 
-import { type AppLanguage, type AppState, type AppTheme, type CardPromptTemplate, type ConsistencyCheckPromptTemplate, type CustomFontMeta, type EmbeddingModelConfig, type KeybindingActionId, type McpServerConfig, type ModelConfig, type PromptTemplate, type ProxyConfig } from '../../../shared/types';
+import { type AppLanguage, type AppState, type AppTheme, type CardPromptTemplate, type ConsistencyCheckPromptTemplate, type CustomFontMeta, type EmbeddingModelConfig, type McpServerConfig, type ModelConfig, type PromptTemplate, type ProxyConfig } from '../../../shared/types';
 import { changeLanguage } from '../../i18n';
 import { applyTheme } from '../../shared/services/themeService';
 import { INITIAL_APP_STATE } from '../initialState';
@@ -41,7 +41,6 @@ interface SettingsState {
   uiFontSize: number | undefined;
   editorFontSize: number | undefined;
   editorLineHeight: number | undefined;
-  keybindings: Partial<Record<KeybindingActionId, string>>;
   proxy: ProxyConfig | undefined;
   minimizeToTray: boolean | undefined;
   autoLaunch: boolean | undefined;
@@ -64,8 +63,6 @@ interface SettingsState {
   addCustomFont: (meta: CustomFontMeta) => void;
   removeCustomFont: (id: string) => void;
   setMcpServers: (servers: McpServerConfig[]) => void;
-  setKeybinding: (action: KeybindingActionId, binding: string) => void;
-  resetKeybindings: () => void;
   setProxy: (proxy: ProxyConfig | undefined) => void;
   setMinimizeToTray: (minimizeToTray: boolean) => void;
   setAutoLaunch: (autoLaunch: boolean) => void;
@@ -98,7 +95,6 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   uiFontSize: undefined,
   editorFontSize: undefined,
   editorLineHeight: undefined,
-  keybindings: {},
   proxy: undefined,
   minimizeToTray: undefined,
   autoLaunch: undefined,
@@ -108,8 +104,6 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   addCustomFont: (meta) => set((s) => ({ customFonts: [...s.customFonts, meta] })),
   removeCustomFont: (id) => set((s) => ({ customFonts: s.customFonts.filter((c) => c.id !== id) })),
   setMcpServers: (mcpServers) => set({ mcpServers }),
-  setKeybinding: (action, binding) => set((s) => ({ keybindings: { ...s.keybindings, [action]: binding } })),
-  resetKeybindings: () => set({ keybindings: {} }),
   setProxy: (proxy) => set({ proxy }),
   setMinimizeToTray: (minimizeToTray) => set({ minimizeToTray }),
   setAutoLaunch: (autoLaunch) => set({ autoLaunch }),

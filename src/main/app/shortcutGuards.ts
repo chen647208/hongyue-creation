@@ -22,12 +22,26 @@ export function installBrowserShortcutGuards(contents: WebContents): void {
   });
 }
 
-/** 最小应用菜单：仅保留应用/编辑/窗口角色，去掉「视图/刷新/开发者工具」入口。 */
-export function buildMinimalMenu(): Menu {
+/**
+ * 禁用捏合缩放：把可视缩放锁定为 1，浏览器式缩放因子不再随手势变化。
+ * 应用内缩放改由设置中的界面字号（`uiFontSize`）承担，渲染层拦截 Ctrl/Cmd+滚轮。
+ */
+export function installZoomGuard(contents: WebContents): void {
+  void contents.setVisualZoomLevelLimits(1, 1).catch(() => undefined);
+}
+
+/**
+ * 最小应用菜单：仅保留应用/编辑/窗口角色，去掉「视图/刷新/缩放/开发者工具」入口。
+ * 开发运行额外保留开发者工具开关；缩放加速键不注册，键盘缩放交由应用自身接管。
+ */
+export function buildMinimalMenu(options?: { devtools?: boolean }): Menu {
   const template: MenuItemConstructorOptions[] = [
     ...(process.platform === 'darwin' ? [{ role: 'appMenu' } as MenuItemConstructorOptions] : []),
     { role: 'editMenu' },
     { role: 'windowMenu' },
   ];
+  if (options?.devtools) {
+    template.push({ role: 'toggleDevTools' });
+  }
   return Menu.buildFromTemplate(template);
 }

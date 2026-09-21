@@ -13,6 +13,7 @@
  * 书籍/项目动作在 useBookActions，引导在 useAppBootstrap——本文件只做装配。
  */
 
+import { clampUiFontSize, UI_FONT_SIZE } from '@shared/constants/uiScale';
 import { Bot } from 'lucide-react';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +22,7 @@ import { ASSISTANT_FEATURE_ID } from '@/features/assistant/constants';
 import { registerCoreSettingsTabs } from '@/features/settings/coreSettingsTabs';
 import { dt } from '@/i18n';
 import { COMMAND_PALETTE_EVENT } from '@/shared/constants/appEvents';
+import { useGlobalKeymap } from '@/shared/keymap';
 import { type AppCommand,commandRegistry } from '@/shared/services/commandRegistry';
 import { Button } from '@/shared/ui/Button';
 import { TooltipProvider } from '@/shared/ui/Tooltip';
@@ -31,9 +33,9 @@ import ApprovalHost from '../features/assistant/components/ApprovalHost';
 import AIHistoryViewer from '../features/writing/AIHistoryViewer';
 import { useViewportTier } from '../shared/hooks/useViewportTier';
 import { useViewPreference } from '../shared/hooks/useViewPreference';
+import { useZoomGuard } from '../shared/hooks/useZoomGuard';
 import { exportCover } from '../shared/services/coverService';
 import { dialogService } from '../shared/services/dialogService';
-import { eventToKeybinding, resolveKeybindings } from '../shared/services/keybindings';
 import { getStorageBackendStatus,repository } from '../shared/services/repository';
 import { resolveWorkspaceChrome } from '../shared/utils/layout';
 import { registerAssistantRuntime } from './app-shell/assistantRuntimeSetup';
@@ -74,6 +76,7 @@ const VersionCheckModal = lazy(() => import('../features/version/VersionCheckMod
 const App: React.FC = () => {
   useAppBootstrap();
   useCollaborationSync();
+  useZoomGuard();
   const { t, i18n } = useTranslation('app');
 
   // 纯 UI 态（不落盘）
@@ -148,19 +151,6 @@ const App: React.FC = () => {
     else setAssistantOpenPref('closed');
   }, [assistantOverlay, setAssistantOpenPref]);
 
-  // IDE 式开关：默认 Ctrl/Cmd+J 随时显隐 AI 侧边栏（设置页可改键）
-  const keybindingOverrides = useSettingsStore(s => s.keybindings);
-  const bindings = resolveKeybindings(keybindingOverrides);
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (eventToKeybinding(e) === bindings.toggleAssistant) {
-        e.preventDefault();
-        toggleAssistant();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [toggleAssistant, bindings.toggleAssistant]);
   const enterWorkspace = useCallback(() => {
     setSection('inspiration'); setEditingChapterId(null); setView('workspace');
   }, []);
@@ -182,46 +172,61 @@ const App: React.FC = () => {
     // 切离写作不清空活动章节：往返保留上下文，进书/重置时才清
   }, []);
 
-  // 分区快捷键：默认 Ctrl/Cmd+1..5（工作台内有效，设置页可改键，与 USER_GUIDE 对齐）
-  useEffect(() => {
-    const onSectionKey = (e: KeyboardEvent) => {
-      if (view !== 'workspace') return;
-      const pressed = eventToKeybinding(e);
-      if (!pressed) return;
-      const idx = [bindings.section1, bindings.section2, bindings.section3, bindings.section4, bindings.section5].indexOf(pressed);
-      if (idx < 0) return;
-      const next = SECTION_ORDER[idx];
-      if (next) {
-        e.preventDefault();
-        handleSectionChange(next);
-      }
-    };
-    window.addEventListener('keydown', onSectionKey);
-    return () => window.removeEventListener('keydown', onSectionKey);
-  }, [view, handleSectionChange, bindings.section1, bindings.section2, bindings.section3, bindings.section4, bindings.section5]);
+  // 应用内缩放：唯一口径是界面字号设置，快捷键按步长增减/复位（关闭浏览器式缩放后接管）
+  const zoom = useCallback((delta: number) => {
+    const store = useSettingsStore.getState();
+    const current = store.uiFontSize ?? UI_FONT_SIZE.default;
+    store.setUiFontSize(clampUiFontSize(current + delta));
+  }, []);
+  const zoomIn = useCallback(() => zoom(UI_FONT_SIZE.step), [zoom]);
+  const zoomOut = useCallback(() => zoom(-UI_FONT_SIZE.step), [zoom]);
+  const zoomReset = useCallback(() => {
+    useSettingsStore.getState().setUiFontSize(UI_FONT_SIZE.default);
+  }, []);
+  const goSection = useCallback((index: number) => {
+    const next = SECTION_ORDER[index];
+    if (next) handleSectionChange(next);
+  }, [handleSectionChange]);
 
-  // 命令面板：Ctrl/Cmd+K 随时开关；槽位贡献按钮经事件打开
+  // 全局快捷键统一派发（命令目录见 shared/keymap）：应用绑定优先，未提供处理器/未启用的命令跳过
+  useGlobalKeymap(
+    {
+      commandPalette: () => setIsCommandPaletteOpen((v) => !v),
+      toggleAssistant: () => toggleAssistant(),
+      globalSearch: () => setIsSearchOpen(true),
+      openSettings: () => setIsSettingsOpen(true),
+      zoomIn,
+      zoomOut,
+      zoomReset,
+      section1: () => goSection(0),
+      section2: () => goSection(1),
+      section3: () => goSection(2),
+      section4: () => goSection(3),
+      section5: () => goSection(4),
+    },
+    {
+      enabled: {
+        section1: view === 'workspace',
+        section2: view === 'workspace',
+        section3: view === 'workspace',
+        section4: view === 'workspace',
+        section5: view === 'workspace',
+      },
+    }
+  );
+
+  // 命令面板：槽位贡献按钮经事件打开；全局 Ctrl/Cmd+K 由快捷键派发
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        setIsCommandPaletteOpen((v) => !v);
-      }
-    };
     const onOpenEvent = () => setIsCommandPaletteOpen(true);
-    window.addEventListener('keydown', onKey);
     window.addEventListener(COMMAND_PALETTE_EVENT, onOpenEvent);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener(COMMAND_PALETTE_EVENT, onOpenEvent);
-    };
+    return () => window.removeEventListener(COMMAND_PALETTE_EVENT, onOpenEvent);
   }, []);
 
   const builtInCommands = useMemo<AppCommand[]>(() => {
     const list: AppCommand[] = [
       { id: 'settings', title: t('command.settings'), keywords: 'settings', run: () => setIsSettingsOpen(true) },
       { id: 'search', title: t('command.search'), keywords: 'search find', run: () => setIsSearchOpen(true) },
-      { id: 'assistant', title: t('command.toggleAssistant'), keywords: 'assistant ctrl+j', run: toggleAssistant },
+      { id: 'assistant', title: t('command.toggleAssistant'), keywords: 'assistant', run: toggleAssistant },
       { id: 'bookshelf', title: t('command.bookshelf'), keywords: 'bookshelf shelf', run: () => setView('bookshelf') },
     ];
     if (activeProject) {

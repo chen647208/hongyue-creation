@@ -13,8 +13,7 @@
  */
 import { type RefObject,useCallback, useEffect, useState } from 'react';
 
-import { useSettingsStore } from '@/app/stores/settingsStore';
-import { eventToKeybinding, resolveKeybindings } from '@/shared/services/keybindings';
+import { matchEvent, useResolvedKeybindings } from '@/shared/keymap';
 
 import type { NovelEditorHandle } from '../types';
 
@@ -67,11 +66,11 @@ export function useFindReplace({ editorRef, activeChapterId, content, shortcutBl
     setMatchIndex(0);
   }, [matchesNow, replacement, editorRef]);
 
-  // 查找条开关：默认 Ctrl/Cmd+F
-  const findBinding = resolveKeybindings(useSettingsStore(s => s.keybindings)).find;
+  // 查找条开关：默认 Ctrl/Cmd+F（编辑器内有效，设置页可改键）
+  const findBinding = useResolvedKeybindings().find;
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (eventToKeybinding(e) === findBinding && activeChapterId && !shortcutBlocked) {
+      if (matchEvent(findBinding, e) && activeChapterId && !shortcutBlocked) {
         e.preventDefault();
         setOpen((v) => !v);
       }

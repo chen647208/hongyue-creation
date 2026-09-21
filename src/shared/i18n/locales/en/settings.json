@@ -69,6 +69,7 @@
     "uiFontSizeLabel": "Interface size ({{size}}px)",
     "editorFontSizeLabel": "Body size ({{size}}px)",
     "lineHeightLabel": "Body line height ({{height}})",
+    "zoomEntryHint": "Interface font size is the only app zoom: use the zoom shortcuts. Ctrl/Cmd+wheel and pinch no longer change zoom.",
     "importFont": "Import Custom Font",
     "importingFont": "Importing…",
     "importFailed": "Import failed: {{message}}",
@@ -97,19 +98,33 @@
     "proxyWebNote": "Web preview has no desktop proxy support; the address only applies in the desktop app.",
     "proxyLocalNote": "Local services (e.g. Ollama on localhost) bypass the proxy and connect directly.",
     "shortcutsTitle": "Keyboard shortcuts",
-    "shortcutsHint": "Click an action, then press a combo to record. Conflicting combos are rejected.",
+    "shortcutsHint": "Click a command, then press a combo to record. Conflicting or browser-reserved combos are rejected.",
     "shortcutRecord": "Click to record",
     "shortcutRecording": "Press a combo… (Esc cancels)",
-    "shortcutReset": "Reset to defaults",
+    "shortcutRecordAria": "Record a shortcut for \"{{action}}\"",
+    "shortcutReset": "Reset all to defaults",
+    "shortcutResetOne": "Reset \"{{action}}\" to default",
     "shortcutConflict": "Conflicts with \"{{action}}\", not saved",
+    "shortcutReserved": "That combo is reserved by the browser (reload/devtools/print); not saved",
+    "shortcutCategories": {
+      "general": "General",
+      "navigation": "Section navigation",
+      "view": "View & zoom"
+    },
     "shortcutActions": {
+      "commandPalette": "Command palette",
       "toggleAssistant": "Toggle AI sidebar",
+      "find": "Editor find",
+      "globalSearch": "Global search",
+      "openSettings": "Open settings",
       "section1": "Section 1",
       "section2": "Section 2",
       "section3": "Section 3",
       "section4": "Section 4",
       "section5": "Section 5",
-      "find": "Editor find"
+      "zoomIn": "Zoom interface in",
+      "zoomOut": "Zoom interface out",
+      "zoomReset": "Reset interface font size"
     }
   },
   "skills": {

@@ -987,16 +987,6 @@ export interface CustomFontMeta {
   format: 'ttf' | 'otf' | 'woff' | 'woff2';
 }
 
-/** 可自定义快捷键动作 id（固定集合；加动作同步改 keybindings 服务与设置页）。 */
-export type KeybindingActionId =
-  | 'toggleAssistant'
-  | 'section1'
-  | 'section2'
-  | 'section3'
-  | 'section4'
-  | 'section5'
-  | 'find';
-
 /** 代理配置（空 url 即直连；Ollama 本地地址豁免）。 */
 export interface ProxyConfig {
   url: string;
@@ -1090,8 +1080,6 @@ export interface AppState {
   editorFontSize?: number;
   /** 正文行高倍数；undefined 表默认 1.9 */
   editorLineHeight?: number;
-  /** 自定义快捷键（动作 id → ctrl+键串；缺席回退默认）。 */
-  keybindings?: Partial<Record<KeybindingActionId, string>>;
   /** 代理配置；缺席即直连。 */
   proxy?: ProxyConfig;
   /** 关闭窗口最小化到托盘；缺席表开启。 */

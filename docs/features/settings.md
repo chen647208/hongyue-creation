@@ -23,7 +23,7 @@
 - `components/UserSkillsCard.tsx`：写法技能（内置只读 + 用户 SKILL.md 导入/删除，嵌在插件面板）
 - `components/StorageSettingsPanel.tsx`：存储设置面板
 - `components/SystemGuidePanel.tsx`：系统说明和使用引导
-- `components/ShortcutRecorder.tsx` + `services/keybindings.ts`：快捷键录制/冲突检测/默认回退（`App.tsx` 开关与分区跳转、`WritingEditor.tsx` 查找条只读合并态）
+- `components/ShortcutRecorder.tsx` + `src/renderer/shared/keymap`：快捷键命令目录/解析匹配/冲突与保留提示/持久化（`App.tsx` 全局派发、`useFindReplace.ts` 查找条）
 - `services/modelListService.ts`：模型列表拉取服务
 - `services/embeddingModelService.ts`：Embedding 模型配置服务
 - `factories.ts`：设置项构造与默认值生成
@@ -51,6 +51,16 @@
 - 位置：设置 → 通用 → 界面功能开关，组件为 `src/renderer/features/settings/components/FeatureTogglesPanel.tsx`。
 - 开关项：助手面板、全库检索、世界关系图、一致性检查、智能推荐、增强时间线、数据视图、双轴时间线、剧本。
 - 语义：默认开启，关闭即从界面移除入口，数据不受影响；状态存 `localStore` 的 `features.disabled`。
+
+## 快捷键与缩放
+
+- 位置：设置 → 通用 → 快捷键，组件为 `src/renderer/features/settings/components/ShortcutRecorder.tsx`；键位系统在 `src/renderer/shared/keymap`（命令目录、纯函数、store、派发 hook）。
+- 命令：命令面板、显隐助手、编辑器查找、全库检索、打开设置、分区 1–5、放大/缩小/复位界面字号；默认绑定见 `keymap/commands.ts`。
+- 改键：点击命令后按下组合键录入；与其它命令同串或属于浏览器保留组合时拒绝保存并提示；单条与整体均可恢复默认。未配置即回退默认。
+- 持久化：`localStore` 键 `keymap.bindings`，只存覆盖项，空表即全默认；键位是安装级偏好，不进业务数据、不随作品同步。
+- 缩放：主进程 `installZoomGuard` 调 `setVisualZoomLevelLimits(1, 1)` 关掉捏合缩放，最小菜单不注册缩放加速键；渲染层 `useZoomGuard` 以非 passive 的 capture `wheel` 拦截 `Ctrl/Cmd+滚轮`。应用内缩放唯一口径是 `uiFontSize`，范围单源在 `src/shared/constants/uiScale.ts`；`editorFontSize` 为正文阅读字号，不参与界面缩放。
+- 复位：快捷键 `zoomReset`（默认 `Ctrl+0`）把 `uiFontSize` 复位到默认值；单条/整体恢复默认只清覆盖项。
+- 协同：浏览器式保留组合清单单源在 `src/shared/constants/browserShortcuts.ts`，主进程据此屏蔽，渲染层据此提示。
 
 ## 实体类型与字段
 
@@ -83,6 +93,6 @@
 
 ## 维护建议
 
-- 新增设置项优先落到对应 `Panel` 组件，不要直接堆到 `SettingsModal.tsx`
+- 加入设置项优先落到对应 `Panel` 组件，不要直接堆到 `SettingsModal.tsx`
 - 模型、Embedding、模板相关逻辑优先放到 `services`、`factories.ts` 或 `constants.ts`
 - 保持设置面板按主题拆分，便于后续继续扩展

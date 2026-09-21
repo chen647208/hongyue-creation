@@ -69,6 +69,7 @@
     "uiFontSizeLabel": "界面字号（{{size}}px）",
     "editorFontSizeLabel": "正文字号（{{size}}px）",
     "lineHeightLabel": "正文行高（{{height}}）",
+    "zoomEntryHint": "界面字号是应用缩放的唯一口径：可用缩放快捷键调整，Ctrl/Cmd+滚轮与捏合手势不再改变缩放。",
     "importFont": "导入自定义字体",
     "importingFont": "导入中…",
     "importFailed": "导入失败：{{message}}",
@@ -97,19 +98,33 @@
     "proxyWebNote": "网页预览版无桌面代理能力，地址仅在桌面端生效。",
     "proxyLocalNote": "本地服务（如 Ollama localhost）不走代理，直连更快。",
     "shortcutsTitle": "快捷键",
-    "shortcutsHint": "点击动作后按下组合键即录入；与其它动作冲突时拒绝保存。",
+    "shortcutsHint": "点击命令后按下组合键即录入；与其它命令冲突、或属于浏览器保留组合时拒绝保存。",
     "shortcutRecord": "点击录入",
     "shortcutRecording": "按下组合键…（Esc 取消）",
-    "shortcutReset": "恢复默认",
+    "shortcutRecordAria": "为「{{action}}」录入快捷键",
+    "shortcutReset": "全部恢复默认",
+    "shortcutResetOne": "将「{{action}}」恢复默认",
     "shortcutConflict": "与「{{action}}」冲突，未保存",
+    "shortcutReserved": "该组合被浏览器保留（刷新/开发者工具/打印等），未保存",
+    "shortcutCategories": {
+      "general": "通用",
+      "navigation": "分区导航",
+      "view": "视图与缩放"
+    },
     "shortcutActions": {
+      "commandPalette": "命令面板",
       "toggleAssistant": "显隐 AI 侧边栏",
+      "find": "编辑器查找",
+      "globalSearch": "全库检索",
+      "openSettings": "打开设置",
       "section1": "分区 1",
       "section2": "分区 2",
       "section3": "分区 3",
       "section4": "分区 4",
       "section5": "分区 5",
-      "find": "编辑器查找"
+      "zoomIn": "放大界面",
+      "zoomOut": "缩小界面",
+      "zoomReset": "界面字号复位"
     }
   },
   "skills": {

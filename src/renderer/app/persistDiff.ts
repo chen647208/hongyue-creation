@@ -17,7 +17,7 @@ const NON_PROJECT_KEYS = [
   'embeddingModels', 'activeProjectId', 'activeModelId', 'activeEmbeddingModelId', 'language', 'theme',
   'uiFont', 'editorFont', 'customFonts', 'mcpServers',
   'uiFontSize', 'editorFontSize', 'editorLineHeight',
-  'keybindings', 'proxy', 'minimizeToTray', 'autoLaunch',
+  'proxy', 'minimizeToTray', 'autoLaunch',
 ] as const;
 
 export type PersistOp =

@@ -7,85 +7,145 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import { RotateCcw } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
-import { useSettingsStore } from '@/app/stores/settingsStore';
 import { useTranslation } from '@/i18n';
 import {
-  DEFAULT_KEYBINDINGS,
-  eventToKeybinding,
+  eventToBinding,
   findConflicts,
-  formatKeybinding,
-  type KeybindingMap,
-  resolveKeybindings,
-} from '@/shared/services/keybindings';
+  formatBinding,
+  groupKeybindingCommands,
+  isReservedBinding,
+  type KeybindingActionId,
+  useKeymapStore,
+  useResolvedKeybindings,
+} from '@/shared/keymap';
 import { Button } from '@/shared/ui/Button';
 import { Label } from '@/shared/ui/Label';
 
-import type { KeybindingActionId } from '../../../../shared/types';
+/** 录制结果提示：与其它命令冲突，或落在浏览器保留组合上。 */
+type Notice = { kind: 'conflict'; action: KeybindingActionId } | { kind: 'reserved' } | null;
 
-const ACTIONS = Object.keys(DEFAULT_KEYBINDINGS) as KeybindingActionId[];
-
-/** 快捷键录制区（docs/design/15）：点动作→按组合即录入，冲突拒绝保存。 */
+/**
+ * 快捷键设置区：点击命令后按下组合键录入，支持单条与整体恢复默认。
+ * 冲突组合与浏览器保留组合拒绝保存并给出提示；未配置即回退默认。
+ */
 const ShortcutRecorder: React.FC = () => {
   const { t } = useTranslation('settings');
-  const overrides = useSettingsStore((s) => s.keybindings);
-  const store = useSettingsStore.getState();
+  const overrides = useKeymapStore((s) => s.overrides);
+  const setBinding = useKeymapStore((s) => s.setBinding);
+  const resetBinding = useKeymapStore((s) => s.resetBinding);
+  const resetAll = useKeymapStore((s) => s.resetAll);
+  const resolved = useResolvedKeybindings();
   const [recording, setRecording] = useState<KeybindingActionId | null>(null);
-  const [conflict, setConflict] = useState<string | null>(null);
-  const resolved = resolveKeybindings(overrides);
+  const [notice, setNotice] = useState<Notice>(null);
   const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.userAgent);
+  const groups = groupKeybindingCommands();
 
   useEffect(() => {
     if (!recording) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.key === 'Escape') {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === 'Escape') {
         setRecording(null);
         return;
       }
-      const binding = eventToKeybinding(e);
+      const binding = eventToBinding(event);
       if (!binding) return;
-      const current: KeybindingMap = { ...resolved };
-      const hits = findConflicts(current, recording, binding);
-      if (hits.length > 0) {
-        const name = hits[0] as KeybindingActionId;
-        setConflict(t('general.shortcutConflict', { action: t(`general.shortcutActions.${name}`) }));
+      if (isReservedBinding(binding)) {
+        setNotice({ kind: 'reserved' });
         return;
       }
-      store.setKeybinding(recording, binding);
-      setConflict(null);
+      const hits = findConflicts(resolved, recording, binding);
+      const other = hits[0];
+      if (other !== undefined) {
+        setNotice({ kind: 'conflict', action: other });
+        return;
+      }
+      setBinding(recording, binding);
+      setNotice(null);
       setRecording(null);
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [recording, resolved, store, t]);
+  }, [recording, resolved, setBinding]);
+
+  const noticeText = (): string | null => {
+    if (!notice) return null;
+    if (notice.kind === 'reserved') return t('general.shortcutReserved');
+    return t('general.shortcutConflict', { action: t(`general.shortcutActions.${notice.action}`) });
+  };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-end">
-        <Button variant="ghost" size="sm" onClick={() => { store.resetKeybindings(); setConflict(null); }}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            resetAll();
+            setNotice(null);
+            setRecording(null);
+          }}
+        >
+          <RotateCcw className="size-3.5" />
           {t('general.shortcutReset')}
         </Button>
       </div>
-      {ACTIONS.map((action) => (
-        <div key={action} className="flex items-center justify-between gap-3">
-          <Label>{t(`general.shortcutActions.${action}`)}</Label>
-          <Button
-            variant={recording === action ? 'default' : 'outline'}
-            size="sm"
-            className="min-w-36 font-mono"
-            onClick={() => { setConflict(null); setRecording(action); }}
-            title={t('general.shortcutRecord')}
-          >
-            {recording === action
-              ? t('general.shortcutRecording')
-              : formatKeybinding(resolved[action] ?? DEFAULT_KEYBINDINGS[action], isMac)}
-          </Button>
+      {groups.map((group) => (
+        <div key={group.category} className="space-y-2">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground">
+            {t(`general.shortcutCategories.${group.category}`)}
+          </p>
+          {group.commands.map((command) => {
+            const action = command.id;
+            const actionLabel = t(`general.shortcutActions.${action}`);
+            const isDefault = overrides[action] === undefined;
+            return (
+              <div key={action} className="flex items-center justify-between gap-3">
+                <Label>{actionLabel}</Label>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant={recording === action ? 'default' : 'outline'}
+                    size="sm"
+                    className="min-w-36 font-mono"
+                    aria-label={t('general.shortcutRecordAria', { action: actionLabel })}
+                    onClick={() => {
+                      setNotice(null);
+                      setRecording(action);
+                    }}
+                    title={t('general.shortcutRecord')}
+                  >
+                    {recording === action ? t('general.shortcutRecording') : formatBinding(resolved[action], isMac)}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 text-muted-foreground hover:text-foreground"
+                    disabled={isDefault}
+                    aria-label={t('general.shortcutResetOne', { action: actionLabel })}
+                    title={t('general.shortcutResetOne', { action: actionLabel })}
+                    onClick={() => {
+                      setNotice(null);
+                      setRecording(null);
+                      resetBinding(action);
+                    }}
+                  >
+                    <RotateCcw className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       ))}
-      {conflict && <p className="text-xs text-destructive">{conflict}</p>}
+      {noticeText() !== null && (
+        <p role="alert" className="text-xs text-destructive">
+          {noticeText()}
+        </p>
+      )}
     </div>
   );
 };

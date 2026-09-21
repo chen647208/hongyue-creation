@@ -7,6 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import { UI_FONT_SIZE } from '@shared/constants/uiScale';
 import type { AppLanguage, AppTheme } from '@shared/types';
 import { Download, Keyboard, Languages, Monitor, Moon, Sun, Trash2, Type, Upload } from 'lucide-react';
 import React, { useRef, useState } from 'react';
@@ -51,7 +52,7 @@ const GeneralSettingsPanel: React.FC<GeneralSettingsPanelProps> = ({
   const uiFont = useSettingsStore((s) => s.uiFont ?? DEFAULT_UI_FONT);
   const editorFont = useSettingsStore((s) => s.editorFont ?? DEFAULT_EDITOR_FONT);
   const customFonts = useSettingsStore((s) => s.customFonts);
-  const uiFontSize = useSettingsStore((s) => s.uiFontSize ?? 14);
+  const uiFontSize = useSettingsStore((s) => s.uiFontSize ?? UI_FONT_SIZE.default);
   const editorFontSize = useSettingsStore((s) => s.editorFontSize ?? 18);
   const editorLineHeight = useSettingsStore((s) => s.editorLineHeight ?? 1.9);
   const store = useSettingsStore.getState();
@@ -172,9 +173,9 @@ const GeneralSettingsPanel: React.FC<GeneralSettingsPanelProps> = ({
               <input
                 id="settings-ui-font-size"
                 type="range"
-                min={11}
-                max={20}
-                step={1}
+                min={UI_FONT_SIZE.min}
+                max={UI_FONT_SIZE.max}
+                step={UI_FONT_SIZE.step}
                 value={uiFontSize}
                 onChange={(e) => store.setUiFontSize(Number(e.target.value))}
                 className="w-full accent-primary"
@@ -207,6 +208,8 @@ const GeneralSettingsPanel: React.FC<GeneralSettingsPanelProps> = ({
               />
             </div>
           </div>
+
+          <p className="text-xs text-muted-foreground">{t('general.zoomEntryHint')}</p>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">

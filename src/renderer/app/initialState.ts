@@ -86,7 +86,6 @@ export const normalizeImportedState = (imported: Partial<AppState> | null | unde
     uiFontSize: typeof src.uiFontSize === 'number' ? src.uiFontSize : INITIAL_APP_STATE.uiFontSize,
     editorFontSize: typeof src.editorFontSize === 'number' ? src.editorFontSize : INITIAL_APP_STATE.editorFontSize,
     editorLineHeight: typeof src.editorLineHeight === 'number' ? src.editorLineHeight : INITIAL_APP_STATE.editorLineHeight,
-    keybindings: src.keybindings && typeof src.keybindings === 'object' ? src.keybindings : undefined,
     proxy: src.proxy && typeof src.proxy.url === 'string' ? { url: src.proxy.url } : undefined,
     minimizeToTray: typeof src.minimizeToTray === 'boolean' ? src.minimizeToTray : undefined,
     autoLaunch: typeof src.autoLaunch === 'boolean' ? src.autoLaunch : undefined,

@@ -122,8 +122,8 @@
     "guidedNext": "建议下一步：{{step}}",
     "guidedGoTip": "前往该步骤",
     "guidedDismiss": "关闭建议",
-    "toggleAssistantTip": "开关 AI 侧边栏（Ctrl+J）",
-    "expandAssistant": "展开 AI 侧边栏（Ctrl+J）"
+    "toggleAssistantTip": "开关 AI 侧边栏（快捷键可在设置中修改）",
+    "expandAssistant": "展开 AI 侧边栏"
   },
   "reset": {
     "factoryTitle": "恢复出厂设置",
