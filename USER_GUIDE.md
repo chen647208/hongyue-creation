@@ -513,19 +513,13 @@
 ### 资源链接
 
 #### 官方资源
-- 项目仓库：[GitHub 链接]
-- 最新版本下载：[发布页面]
-- 在线文档：[文档网站]
+- 项目仓库：<https://github.com/chen647208/hongyue-creation>
+- 最新版本下载：<https://github.com/chen647208/hongyue-creation/releases/latest>
+- 在线文档：<https://chen647208.github.io/hongyue-creation/>
 
 #### 学习资源
-- 小说创作教程：[推荐链接]
-- AI 写作技巧：[教程链接]
-- 创意写作社区：[社区链接]
-
-#### 工具推荐
-- 文本编辑器：[推荐工具]
-- 思维导图工具：[推荐工具]
-- 项目管理工具：[推荐工具]
+- 写作技巧与创作方法见文档站的「功能说明」与「设计蓝图」分区。
+- 提问与反馈走 GitHub Issues：<https://github.com/chen647208/hongyue-creation/issues>
 
 ### 版本历史
 

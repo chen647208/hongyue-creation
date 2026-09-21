@@ -1,23 +1,29 @@
 import { defineConfig } from 'vitepress';
 
-// 文档站（design/08 M5）：以 docs/ 设计与指南为内容源，VitePress 静态输出。
+// 文档站：以 docs/{design,guides,features} 为内容源，VitePress 静态输出。
 export default defineConfig({
   lang: 'zh-CN',
-  title: 'AI小说家 (ai-novel)',
-  description: '本地优先的 AI 小说创作助手——设计蓝图与使用指南',
+  title: '红月创作 (Hongyue Creation)',
+  description: '本地优先的桌面小说创作工具——设计蓝图与使用指南',
+  base: '/hongyue-creation/',
   srcDir: 'src',
   themeConfig: {
-    siteTitle: 'AI小说家 (ai-novel)',
+    siteTitle: '红月创作 (Hongyue Creation)',
     nav: [
-      { text: '设计蓝图', link: '/design/08-roadmap', activeMatch: '/design/' },
+      { text: '设计蓝图', link: '/design/README', activeMatch: '/design/' },
       { text: '使用指南', link: '/guides/project-structure', activeMatch: '/guides/' },
       { text: '功能说明', link: '/features/workflow', activeMatch: '/features/' },
+      {
+        text: '使用教程',
+        link: 'https://github.com/chen647208/hongyue-creation/blob/main/USER_GUIDE.md',
+      },
     ],
     sidebar: {
       '/design/': [
         {
-          text: '目标设计',
+          text: '蓝图总纲',
           items: [
+            { text: '设计文档索引', link: '/design/README' },
             { text: '01 现状评估', link: '/design/01-current-state' },
             { text: '02 目标架构', link: '/design/02-target-architecture' },
             { text: '03 数据层', link: '/design/03-data-layer' },
@@ -28,6 +34,62 @@ export default defineConfig({
             { text: '08 路线图', link: '/design/08-roadmap' },
           ],
         },
+        {
+          text: '深化设计',
+          items: [
+            { text: '09 Agent 后续项', link: '/design/09-agent-followups' },
+            { text: '10 流程与数据欠账', link: '/design/10-flow-and-data-debt' },
+            { text: '11 会话记忆与压缩', link: '/design/11-chat-memory' },
+            { text: '12 写作管理', link: '/design/12-writing-manage' },
+            { text: '13 导出矩阵', link: '/design/13-export-matrix' },
+            { text: '14 助手进阶', link: '/design/14-assistant-advanced' },
+            { text: '15 系统补齐', link: '/design/15-system-roundup' },
+            { text: '16 功能补齐', link: '/design/16-new-features' },
+            { text: '17 行业基线补齐', link: '/design/17-industry-gaps' },
+            { text: '18 规范化重构', link: '/design/18-standardization' },
+            { text: '19 UI 系统机制', link: '/design/19-ui-system' },
+            { text: '20 外部项目基准', link: '/design/20-external-benchmark' },
+            { text: '21 插件沙箱', link: '/design/21-plugin-sandbox' },
+            { text: '22 插件逻辑贡献协议', link: '/design/22-plugin-logic-contributions' },
+            { text: '23 数据层存储选型', link: '/design/23-data-layer-storage' },
+            { text: '24 本地优先数据层', link: '/design/24-local-first-data-layer' },
+          ],
+        },
+        {
+          text: '平台与生态',
+          items: [
+            { text: '25 数据安全', link: '/design/25-data-safety' },
+            { text: '26 成熟度缺口清单', link: '/design/26-maturity-gaps' },
+            { text: '27 IPC 信任边界加固', link: '/design/27-ipc-hardening' },
+            { text: '28 文档已写、代码未落地清单', link: '/design/28-doc-impl-gaps' },
+            { text: '29 通用创作平台', link: '/design/29-general-creation-platform' },
+            { text: '30 按需载入正文', link: '/design/30-lazy-node-loading' },
+            { text: '31 存储后端切换与哨兵', link: '/design/31-storage-backend-migration' },
+            { text: '32 AI 写入治理', link: '/design/32-ai-write-governance' },
+            { text: '33 动效规范', link: '/design/33-motion' },
+            { text: '34 创作域能力矩阵', link: '/design/34-creation-domain-matrix' },
+            { text: '35 跨设备与移动端', link: '/design/35-cross-device-and-mobile' },
+            { text: '36 数据同步与冲突', link: '/design/36-data-sync-and-conflict' },
+            { text: '37 AI 上下文注入与可信检索', link: '/design/37-ai-context-and-grounding' },
+            { text: '38 修订、批注与关联', link: '/design/38-revision-annotation-and-linking' },
+            { text: '39 编译与导出', link: '/design/39-compile-and-export' },
+            { text: '40 生态与运行时能力', link: '/design/40-ecosystem-and-runtime' },
+          ],
+        },
+        {
+          text: '专题深化',
+          items: [
+            { text: '41 非虚构与引用', link: '/design/41-nonfiction-and-reference' },
+            { text: '42 分支叙事与绘本', link: '/design/42-branching-and-picturebook' },
+            { text: '43 无障碍与国际化品质', link: '/design/43-accessibility-and-i18n' },
+            { text: '44 创作范式地图与跨域能力', link: '/design/44-paradigms-and-cross-domain' },
+            { text: '45 查询、块引用与素材隔离', link: '/design/45-query-blocks-and-materials' },
+            { text: '46 时间线深化与版本', link: '/design/46-timeline-and-versioning' },
+            { text: '47 跨域视图与脚本层', link: '/design/47-cross-domain-views-and-scripting' },
+            { text: '48 后续任务总表', link: '/design/48-backlog' },
+            { text: '49 可执行插件描述符协议', link: '/design/49-executable-plugin-protocol' },
+          ],
+        },
       ],
       '/guides/': [
         {
@@ -36,7 +98,14 @@ export default defineConfig({
             { text: '项目结构', link: '/guides/project-structure' },
             { text: '构建与发布', link: '/guides/build-and-release' },
             { text: 'CI 与发布流程', link: '/guides/ci-and-release' },
+            { text: '编写插件', link: '/guides/writing-a-plugin' },
             { text: '许可说明', link: '/guides/licensing' },
+            { text: '验收报告', link: '/guides/acceptance-report' },
+            { text: 'v0 就绪度与验收清单', link: '/guides/v0-readiness' },
+            {
+              text: '使用教程（USER_GUIDE）',
+              link: 'https://github.com/chen647208/hongyue-creation/blob/main/USER_GUIDE.md',
+            },
           ],
         },
       ],
@@ -44,14 +113,19 @@ export default defineConfig({
         {
           text: '功能说明',
           items: [
-            { text: '创作流程', link: '/features/workflow' },
-            { text: 'AI 层', link: '/features/ai-layer' },
+            { text: '创作主流程', link: '/features/workflow' },
+            { text: 'AI 调用层', link: '/features/ai-layer' },
             { text: '写作', link: '/features/writing' },
             { text: '伏笔追踪', link: '/features/foreshadowing' },
             { text: '知识库', link: '/features/knowledge' },
             { text: '助手', link: '/features/assistant' },
-            { text: '世界构建', link: '/features/world' },
+            { text: '世界观与一致性', link: '/features/world' },
+            { text: '角色', link: '/features/characters' },
             { text: '设置', link: '/features/settings' },
+            { text: '插件、同步与加密', link: '/features/plugins-and-sync' },
+            { text: '版本', link: '/features/version' },
+            { text: '备份与崩溃上报', link: '/features/backup-and-crash' },
+            { text: 'UI 组件清单', link: '/features/ui-catalog' },
           ],
         },
       ],

@@ -1,0 +1,123 @@
+name: Nightly
+
+# 每日一次的全量回归：verify 单链 + E2E 冒烟。
+# 失败自动开/更新固定标题的 Issue，恢复后自动关闭。
+on:
+  schedule:
+    # 02:00 Asia/Shanghai（18:00 UTC 前一天）
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: 全量校验（verify）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v7
+
+      - name: 配置 Node（读取 .nvmrc）
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 全部门禁（与本地同一条 npm run verify 链）
+        run: npm run verify
+
+  e2e:
+    name: E2E 冒烟（xvfb 无头）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v7
+
+      - name: 安装系统依赖（Electron 运行库）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgbm-dev libnss3 libatk-bridge2.0-0 libgtk-3-0 libasound2 xvfb libxss1 libxtst6 libatspi2.0-0 fonts-noto-cjk || true
+
+      - name: 配置 Node（读取 .nvmrc）
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      - name: 构建渲染层与主进程产物
+        run: npm run electron:build
+
+      - name: E2E 启动冒烟
+        run: xvfb-run -a npm run test:e2e
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+  report:
+    name: 汇总结果
+    needs: [verify, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 开/更新或关闭回归 Issue
+        uses: actions/github-script@v9
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const title = '夜间全量回归失败';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const runUrl = process.env.RUN_URL;
+
+            const failed = [];
+            if (process.env.VERIFY_RESULT !== 'success') failed.push(`verify（${process.env.VERIFY_RESULT}）`);
+            if (process.env.E2E_RESULT !== 'success') failed.push(`e2e（${process.env.E2E_RESULT}）`);
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = issues.find((issue) => issue.title === title);
+
+            if (failed.length > 0) {
+              const body = [
+                '## 夜间全量回归失败',
+                '',
+                `- 运行记录：${runUrl}`,
+                `- 失败作业：${failed.join('、')}`,
+                '',
+                '完整日志见运行记录页。',
+              ].join('\n');
+              if (existing) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body });
+              } else {
+                await github.rest.issues.create({ owner, repo, title, body });
+              }
+            } else if (existing) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body: `回归已恢复通过：${runUrl}`,
+              });
+              await github.rest.issues.update({ owner, repo, issue_number: existing.number, state: 'closed' });
+            }

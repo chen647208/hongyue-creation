@@ -1,0 +1,51 @@
+name: Generated Files
+
+# 在 main 上重跑生成脚本，把生成物变更自动提交回 main。
+# 这是生成物的自动维护，不替代 npm run verify 单链门禁。
+# 注意：用 GITHUB_TOKEN 提交不会再次触发工作流，无递归风险。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: generated-files-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: 重生成并提交
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v7
+
+      - name: 配置 Node（读取 .nvmrc）
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 重新生成生成物
+        run: |
+          npm run licenses:generate
+          # docs:sync 输出到 docs-site/src，该目录被 .gitignore 忽略，仅构建预览使用
+          npm run docs:sync
+
+      - name: 有变更则提交回 main
+        run: |
+          if git diff --quiet; then
+            echo "生成物无变化，跳过提交。"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add THIRD-PARTY-LICENSES.md
+          git commit -m "chore: 更新生成物"
+          git push

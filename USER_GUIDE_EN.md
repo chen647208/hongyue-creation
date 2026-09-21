@@ -513,19 +513,13 @@ Default shortcuts (`Ctrl`, `Cmd` on macOS); remap in Settings → General → Sh
 ### Links
 
 #### Official
-- Repo: [GitHub link]
-- Latest download: [releases page]
-- Online docs: [docs site]
+- Repo: <https://github.com/chen647208/hongyue-creation>
+- Latest download: <https://github.com/chen647208/hongyue-creation/releases/latest>
+- Online docs: <https://chen647208.github.io/hongyue-creation/>
 
 #### Learning
-- Fiction craft tutorials: [recommended links]
-- AI writing tips: [tutorials]
-- Creative writing communities: [communities]
-
-#### Tools
-- Text editors: [recommendations]
-- Mind mapping: [recommendations]
-- Project management: [recommendations]
+- Craft and design notes live under the docs site "Features" and "Design" sections.
+- Questions and feedback: GitHub Issues <https://github.com/chen647208/hongyue-creation/issues>
 
 ### Version history
 

@@ -3,6 +3,9 @@
 本目录用于记录当前项目的真实结构、功能模块与构建发布方式。
 所有文档均以当前代码为准，目标是帮助后续维护时快速定位入口、职责和边界。
 
+面向使用者的教程见仓库根 [USER_GUIDE.md](../USER_GUIDE.md) 与 [USER_GUIDE_EN.md](../USER_GUIDE_EN.md)；
+在线文档站见 <https://chen647208.github.io/hongyue-creation/>。
+
 ## 文档规范
 
 本项目以实时跟进业界最新实践为常态——代码库没有「迁移完成时」，任何时候
@@ -31,6 +34,7 @@ Trail of Bits、Cloudflare coding standards、WordPress 文档风格指南同款
 - `guides/writing-a-plugin.md`：从模板编写插件、贡献点与许可边界
 - `guides/licensing.md`：AGPL-3.0 社区版与商业授权的双重许可说明
 - `guides/acceptance-report.md`：M0–M5 验收报告（各设计篇验收标准逐项状态与证据）
+- `guides/v0-readiness.md`：v0 就绪度与验收清单（对外发布口径与手工验收步骤）
 - `CLA.md`：贡献者许可协议正文
 
 ### 2. 再看核心功能
