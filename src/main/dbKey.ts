@@ -121,7 +121,7 @@ export function loadDbKey(): string | null {
     return safeStorage.decryptString(Buffer.from(file.wrappedKey, 'base64'));
   } catch (err) {
     logger.error('db', '数据库密钥解包失败', err);
-    throw new Error('数据库密钥无法解锁（钥匙串已变更），请使用恢复码');
+    throw new Error('数据库密钥无法解锁（钥匙串已变更），请使用恢复码', { cause: err });
   }
 }
 

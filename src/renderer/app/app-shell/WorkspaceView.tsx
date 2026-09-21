@@ -114,7 +114,7 @@ const WorkspaceSection: React.FC<WorkspaceViewProps> = ({
   }
   const bannerBlocked = modelBlocked && handwriteBypass;
 
-  let content: React.ReactNode = null;
+  let content: React.ReactNode;
   switch (section) {
     case 'inspiration':
       content = (

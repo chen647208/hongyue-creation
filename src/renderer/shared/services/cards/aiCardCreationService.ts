@@ -167,7 +167,7 @@ export class AICardCreationService {
     logger.debug('AI原始返回:', content);
     
     // 尝试多种方式提取JSON
-    let jsonStr = '';
+    let jsonStr: string;
     
     // 方式1: 提取 ```json 代码块
     const jsonCodeBlockMatch = content.match(/```json\s*([\s\S]*?)```/);
@@ -205,7 +205,7 @@ export class AICardCreationService {
       return asRecord(JSON.parse(jsonStr));
     } catch (e) {
       logger.error('JSON解析失败:', jsonStr, e);
-      throw new Error(i18n.t('cards:create.invalidFormat'));
+      throw new Error(i18n.t('cards:create.invalidFormat'), { cause: e });
     }
   }
 
