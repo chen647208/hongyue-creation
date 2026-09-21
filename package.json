@@ -146,7 +146,7 @@
     "electron": "^44.0.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
-    "eslint": "^9.39.4",
+    "eslint": "^10.10.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-simple-import-sort": "^14.0.0",
