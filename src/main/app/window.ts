@@ -10,9 +10,10 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 
 import { logger } from '../logger.js';
+import { buildMinimalMenu, installBrowserShortcutGuards } from './shortcutGuards.js';
 import { interceptClose } from './tray.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -139,6 +140,11 @@ export async function createWindow(): Promise<void> {
   });
 
   applyWindowSecurity(mainWindow);
+  if (app.isPackaged) {
+    // 打包运行：去掉浏览器式菜单与快捷键（刷新/开发者工具/打印），贴近原生软件
+    Menu.setApplicationMenu(buildMinimalMenu());
+    installBrowserShortcutGuards(mainWindow.webContents);
+  }
   if (saved.maximized) mainWindow.maximize();
 
   // 关闭/退出前落盘几何，下次原样恢复；最小化到托盘开启时关闭即隐藏

@@ -1,0 +1,26 @@
+name: Release Drafter
+
+# 持续维护一份发布说明草稿：main 有变更或 PR 事件时更新；发布时用草稿正文。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-drafter-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update_release_draft:
+    name: 更新发布草稿
+    runs-on: ubuntu-latest
+    steps:
+      - name: 生成/更新草稿 Release
+        uses: release-drafter/release-drafter@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

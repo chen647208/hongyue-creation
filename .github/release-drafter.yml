@@ -1,0 +1,57 @@
+# 发布说明草稿配置：随 main 变更持续更新草稿 Release，按类型分类。
+# 使用 Conventional Commits 前缀自动打标签（autolabeler），发布的草稿可用于补全 release.yml 的说明。
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+categories:
+  - title: '破坏性变更'
+    labels: ['breaking']
+  - title: '新功能'
+    labels: ['feature', 'enhancement']
+  - title: '修复'
+    labels: ['fix', 'bug']
+  - title: '文档'
+    labels: ['docs']
+  - title: '维护'
+    labels: ['chore', 'refactor', 'test', 'ci', 'dependencies']
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
+version-resolver:
+  major:
+    labels: ['breaking']
+  minor:
+    labels: ['feature', 'enhancement']
+  patch:
+    labels: ['fix', 'bug', 'docs', 'chore', 'refactor', 'test', 'ci', 'dependencies']
+  default: patch
+template: |
+  ## 变更
+
+  $CHANGES
+autolabeler:
+  - label: 'breaking'
+    title:
+      - '/^[a-z]+(\(.+\))?!:/i'
+  - label: 'feature'
+    title:
+      - '/^feat(\(.+\))?:/i'
+  - label: 'fix'
+    title:
+      - '/^fix(\(.+\))?:/i'
+  - label: 'docs'
+    title:
+      - '/^docs(\(.+\))?:/i'
+  - label: 'chore'
+    title:
+      - '/^(chore|build|style)(\(.+\))?:/i'
+  - label: 'refactor'
+    title:
+      - '/^refactor(\(.+\))?:/i'
+  - label: 'test'
+    title:
+      - '/^test(\(.+\))?:/i'
+  - label: 'ci'
+    title:
+      - '/^ci(\(.+\))?:/i'
+  - label: 'dependencies'
+    title:
+      - '/^chore\(deps(-dev)?\):/i'
