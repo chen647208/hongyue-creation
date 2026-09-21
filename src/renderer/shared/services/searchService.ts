@@ -46,7 +46,7 @@ export async function hybridSearch(
   const fts = await repository.search(q, { limit: limit * 2, preferMaterial: options?.preferMaterial }).catch(() => [] as SearchHit[]);
   if (!options?.projectId) return fts.slice(0, limit);
 
-  let vector: SearchHit[] = [];
+  let vector: SearchHit[];
   try {
     const results = await vectorIntegrationService.semanticSearchKnowledge(options.projectId, q, { limit });
     vector = results.map((r, i) => vectorHitToSearchHit(r, i));

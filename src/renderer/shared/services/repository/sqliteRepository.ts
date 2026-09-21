@@ -144,7 +144,7 @@ export class SqliteRepository implements StorageRepository {
   /** 迁移前快照：已有旧版本库即将升级时先热备份一份（失败不阻断启动）。 */
   private async snapshotBeforeMigration(): Promise<void> {
     if (!this.driver.hotBackup) return;
-    let current = 0;
+    let current: number;
     try {
       const row = await this.driver.get<{ value: string }>('schema.versionSelect');
       current = row ? Number(row.value) : 0;

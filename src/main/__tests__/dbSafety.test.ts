@@ -72,7 +72,7 @@ describe('数据安全演练（真实加密引擎）', () => {
     bytes[at] = (bytes[at] ?? 0) ^ 0xff;
     fs.writeFileSync(backupPath, bytes);
 
-    let readable = false;
+    let readable: boolean;
     try {
       const corrupted = new Database(backupPath);
       corrupted.pragma(`key='${KEY}'`);

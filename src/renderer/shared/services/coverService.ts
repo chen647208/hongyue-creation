@@ -65,7 +65,7 @@ export async function exportCover(book: Pick<Project, 'title' | 'intro'>): Promi
   const safeTitle = book.title.replace(/[\\/:*?"<>|]/g, '_') || 'cover';
 
   // 先尝试 PNG
-  let pngBase64: string | null = null;
+  let pngBase64: string | null;
   try {
     const dataUrl = await svgToPngDataUrl(svg, 1024, 1365);
     pngBase64 = dataUrl.split(',')[1] ?? null;

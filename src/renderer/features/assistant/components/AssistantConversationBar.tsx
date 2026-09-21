@@ -62,7 +62,7 @@ const AssistantConversationBar: React.FC<AssistantConversationBarProps> = ({
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     const currentIndex = conversations.findIndex((c) => c.id === activeId);
     if (currentIndex < 0) return;
-    let next = currentIndex;
+    let next: number;
     if (event.key === 'ArrowRight') next = (currentIndex + 1) % conversations.length;
     else if (event.key === 'ArrowLeft') next = (currentIndex - 1 + conversations.length) % conversations.length;
     else if (event.key === 'Home') next = 0;
