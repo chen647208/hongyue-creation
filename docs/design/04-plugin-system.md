@@ -254,7 +254,7 @@ Rust host core、stdio JSON-RPC sidecar、面向编码的文件/diff/Bash 工具
 
 1. `TaskScheduler`（已落地）：`renderer/shared/services/taskScheduler.ts`；自动备份兜底（60s）经它驱动，任务抛错隔离、错峰不叠峰。
 2. `healthCheck`（已落地）：`main/app/diagnosticsCore.ts` 的 `collectHealth`，随诊断包导出为 `health.json`。
-3. `contributionRegistry`（已落地引擎 + 收编两个注册表）：统一贡献注册表引擎 `renderer/shared/services/contributionRegistry.ts`（注册返回 Disposable、order 排序、引用稳定快照）；`commandRegistry` 与 `settingsTabRegistry` 已继承它。schema 驱动设置表单待后续。
+3. `contributionRegistry`（已落地引擎 + 收编两个注册表）：统一贡献注册表引擎 `renderer/shared/services/contributionRegistry.ts`（注册返回 Disposable、order 排序、引用稳定快照）；`commandRegistry` 与 `settingsTabRegistry` 已继承它。
 
 ### 12.3 不迁移
 
@@ -295,6 +295,6 @@ GPL-3.0 代码、.NET/AspNetCore/SignalR 栈、PVR 领域模型、Web 服务 + �
 
 1. `renderer/shared/services/contributionRegistry.ts`：`ContributionRegistry<T>`（注册返回 Disposable、按 order 排序、引用稳定快照、订阅）已落地，配单测。
 2. `commandRegistry` 与 `settingsTabRegistry` 已收编为它的子类，公开 API 不变。
-3. 设置表单由 schema 渲染（已落地引擎）：`shared/ui/SchemaForm.tsx` 按 JSON Schema 渲染 string/number/boolean；插件状态面板对声明 `settingsSchema` 的插件渲染设置并持久化在 `plugin.<id>.settings`。enum/嵌套对象待后续。
+3. 设置表单由 schema 渲染（已落地引擎）：`shared/ui/SchemaForm.tsx` 按 JSON Schema 渲染 string/number/integer/boolean/enum 下拉/object 递归嵌套；插件状态面板对声明 `settingsSchema` 的插件渲染设置并持久化在 `plugin.<id>.settings`。
 
-验收：加一个贡献只写声明 + register，不改应用壳；禁用后贡献与设置项一并消失；状态退避可见（第 3 项待）。
+验收：加一个贡献只写声明 + register，不改应用壳；禁用后贡献与设置项一并消失；状态退避可见。
