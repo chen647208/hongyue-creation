@@ -15,10 +15,12 @@
  * 基线由首启动 hydrate 建立：磁盘现状 == 刚载入的组合态，首帧不整体重写。
  */
 
+import { canonicalHash } from '@core/sync';
+
 import { dt } from '@/i18n';
 
 import { APP_STATE_VERSION } from '../../../shared/constants/versions';
-import { type AppState, type Project, type StorageConfig } from '../../../shared/types';
+import { type AppState, type Chapter, type StorageConfig } from '../../../shared/types';
 import { autoBackupService } from '../../shared/services/autoBackupService';
 import { emitPluginEvent, hasPluginScriptSubscribers } from '../../shared/services/pluginEventBus';
 import { repository } from '../../shared/services/repository';
@@ -97,17 +99,36 @@ export function seedPersistBaseline(base: AppState | null): void {
 }
 
 /**
- * 章节落盘成功后派发 `chapter.save`：只对引用变化的章节发事件，载荷带 id 与标题（不带正文）。
- * 无已激活脚本订阅时直接返回，不计算载荷（缺省零开销）。
+ * 章节落盘成功后派发 `chapter.save`：只对内容发生变化的章节发事件，载荷带 id 与标题（不带正文）。
+ *
+ * 首帧（无前序基线的全量落盘）也逐章派发：插件订阅章节保存维护自己的索引或缓存，
+ * 首帧不派发会让插件的缓存永远初始化不了。
+ * 变化按内容指纹判定（core/sync 的 canonicalHash，与同步合并同一口径，不另造哈希），
+ * 不按对象引用：章节被重建引用但内容相同（hydrate 后重新载入）不判变，不重复派发。
+ * 无已激活脚本订阅时直接返回，不计算变化集（缺省零开销）。
  */
-function emitChapterSaveEvents(ops: PersistOp[], previous: Project[]): void {
+function emitChapterSaveEvents(prev: AppState | null, next: AppState, ops: PersistOp[]): void {
   if (!hasPluginScriptSubscribers('chapter.save')) return;
+  const emit = (bookId: string, chapter: Chapter) => {
+    emitPluginEvent('chapter.save', { bookId, chapterId: chapter.id, title: chapter.title });
+  };
+  // 基线不存在：本次是全量落盘，写入的每个章节都算一次保存。
+  if (prev === null) {
+    for (const project of next.projects) {
+      for (const chapter of project.chapters) emit(project.id, chapter);
+    }
+    return;
+  }
+  const prevById = new Map(prev.projects.map((p) => [p.id, p]));
   for (const op of ops) {
     if (op.kind !== 'saveProject') continue;
-    const before = new Map((previous.find((p) => p.id === op.project.id)?.chapters ?? []).map((c) => [c.id, c]));
+    const before = new Map((prevById.get(op.project.id)?.chapters ?? []).map((c) => [c.id, c]));
     for (const chapter of op.project.chapters) {
-      if (before.get(chapter.id) === chapter) continue;
-      emitPluginEvent('chapter.save', { bookId: op.project.id, chapterId: chapter.id, title: chapter.title });
+      const previous = before.get(chapter.id);
+      // 同一引用即未变；引用不同时按内容指纹判，深相等不判变。
+      if (previous === chapter) continue;
+      if (previous !== undefined && canonicalHash(previous) === canonicalHash(chapter)) continue;
+      emit(op.project.id, chapter);
     }
   }
 }
@@ -124,7 +145,7 @@ async function doFlush(): Promise<void> {
       ops = await persistDiff(repository, prev, next, commitMetaOf);
     }
     // 落盘成功后才派发章节保存事件（异步非阻塞；无插件订阅时零开销）
-    emitChapterSaveEvents(ops, prev?.projects ?? []);
+    emitChapterSaveEvents(prev, next, ops);
     // 仅在成功后才推进基线：失败时保持旧基线，重试会重算同一份差分
     lastPersisted = next;
     dirty = false;
