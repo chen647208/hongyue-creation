@@ -19,9 +19,21 @@ async function enterWorkspaceWriting(page: Page): Promise<void> {
   }
   await page.keyboard.press('Control+j').catch(() => undefined);
   await page.keyboard.press('Control+5');
-  await page.getByRole('button', { name: /先手写看看|Write by hand/ }).first().click({ timeout: 8_000 }).catch(() => undefined);
-  await page.getByRole('button', { name: /新建第一章|Create first chapter/ }).first().click({ timeout: 20_000 }).catch(() => undefined);
-  await page.locator('.ProseMirror').first().waitFor({ state: 'attached', timeout: 30_000 });
+  // 分区快捷键只受 view 门控、不受模型拦截影响；未配置模型时写作区被豁免按钮挡住，
+  // 先点掉它首章按钮才会出现。这里不用 .catch 吞掉点击失败——吞掉只会把真实失败
+  // 伪装成「编辑器 30s 超时」，难以定位。
+  const handwrite = page.getByRole('button', { name: /先手写看看|Write by hand/ }).first();
+  if (await handwrite.isVisible({ timeout: 8_000 }).catch(() => false)) {
+    await handwrite.click();
+  }
+  // 无章时「新建第一章」出现，点掉；reload 后章节已存在时该按钮不出现、编辑器直接挂载。
+  // 注意 isVisible() 不等待，必须用竞速等待，否则会在按钮还没渲染时就误判为已建章。
+  const editor = page.locator('.ProseMirror').first();
+  const createChapter = page.getByRole('button', { name: /新建第一章|Create first chapter/ }).first();
+  await expect(createChapter.or(editor).first()).toBeVisible({ timeout: 30_000 });
+  // 已建章时该按钮已不在：点不到属预期，不是失败
+  await createChapter.click({ timeout: 5_000 }).catch(() => undefined);
+  await expect(editor).toBeAttached({ timeout: 30_000 });
 }
 
 test('实时协作：两个窗口同步章节正文', async () => {
