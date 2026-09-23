@@ -98,13 +98,19 @@ function parseCondition(value: unknown): QueryCondition | undefined {
   return undefined;
 }
 
-function parseComputedColumns(value: unknown): ComputedColumn[] | undefined {
+/**
+ * 解析计算列声明。`reservedKeys` 为已被占用的键（既有列 key）：
+ * 计算列键与既有列或另一条计算列重复时拒绝该列——否则同名单元格被静默覆盖、列出现两份。
+ */
+function parseComputedColumns(value: unknown, reservedKeys: ReadonlySet<string>): ComputedColumn[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const columns: ComputedColumn[] = [];
+  const taken = new Set(reservedKeys);
   for (const item of value) {
     if (typeof item !== 'object' || item === null) continue;
     const record = item as Record<string, unknown>;
     if (typeof record.key !== 'string' || record.key === '') continue;
+    if (taken.has(record.key)) continue;
     const operands = Array.isArray(record.operands)
       ? record.operands.filter((operand): operand is string => typeof operand === 'string' && operand !== '')
       : [];
@@ -130,6 +136,7 @@ function parseComputedColumns(value: unknown): ComputedColumn[] | undefined {
       }
       if (Object.keys(params).length > 0) column.params = params;
     }
+    taken.add(record.key);
     columns.push(column);
   }
   return columns.length > 0 ? columns : undefined;
@@ -244,9 +251,10 @@ export function parseViewLayout(config: Record<string, unknown> | undefined): Vi
   const hidden = Array.isArray(config.hidden)
     ? config.hidden.filter((value): value is string => typeof value === 'string')
     : [];
+  const columns = parseColumns(config.columns);
   return {
     kind: isViewKind(config.kind) ? config.kind : DEFAULT_VIEW_LAYOUT.kind,
-    columns: parseColumns(config.columns),
+    columns,
     hidden,
     sortKey: typeof config.sortKey === 'string' ? config.sortKey : undefined,
     sortDesc: config.sortDesc === true,
@@ -255,7 +263,7 @@ export function parseViewLayout(config: Record<string, unknown> | undefined): Vi
     readerDevice: config.readerDevice === 'tablet' || config.readerDevice === 'phone' ? config.readerDevice : config.readerDevice === 'desktop' ? 'desktop' : undefined,
     height: typeof config.height === 'number' ? config.height : undefined,
     conditions: parseCondition(config.conditions),
-    computed: parseComputedColumns(config.computed),
+    computed: parseComputedColumns(config.computed, new Set(columns.map((column) => column.key))),
     aggregations: parseAggregations(config.aggregations),
     fieldAliases: parseFieldAliases(config.fieldAliases),
     chart: parseChartSpec(config.chart),

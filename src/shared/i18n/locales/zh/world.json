@@ -38,6 +38,22 @@
         "color": "颜色",
         "size": "大小",
         "shape": "形状"
+      },
+      "valueType": "维度类型",
+      "typeAuto": "按取值推断",
+      "types": {
+        "nominal": "类别",
+        "ordinal": "有序",
+        "quantitative": "数值",
+        "temporal": "时间"
+      },
+      "aggregate": "聚合方式",
+      "aggregates": {
+        "count": "计数",
+        "sum": "求和",
+        "avg": "均值",
+        "min": "最小",
+        "max": "最大"
       }
     },
     "canvas": {
@@ -144,6 +160,7 @@
       "empty": "暂无计算列，插入预设获取示例",
       "remove": "移除计算列",
       "insertFormula": "插入公式",
+      "keyConflict": "计算列键「{{key}}」与既有列或其它计算列重复，原配置未改动。",
       "param": {
         "speechRate": "语速（字/秒）"
       }
@@ -157,6 +174,14 @@
       "value": "值",
       "valuePlaceholder": "比较值",
       "addCondition": "添加条件",
+      "addChild": "在本组内添加条件",
+      "addGroup": "新建分组",
+      "removeGroup": "移除分组",
+      "group": {
+        "and": "全部满足",
+        "or": "任一满足",
+        "not": "都不满足"
+      },
       "aggregations": "聚合",
       "aggregationKind": "聚合方式",
       "addAggregation": "添加聚合",

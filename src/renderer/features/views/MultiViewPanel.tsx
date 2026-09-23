@@ -8,6 +8,7 @@
  */
 
 /** 多视图面板：同一份作品数据可在表格/卡片/图之间切换，布局存入 ViewDefinition。 */
+import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import type { Project } from '@shared/types';
 import { BarChart3, BookmarkPlus, BookOpen, FileDown, LayoutDashboard, LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2, Upload } from 'lucide-react';
@@ -29,13 +30,16 @@ import { Select } from '@/shared/ui/Select';
 import { ViewModeToggle } from '@/shared/ui/ViewModeToggle';
 import { cn } from '@/shared/utils/cn';
 
-import { buildEntityView } from './buildEntityView';
+import { buildEntityView,ENTITY_VIEW_COLUMNS } from './buildEntityView';
 import { addCanvasEdge, mergeCanvasDocument, moveCanvasNode, projectCanvas, removeCanvasEdge } from './canvasView';
 import { parseCanvasText, serializeCanvas } from './jsonCanvas';
-import type { AggregationKind, CanvasPoint, ChartChannel, ChartMark, ConditionOperator, QueryLeaf, ViewColumn, ViewRow } from './types';
+import type { AggregationKind, CanvasPoint, ChartAggregate, ChartChannel, ChartMark, ChartValueType, ConditionOperator, ViewColumn, ViewRow } from './types';
 import ViewCards from './ViewCards';
 import { DEFAULT_CHART_SPEC, projectChart } from './viewChart';
+import ViewConditionEditor from './ViewConditionEditor';
+import { type ConditionGroupType, insertConditionAt, makeConditionLeaf, removeConditionAt } from './viewConditions';
 import { serializeViewTable, type TableFormat } from './viewExport';
+import { buildTemplateFieldLabels } from './viewFieldLabels';
 import ViewGraph from './ViewGraph';
 import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from './viewLayout';
 import ViewOutline from './ViewOutline';
@@ -52,6 +56,8 @@ const LazyCanvasView = React.lazy(() => import('./ViewCanvas'));
 
 const CHART_MARKS: readonly ChartMark[] = ['bar', 'point', 'line', 'area'];
 const CHART_CHANNELS: readonly ChartChannel[] = ['x', 'y', 'color', 'size', 'shape'];
+const CHART_VALUE_TYPES: readonly ChartValueType[] = ['nominal', 'ordinal', 'quantitative', 'temporal'];
+const CHART_AGGREGATES: readonly ChartAggregate[] = ['count', 'sum', 'avg', 'min', 'max'];
 
 interface MultiViewPanelProps {
   project: Project;
@@ -227,24 +233,13 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     month: t('views.query.fields.month'),
     day: t('views.query.fields.day'),
   };
-  const queryFieldLabel = (field: string): string => queryFieldLabels[field] ?? field;
-  // 字段标签：内置/查询字段走映射，预设 i18n 键走 world 命名空间，扩展字段回落原始键。
+  // 扩展字段标签：Project.extensions 的自有键已是行字段，标题取类型注册表的字段声明，未命中回落原键。
+  const templateFieldLabels = useMemo(() => buildTemplateFieldLabels(builtinRegistry.list()), []);
+  // 字段标签：内置列/查询键走映射，扩展键查类型注册表，预设 i18n 键走 world 命名空间，未命中回落原键。
   const fieldLabel = (key: string): string => {
-    const known = columnLabels[key] ?? queryFieldLabels[key];
+    const known = columnLabels[key] ?? queryFieldLabels[key] ?? templateFieldLabels.get(key);
     if (known) return known;
     return key.startsWith('views.') ? dt(`world:${key}`) : key;
-  };
-  const conditionOperatorLabels: Record<ConditionOperator, string> = {
-    eq: t('views.query.op.eq'),
-    neq: t('views.query.op.neq'),
-    contains: t('views.query.op.contains'),
-    notContains: t('views.query.op.notContains'),
-    gt: t('views.query.op.gt'),
-    gte: t('views.query.op.gte'),
-    lt: t('views.query.op.lt'),
-    lte: t('views.query.op.lte'),
-    empty: t('views.query.op.empty'),
-    notEmpty: t('views.query.op.notEmpty'),
   };
   const aggregationKindLabels: Record<AggregationKind, string> = {
     count: t('views.query.agg.count'),
@@ -252,6 +247,19 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     avg: t('views.query.agg.avg'),
     longest: t('views.query.agg.longest'),
     latest: t('views.query.agg.latest'),
+  };
+  const chartValueTypeLabels: Record<ChartValueType, string> = {
+    nominal: t('views.chart.types.nominal'),
+    ordinal: t('views.chart.types.ordinal'),
+    quantitative: t('views.chart.types.quantitative'),
+    temporal: t('views.chart.types.temporal'),
+  };
+  const chartAggregateLabels: Record<ChartAggregate, string> = {
+    count: t('views.chart.aggregates.count'),
+    sum: t('views.chart.aggregates.sum'),
+    avg: t('views.chart.aggregates.avg'),
+    min: t('views.chart.aggregates.min'),
+    max: t('views.chart.aggregates.max'),
   };
   const projection = useMemo(
     () =>
@@ -268,11 +276,39 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   // 图表：轴与图例由「字段→通道」声明派生，投影为纯函数。
   const chartSpec = layout.chart ?? DEFAULT_CHART_SPEC;
   const chartProjection = useMemo(() => projectChart(projection, layout.chart), [projection, layout.chart]);
-  const chartBindingField = (channel: ChartChannel): string => chartSpec.bindings.find((binding) => binding.channel === channel)?.field ?? '';
+  const chartBinding = (channel: ChartChannel) => chartSpec.bindings.find((binding) => binding.channel === channel);
+  const chartBindingField = (channel: ChartChannel): string => chartBinding(channel)?.field ?? '';
   const setChartMark = (mark: ChartMark) => setLayout({ chart: { mark, bindings: chartSpec.bindings } });
   const setChartBinding = (channel: ChartChannel, field: string) => {
+    const previous = chartBinding(channel);
     const bindings = chartSpec.bindings.filter((binding) => binding.channel !== channel);
-    if (field) bindings.push({ field, channel });
+    if (field) bindings.push(previous ? { ...previous, field } : { field, channel });
+    setLayout({ chart: { mark: chartSpec.mark, bindings } });
+  };
+  /** 改通道声明的取值类型：字段不变；选「按取值推断」则从声明中移除 type，回到引擎推断。 */
+  const setChartValueType = (channel: ChartChannel, type: ChartValueType | '') => {
+    const bindings = chartSpec.bindings.map((binding) => {
+      if (binding.channel !== channel) return binding;
+      if (type === '') {
+        const rest = { ...binding };
+        delete rest.type;
+        return rest;
+      }
+      return { ...binding, type };
+    });
+    setLayout({ chart: { mark: chartSpec.mark, bindings } });
+  };
+  /** 改通道声明的聚合方式：字段不变；聚合只对量化通道（y）生效，缺省即按 x 计数。 */
+  const setChartAggregate = (channel: ChartChannel, aggregate: ChartAggregate | '') => {
+    const bindings = chartSpec.bindings.map((binding) => {
+      if (binding.channel !== channel) return binding;
+      if (aggregate === '') {
+        const rest = { ...binding };
+        delete rest.aggregate;
+        return rest;
+      }
+      return { ...binding, aggregate };
+    });
     setLayout({ chart: { mark: chartSpec.mark, bindings } });
   };
 
@@ -303,17 +339,19 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     const row = data.rows.find((item) => item.id === id);
     if (row) handleSelectRow(row);
   };
-  const conditionLeaves = layout.conditions?.type === 'and' ? layout.conditions.children.filter((child): child is QueryLeaf => child.type === 'leaf') : [];
 
-  const addCondition = () => {
-    const leaf: QueryLeaf = { type: 'leaf', field: condField, operator: condOperator };
-    if (condOperator !== 'empty' && condOperator !== 'notEmpty') leaf.value = condValue;
-    setLayout({ conditions: { type: 'and', children: [...conditionLeaves, leaf] } });
+  // 条件树编辑：增删按「根起第几层第几个」的路径定位，未被命中的分支原样保留。
+  const addCondition = (path: readonly number[]) => {
+    const leaf = makeConditionLeaf(condField, condOperator, condValue);
+    setLayout({ conditions: insertConditionAt(layout.conditions, path, leaf) });
   };
 
-  const removeCondition = (index: number) => {
-    const next = conditionLeaves.filter((_, position) => position !== index);
-    setLayout({ conditions: next.length > 0 ? { type: 'and', children: next } : undefined });
+  const addConditionGroup = (path: readonly number[], type: ConditionGroupType) => {
+    setLayout({ conditions: insertConditionAt(layout.conditions, path, { type, children: [] }) });
+  };
+
+  const removeCondition = (path: readonly number[]) => {
+    setLayout({ conditions: removeConditionAt(layout.conditions, path) });
   };
 
   const addAggregation = () => {
@@ -326,6 +364,19 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   };
 
   const computedColumns = layout.computed ?? [];
+
+  // 既有列与行字段占用的键：内置列 + 布局列 + 行数据字段；计算列键撞上任一项即冲突。
+  const baseColumnKeys = useMemo(() => {
+    const keys = new Set<string>(ENTITY_VIEW_COLUMNS.map((column) => column.key));
+    for (const field of availableFields) keys.add(field);
+    return keys;
+  }, [availableFields]);
+
+  /** 计算列键冲突判定：撞既有列、行字段或其它计算列即冲突（撞车会让同名单元格被覆盖、列出现两份）。 */
+  const isComputedKeyConflict = (key: string): boolean =>
+    baseColumnKeys.has(key) ||
+    layout.columns.some((column) => column.key === key) ||
+    computedColumns.some((column) => column.key === key);
 
   const updateComputedParam = (key: string, name: string, value: number) => {
     setLayout({
@@ -347,20 +398,30 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     const formula = pluginFormulas.find((item) => item.id === formulaId);
     if (!formula) return;
     const key = `computed:${formula.id}`;
-    if (computedColumns.some((column) => column.key === key)) return;
+    // 冲突时报错并保留原配置：不改动视图，也不写库。
+    if (isComputedKeyConflict(key)) {
+      dialogService.alert(t('views.computed.keyConflict', { key }));
+      return;
+    }
     setLayout({
       computed: [...computedColumns, { key, label: formula.label, expression: formula.expression, width: 140 }],
     });
   };
 
   const insertPreset = async (preset: ViewPreset) => {
+    const config = serializeViewLayout(preset.layout);
+    const conflict = (parseViewLayout(config).computed ?? []).find((column) => baseColumnKeys.has(column.key));
+    if (conflict) {
+      dialogService.alert(t('views.computed.keyConflict', { key: conflict.key }));
+      return;
+    }
     const id = `view:${project.id}:${crypto.randomUUID()}`;
     await useGenericModelStore.getState().saveView({
       id,
       workId: project.id,
       name: dt(`world:${preset.nameKey}`),
       viewType: 'entity',
-      config: serializeViewLayout(preset.layout),
+      config,
       orderIndex: entityViews.length,
     });
     selectView(id);
@@ -618,57 +679,25 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
             </div>
           </div>
           <div className="mt-3 space-y-2 border-t border-border pt-3">
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">{t('views.query.conditions')}</span>
-              {conditionLeaves.length === 0 && <span className="text-foreground/70">{t('views.query.noConditions')}</span>}
-            </div>
-            {conditionLeaves.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1">
-                {conditionLeaves.map((leaf, index) => (
-                  <span key={`${leaf.field}-${index}`} className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5">
-                    {`${queryFieldLabel(leaf.field)} ${conditionOperatorLabels[leaf.operator]}${leaf.value !== undefined ? ` ${leaf.value}` : ''}`}
-                    <button
-                      type="button"
-                      aria-label={t('views.query.removeCondition')}
-                      className="touch-target text-muted-foreground hover:text-destructive"
-                      onClick={() => removeCondition(index)}
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="flex flex-wrap items-center gap-1">
-              <Select value={condField} onChange={(event) => setCondField(event.target.value)} className="h-7 w-auto text-2xs" aria-label={t('views.query.field')}>
-                {availableFields.map((field) => (
-                  <option key={field} value={field}>{queryFieldLabel(field)}</option>
-                ))}
-              </Select>
-              <Select value={condOperator} onChange={(event) => setCondOperator(event.target.value as ConditionOperator)} className="h-7 w-auto text-2xs" aria-label={t('views.query.operator')}>
-                {(Object.keys(conditionOperatorLabels) as ConditionOperator[]).map((operator) => (
-                  <option key={operator} value={operator}>{conditionOperatorLabels[operator]}</option>
-                ))}
-              </Select>
-              {condOperator !== 'empty' && condOperator !== 'notEmpty' && (
-                <Input
-                  value={condValue}
-                  onChange={(event) => setCondValue(event.target.value)}
-                  placeholder={t('views.query.valuePlaceholder')}
-                  aria-label={t('views.query.value')}
-                  className="h-7 max-w-32 text-2xs"
-                />
-              )}
-              <Button size="sm" variant="outline" className="h-7" onClick={addCondition}>
-                <Plus className="size-3" />
-                {t('views.query.addCondition')}
-              </Button>
-            </div>
+            <ViewConditionEditor
+              condition={layout.conditions}
+              availableFields={availableFields}
+              fieldLabel={fieldLabel}
+              field={condField}
+              operator={condOperator}
+              value={condValue}
+              onFieldChange={setCondField}
+              onOperatorChange={setCondOperator}
+              onValueChange={setCondValue}
+              onAddLeaf={addCondition}
+              onAddGroup={addConditionGroup}
+              onRemove={removeCondition}
+            />
             <div className="flex flex-wrap items-center gap-1">
               <span className="text-muted-foreground">{t('views.query.aggregations')}</span>
               <Select value={aggField} onChange={(event) => setAggField(event.target.value)} className="h-7 w-auto text-2xs" aria-label={t('views.query.field')}>
                 {availableFields.map((field) => (
-                  <option key={field} value={field}>{queryFieldLabel(field)}</option>
+                  <option key={field} value={field}>{fieldLabel(field)}</option>
                 ))}
               </Select>
               <Select value={aggKind} onChange={(event) => setAggKind(event.target.value as AggregationKind)} className="h-7 w-auto text-2xs" aria-label={t('views.query.aggregationKind')}>
@@ -737,7 +766,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                 ))}
               </Select>
               {CHART_CHANNELS.map((channel) => (
-                <label key={channel} className="flex items-center gap-1">
+                <label key={channel} className="flex flex-wrap items-center gap-1">
                   <span className="text-muted-foreground">{t(`views.chart.channels.${channel}`)}</span>
                   <Select
                     value={chartBindingField(channel)}
@@ -747,9 +776,34 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                   >
                     <option value="">{t('views.chart.unbound')}</option>
                     {availableFields.map((field) => (
-                      <option key={field} value={field}>{queryFieldLabel(field)}</option>
+                      <option key={field} value={field}>{fieldLabel(field)}</option>
                     ))}
                   </Select>
+                  {channel === 'x' && chartBindingField('x') !== '' && (
+                    <Select
+                      value={chartBinding('x')?.type ?? ''}
+                      onChange={(event) => setChartValueType('x', event.target.value as ChartValueType | '')}
+                      className="h-7 w-auto text-2xs"
+                      aria-label={t('views.chart.valueType')}
+                    >
+                      <option value="">{t('views.chart.typeAuto')}</option>
+                      {CHART_VALUE_TYPES.map((type) => (
+                        <option key={type} value={type}>{chartValueTypeLabels[type]}</option>
+                      ))}
+                    </Select>
+                  )}
+                  {channel === 'y' && chartBindingField('y') !== '' && (
+                    <Select
+                      value={chartBinding('y')?.aggregate ?? 'count'}
+                      onChange={(event) => setChartAggregate('y', event.target.value as ChartAggregate)}
+                      className="h-7 w-auto text-2xs"
+                      aria-label={t('views.chart.aggregate')}
+                    >
+                      {CHART_AGGREGATES.map((aggregate) => (
+                        <option key={aggregate} value={aggregate}>{chartAggregateLabels[aggregate]}</option>
+                      ))}
+                    </Select>
+                  )}
                 </label>
               ))}
             </div>
@@ -759,7 +813,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
           <div className="mb-2 flex flex-wrap items-center gap-2 text-2xs">
             {aggregations.map((result, index) => (
               <span key={`${result.field}-${result.kind}-${index}`} className="flex items-center gap-1 rounded border border-border bg-muted/40 px-2 py-0.5">
-                {`${queryFieldLabel(result.field)} · ${aggregationKindLabels[result.kind]}：${result.value}`}
+                {`${fieldLabel(result.field)} · ${aggregationKindLabels[result.kind]}：${result.value}`}
                 <button
                   type="button"
                   aria-label={t('views.query.removeAggregation')}

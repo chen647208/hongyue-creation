@@ -121,4 +121,25 @@ describe('viewLayout 图表声明编解码', () => {
     });
     expect(parsed.chart?.bindings).toEqual([{ field: 'a', channel: 'x' }]);
   });
+
+  it('type/aggregate 缺席时往返不补默认值', () => {
+    const parsed = parseViewLayout({
+      chart: { mark: 'bar', bindings: [{ field: 'role', channel: 'x' }, { field: 'age', channel: 'y' }] },
+    });
+    expect(parsed.chart?.bindings).toEqual([{ field: 'role', channel: 'x' }, { field: 'age', channel: 'y' }]);
+  });
+
+  it('显式 y 聚合与 x 维度类型往返不丢', () => {
+    const layout = {
+      ...DEFAULT_VIEW_LAYOUT,
+      chart: {
+        mark: 'line' as const,
+        bindings: [
+          { field: 'year', channel: 'x' as const, type: 'temporal' as const },
+          { field: 'age', channel: 'y' as const, aggregate: 'max' as const },
+        ],
+      },
+    };
+    expect(parseViewLayout(serializeViewLayout(layout)).chart).toEqual(layout.chart);
+  });
 });
