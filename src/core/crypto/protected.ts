@@ -26,7 +26,7 @@ export function isEncryptedEnvelope(body: string): boolean {
 async function deriveKey(passphrase: string, salt: Uint8Array): Promise<{ key: CryptoKey; salt: Uint8Array }> {
   const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
   const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: salt as unknown as BufferSource, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     material,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -50,7 +50,7 @@ export async function encryptBody(body: string, passphrase: string): Promise<str
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const { key } = await deriveKey(passphrase, salt);
-  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as unknown as BufferSource }, key, new TextEncoder().encode(body));
+  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(body));
   return `${ENVELOPE_PREFIX}${toBase64(salt)}.${toBase64(iv)}.${toBase64(new Uint8Array(cipher))}`;
 }
 
@@ -62,7 +62,7 @@ export async function decryptBody(envelope: string, passphrase: string): Promise
   if (!saltB64 || !ivB64 || !dataB64) throw new Error('信封格式损坏');
   const { key } = await deriveKey(passphrase, fromBase64(saltB64));
   try {
-    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(ivB64) as unknown as BufferSource }, key, fromBase64(dataB64) as unknown as BufferSource);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(ivB64) }, key, fromBase64(dataB64));
     return new TextDecoder().decode(plain);
   } catch {
     throw new Error('解密失败：口令错误或数据损坏');
@@ -119,7 +119,7 @@ export class ProtectedSession {
     if (!this.salt) throw new Error('受保护会话未解锁');
     const key = await this.keyFor(this.salt);
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as unknown as BufferSource }, key, new TextEncoder().encode(body));
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(body));
     return `${ENVELOPE_PREFIX}${toBase64(this.salt)}.${toBase64(iv)}.${toBase64(new Uint8Array(cipher))}`;
   }
 
@@ -132,7 +132,7 @@ export class ProtectedSession {
     const salt = fromBase64(saltB64);
     try {
       const key = await this.keyFor(salt);
-      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(ivB64) as unknown as BufferSource }, key, fromBase64(dataB64) as unknown as BufferSource);
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(ivB64) }, key, fromBase64(dataB64));
       return new TextDecoder().decode(plain);
     } catch {
       throw new Error('解密失败：口令错误或数据损坏');

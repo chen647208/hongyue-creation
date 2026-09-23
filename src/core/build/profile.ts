@@ -225,17 +225,245 @@ export function serializeProfileYaml(profile: BuildProfile): string {
   return dump(profile, { lineWidth: 120, noRefs: true });
 }
 
+/**
+ * 读侧窄化组：YAML/JSON 载入的档案是未知结构，先逐字段窄化成 BuildProfile（readProfile），
+ * 再走 validateProfile 的语义校验（取值范围、交叉规则）。必填字段缺失或类型不符即判脏，
+ * 不猜默认值；可选字段无效时忽略该字段（保持对象其余部分）；列表条目逐条判脏。
+ * 未在类型中声明的多余键由展开保留，新旧版本档案互转不丢字段。
+ */
+type ProfileRecord = Record<string, unknown>;
+
+/** 读字符串；空串是合法值（如 scene 模板），只有非字符串判脏。 */
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+/** 读字符串数组：任一元素不是字符串即整体判脏，不静默丢元素；空数组有效。 */
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') return undefined;
+    items.push(entry);
+  }
+  return items;
+}
+
+/** 读布尔值。 */
+function readBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+/** 读有限数；NaN/Infinity 判脏（整数约束由 validateProfile 管）。 */
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/** 把未知值当普通对象读（数组与非对象返回 undefined）。 */
+function readRecord(value: unknown): ProfileRecord | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as ProfileRecord) : undefined;
+}
+
+/** 读素材口径。 */
+function readMaterialPolicy(value: unknown): MaterialPolicy | undefined {
+  return value === 'exclude' || value === 'include' || value === 'prefer' ? value : undefined;
+}
+
+/** 读引用替换方式。 */
+function readResolveRefs(value: unknown): BuildTransform['content']['resolveRefs'] | undefined {
+  return value === 'displayName' || value === 'raw' ? value : undefined;
+}
+
+/** 读范围：from/to 均可选（整数与起点≤终点由 validateProfile 管）。 */
+function readRange(value: unknown): BuildRange | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const range: BuildRange = {};
+  const from = readNumber(data.from);
+  if (from !== undefined) range.from = from;
+  const to = readNumber(data.to);
+  if (to !== undefined) range.to = to;
+  return { ...data, ...range };
+}
+
+/** 读整类开关：cards/meta 必填。 */
+function readRootSwitches(value: unknown): BuildSelection['rootSwitches'] | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const cards = readBoolean(data.cards);
+  const meta = readBoolean(data.meta);
+  if (cards === undefined || meta === undefined) return undefined;
+  return { ...data, cards, meta };
+}
+
+/** 读选择段：四个必填字段加两个可选字段（materialPolicy/range）。 */
+function readSelection(value: unknown): BuildSelection | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const includeTypes = readStringArray(data.includeTypes);
+  const includeInactive = readBoolean(data.includeInactive);
+  const exclude = readStringArray(data.exclude);
+  const rootSwitches = readRootSwitches(data.rootSwitches);
+  if (includeTypes === undefined || includeInactive === undefined || exclude === undefined || rootSwitches === undefined) {
+    return undefined;
+  }
+  const selection: BuildSelection = { includeTypes, includeInactive, exclude, rootSwitches };
+  const materialPolicy = readMaterialPolicy(data.materialPolicy);
+  if (materialPolicy !== undefined) selection.materialPolicy = materialPolicy;
+  const range = readRange(data.range);
+  if (range !== undefined) selection.range = range;
+  return { ...data, ...selection };
+}
+
+/** 读标题处理：四个必填字段加可选层级 level。 */
+function readHeadings(value: unknown): BuildHeadings | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const chapter = readString(data.chapter);
+  const scene = readString(data.scene);
+  const hide = readStringArray(data.hide);
+  const renumber = readBoolean(data.renumber);
+  if (chapter === undefined || scene === undefined || hide === undefined || renumber === undefined) return undefined;
+  const headings: BuildHeadings = { chapter, scene, hide, renumber };
+  const level = readNumber(data.level);
+  if (level !== undefined) headings.level = level;
+  return { ...data, ...headings };
+}
+
+/** 读正文变换段：四个必填字段。 */
+function readTransformContent(value: unknown): BuildTransform['content'] | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const includeSynopsis = readBoolean(data.includeSynopsis);
+  const includeComments = readBoolean(data.includeComments);
+  const stripTags = readStringArray(data.stripTags);
+  const resolveRefs = readResolveRefs(data.resolveRefs);
+  if (includeSynopsis === undefined || includeComments === undefined || stripTags === undefined || resolveRefs === undefined) {
+    return undefined;
+  }
+  return { ...data, includeSynopsis, includeComments, stripTags, resolveRefs };
+}
+
+/** 读变换段：headings/content 均必填。 */
+function readTransform(value: unknown): BuildTransform | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const headings = readHeadings(data.headings);
+  const content = readTransformContent(data.content);
+  if (headings === undefined || content === undefined) return undefined;
+  return { ...data, headings, content };
+}
+
+/** 读渲染段：两个必填字段加可选 font/lineHeight。 */
+function readRender(value: unknown): BuildRender | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const chapterPageBreak = readBoolean(data.chapterPageBreak);
+  const stripUnicode = readBoolean(data.stripUnicode);
+  if (chapterPageBreak === undefined || stripUnicode === undefined) return undefined;
+  const render: BuildRender = { chapterPageBreak, stripUnicode };
+  const font = readString(data.font);
+  if (font !== undefined) render.font = font;
+  const lineHeight = readNumber(data.lineHeight);
+  if (lineHeight !== undefined) render.lineHeight = lineHeight;
+  return { ...data, ...render };
+}
+
+/** 读目录段：enabled/title 必填，maxDepth 可选（取值由 validateProfile 管）。 */
+function readToc(value: unknown): BuildToc | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const enabled = readBoolean(data.enabled);
+  const title = readString(data.title);
+  if (enabled === undefined || title === undefined) return undefined;
+  const toc: BuildToc = { enabled, title };
+  const maxDepth = readNumber(data.maxDepth);
+  if (maxDepth !== undefined) toc.maxDepth = maxDepth;
+  return { ...data, ...toc };
+}
+
+/** 读编译编排段：整体可选；toc 出现但结构无效时只丢 toc，其余字段照常读出。 */
+function readCompile(value: unknown): BuildCompile | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const compile: BuildCompile = {};
+  const toc = readToc(data.toc);
+  if (toc !== undefined) compile.toc = toc;
+  const volumeTypes = readStringArray(data.volumeTypes);
+  if (volumeTypes !== undefined) compile.volumeTypes = volumeTypes;
+  const volumeIds = readStringArray(data.volumeIds);
+  if (volumeIds !== undefined) compile.volumeIds = volumeIds;
+  const volumeHeading = readString(data.volumeHeading);
+  if (volumeHeading !== undefined) compile.volumeHeading = volumeHeading;
+  const frontMatter = readStringArray(data.frontMatter);
+  if (frontMatter !== undefined) compile.frontMatter = frontMatter;
+  const backMatter = readStringArray(data.backMatter);
+  if (backMatter !== undefined) compile.backMatter = backMatter;
+  return { ...data, ...compile };
+}
+
+/** 读参考文献段：整体可选，四个字段均可选。 */
+function readReferences(value: unknown): BuildReferences | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const references: BuildReferences = {};
+  const enabled = readBoolean(data.enabled);
+  if (enabled !== undefined) references.enabled = enabled;
+  const style = readString(data.style);
+  if (style !== undefined) references.style = style;
+  const title = readString(data.title);
+  if (title !== undefined) references.title = title;
+  const footnotesTitle = readString(data.footnotesTitle);
+  if (footnotesTitle !== undefined) references.footnotesTitle = footnotesTitle;
+  return { ...data, ...references };
+}
+
+/**
+ * 把未知值窄化成编译档案：必填字段（name/format/selection/transform/render）缺失或类型不符
+ * 返回 undefined；可选字段无效时忽略该字段。取值合法性（层级 1..6、范围起点≤终点等）
+ * 仍由 validateProfile 判，两者分工不重叠。
+ */
+function readProfile(value: unknown): BuildProfile | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const name = readString(data.name);
+  const format = readString(data.format);
+  const selection = readSelection(data.selection);
+  const transform = readTransform(data.transform);
+  const render = readRender(data.render);
+  if (name === undefined || format === undefined || selection === undefined || transform === undefined || render === undefined) {
+    return undefined;
+  }
+  const profile: BuildProfile = { name, format, selection, transform, render };
+  const id = readString(data.id);
+  if (id !== undefined) profile.id = id;
+  const description = readString(data.description);
+  if (description !== undefined) profile.description = description;
+  const renderer = readString(data.renderer);
+  if (renderer !== undefined) profile.renderer = renderer;
+  const compile = readCompile(data.compile);
+  if (compile !== undefined) profile.compile = compile;
+  const references = readReferences(data.references);
+  if (references !== undefined) profile.references = references;
+  // 已校验字段覆盖在后，保证必填项是校验过的值；未声明键由展开保留。
+  return { ...data, ...profile };
+}
+
 /** YAML 文本 → Profile；结构校验失败抛错（导入 UI 捕获提示）。 */
 export function parseProfileYaml(text: string): BuildProfile {
   const parsed = load(text);
   if (typeof parsed !== 'object' || parsed === null) {
     throw new Error('Profile YAML 必须是对象');
   }
-  const m = parsed as Record<string, unknown>;
+  const m = parsed as ProfileRecord;
+  // 顶层键缺失给逐字段报错（用户直接可读）；类型窄化交给 readProfile。
   for (const key of ['name', 'format', 'selection', 'transform', 'render']) {
     if (!(key in m)) throw new Error(`Profile YAML 缺少字段：${key}`);
   }
-  const profile = m as unknown as BuildProfile;
+  const profile = readProfile(m);
+  if (profile === undefined) {
+    throw new Error('Profile YAML 结构无效：必填字段缺失或类型不符');
+  }
   const errors = validateProfile(profile);
   if (errors.length > 0) throw new Error(`编译档案无效：${errors.join('；')}`);
   return profile;

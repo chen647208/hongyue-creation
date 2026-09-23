@@ -15,12 +15,17 @@ import { describe, expect,it, vi } from 'vitest';
 
 import { IpcSqlDriver } from '../ipcDriver';
 
+type DbBridge = NonNullable<Window['electronAPI']>['db'];
+
 function makeApi() {
-  return {
+  // all/get 与 electronAPI.db 同为泛型签名：mock 保留具体行型供断言侧使用，接入驱动时按泛型签名收敛。
+  const all = vi.fn(async (_id: string, _params?: unknown[]): Promise<Record<string, unknown>[]> => []);
+  const get = vi.fn(async (_id: string, _params?: unknown[]): Promise<Record<string, unknown> | undefined> => undefined);
+  const api = {
     exec: vi.fn(async (_id: string) => undefined),
     run: vi.fn(async (_id: string, _params?: unknown[]) => ({ changes: 1, lastInsertRowid: 2 })),
-    all: vi.fn(async (_id: string, _params?: unknown[]) => [] as Record<string, unknown>[]),
-    get: vi.fn(async (_id: string, _params?: unknown[]) => undefined as Record<string, unknown> | undefined),
+    all,
+    get,
     batch: vi.fn(async (_statements: unknown[]) => undefined),
     integrityCheck: vi.fn(async () => ({ ok: true, result: 'ok' })),
     fullIntegrityCheck: vi.fn(async () => ({ ok: true, result: 'ok' })),
@@ -37,20 +42,22 @@ function makeApi() {
     encryptText: vi.fn(async () => ({ ok: true, data: 'x' })),
     decryptText: vi.fn(async () => ({ ok: true, text: '{}' })),
   };
+  const bridge: DbBridge = { ...api, all: all as DbBridge['all'], get: get as DbBridge['get'] };
+  return { api, bridge };
 }
 
 describe('IpcSqlDriver', () => {
   it('顶层 run 直连 api.run', async () => {
-    const api = makeApi();
-    const driver = new IpcSqlDriver(api);
+    const { api, bridge } = makeApi();
+    const driver = new IpcSqlDriver(bridge);
     const result = await driver.run('nodes.selectAll', []);
     expect(api.run).toHaveBeenCalledWith('nodes.selectAll', []);
     expect(result).toEqual({ changes: 1, lastInsertRowid: 2 });
   });
 
   it('事务内写语句合并为一次批量 IPC', async () => {
-    const api = makeApi();
-    const driver = new IpcSqlDriver(api);
+    const { api, bridge } = makeApi();
+    const driver = new IpcSqlDriver(bridge);
     await driver.transaction(async (tx) => {
       await tx.run('nodes.deleteAll', [1]);
       await tx.run('edges.deleteAll', [2]);
@@ -65,9 +72,9 @@ describe('IpcSqlDriver', () => {
   });
 
   it('事务内读取先下发改动再查询（保序）', async () => {
-    const api = makeApi();
+    const { api, bridge } = makeApi();
     api.all.mockResolvedValue([{ n: 1 }]);
-    const driver = new IpcSqlDriver(api);
+    const driver = new IpcSqlDriver(bridge);
     const rows = await driver.transaction(async (tx) => {
       await tx.run('nodes.deleteAll', []);
       return tx.all('nodes.selectAll', []);
@@ -78,8 +85,8 @@ describe('IpcSqlDriver', () => {
   });
 
   it('事务回调抛错：回滚且不下发缓冲', async () => {
-    const api = makeApi();
-    const driver = new IpcSqlDriver(api);
+    const { api, bridge } = makeApi();
+    const driver = new IpcSqlDriver(bridge);
     await expect(
       driver.transaction(async (tx) => {
         await tx.run('nodes.deleteAll', []);

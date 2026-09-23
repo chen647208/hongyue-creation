@@ -202,6 +202,8 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
       extractPdfText: electronApi
         ? (base64) => electronApi.extractPdfText(base64)
         : undefined,
+      // 附件的告警键是运行期字符串：t 的键为类型化字面量，入参退化为 never 后返回值变成
+      // TFunctionDetailedResult<never, never>，与 string 无交集，单段断言不成立，只能双段收敛到 string。
       alert: (key, params) => dialogService.alert(t(key as never, params as never) as unknown as string),
       logError: (message, name, error) => logger.error(message, name, error),
       now: () => Date.now(),

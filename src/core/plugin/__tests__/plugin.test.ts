@@ -65,6 +65,43 @@ describe('validateManifest（验收 1：错误定位 JSON 路径）', () => {
     });
     expect(asArray.ok, asArray.ok ? '' : JSON.stringify(asArray.issues)).toBe(true);
   });
+
+  it('可选字段窄化：有效值进 manifest，无效值只忽略该字段', () => {
+    const base = { id: 'com.x.y', name: 'p', version: '1.0.0', host: '^2.0.0', license: 'MIT' };
+    const ok = validateManifest({
+      ...base,
+      description: '说明',
+      keywords: ['a', 'b'],
+      activation: 'onStartup',
+      settingsSchema: { type: 'object' },
+      contributes: { types: ['types'], mcpServers: { fs: { command: 'npx', args: ['-y', 'srv'] } }, hooks: 'hooks' },
+      permissions: { read: ['cards'], network: true, ai: { quotaPerHour: 10 } },
+    });
+    expect(ok.ok, ok.ok ? '' : JSON.stringify(ok.issues)).toBe(true);
+    if (!ok.ok) return;
+    expect(ok.manifest.description).toBe('说明');
+    expect(ok.manifest.keywords).toEqual(['a', 'b']);
+    expect(ok.manifest.activation).toBe('onStartup');
+    expect(ok.manifest.settingsSchema).toEqual({ type: 'object' });
+    expect(ok.manifest.contributes?.mcpServers).toEqual({ fs: { command: 'npx', args: ['-y', 'srv'] } });
+    expect(ok.manifest.contributes?.hooks).toBe('hooks');
+    expect(ok.manifest.permissions).toEqual({ read: ['cards'], network: true, ai: { quotaPerHour: 10 } });
+
+    const dirty = validateManifest({
+      ...base,
+      description: 42,
+      keywords: ['a', 3],
+      contributes: { types: [], mcpServers: { fs: { command: 1 } }, hooks: {} },
+    });
+    expect(dirty.ok, dirty.ok ? '' : JSON.stringify(dirty.issues)).toBe(true);
+    if (!dirty.ok) return;
+    expect(dirty.manifest.description).toBeUndefined();
+    expect(dirty.manifest.keywords).toBeUndefined();
+    // hooks 传对象符合 contributes 值的通用检查，但窄化不进 string，整键忽略
+    expect(dirty.manifest.contributes?.hooks).toBeUndefined();
+    // mcpServers 里唯一条目 command 不是字符串：该条目被丢，map 退化为空
+    expect(dirty.manifest.contributes?.mcpServers).toEqual({});
+  });
 });
 
 describe('命名空间（验收 4：同名各自前缀化）', () => {

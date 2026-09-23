@@ -8,11 +8,15 @@
  */
 
 import type {
+  HistoryDate,
+  HistoryEvent,
+  MagicLevel,
   MagicSystem,
   Project,
   TechnologyLevel,
   Timeline,
   TimelineEvent,
+  TimelineImpactId,
   WorldHistory,
 } from '../../shared/types';
 import type { AttributeEntity, BookEntities, EdgeEntity, EdgeKind, NodeEntity } from '../entities/types';
@@ -32,8 +36,8 @@ import { builtinRegistry, type TypeTemplate } from '../types-registry';
 
 /** 集合 → 实体映射规格 */
 interface CollectionSpec {
-  /** Project 上的键 */
-  key: string;
+  /** Project 上的集合字段名（与字段同名；读写只走 readCollection/writeCollection，禁按任意字符串索引 Project） */
+  key: CollectionKey;
   /** 节点类型模板 id */
   type: string;
   /** contain 边 role */
@@ -44,6 +48,28 @@ interface CollectionSpec {
   bodyField?: string;
   /** 固定标题（无名称字段的集合） */
   fixedTitle?: string;
+}
+
+/** Project 上受管集合的字段名：键与字段一一对应。 */
+type CollectionKey =
+  | 'chapters'
+  | 'virtualChapters'
+  | 'characters'
+  | 'locations'
+  | 'factions'
+  | 'ruleSystems'
+  | 'knowledge'
+  | 'foreshadows'
+  | 'references';
+
+/** 读 Project 上的集合：键限定在 CollectionKey，元素当未知结构（字段级由 fieldsToAttrs 逐项处理）。 */
+function readCollection(project: Project, key: CollectionKey): unknown[] | undefined {
+  return project[key];
+}
+
+/** 把投影出的集合写回 Project：单点收敛未知元素数组到集合元素数组。 */
+function writeCollection<K extends CollectionKey>(project: Project, key: K, items: unknown[]): void {
+  project[key] = items as Project[K];
 }
 
 const COLLECTIONS: readonly CollectionSpec[] = [
@@ -190,7 +216,7 @@ export function projectToEntities(project: Project, now = Date.now()): BookEntit
 
   // 平铺集合
   for (const spec of COLLECTIONS) {
-    const list = (project as unknown as Record<string, unknown[]>)[spec.key];
+    const list = readCollection(project, spec.key);
     if (!Array.isArray(list)) continue;
     const template = builtinRegistry.get(spec.type);
     list.forEach((item, index) => {
@@ -229,19 +255,20 @@ export function projectToEntities(project: Project, now = Date.now()): BookEntit
       const id = `${bookId}:world.magic-system`;
       nodes.push(makeNode(id, 'world.magic-system', wv.magicSystem.name ?? '', bookId, '', wv.createdAt, wv.updatedAt));
       edges.push(makeEdge(bookId, id, 'contain', 'world', 0, bookId));
-      attrs.push(...fieldsToAttrs(id, wv.magicSystem as unknown as Record<string, unknown>, builtinRegistry.get('world.magic-system')));
+      // 领域接口没有索引签名：展开得到匿名对象类型后再交给逐字段枚举，避免整体强转。
+      attrs.push(...fieldsToAttrs(id, { ...wv.magicSystem }, builtinRegistry.get('world.magic-system')));
     }
     if (wv.technologyLevel) {
       const id = `${bookId}:world.tech-level`;
       nodes.push(makeNode(id, 'world.tech-level', wv.technologyLevel.era ?? '', bookId, '', wv.createdAt, wv.updatedAt));
       edges.push(makeEdge(bookId, id, 'contain', 'world', 1, bookId));
-      attrs.push(...fieldsToAttrs(id, wv.technologyLevel as unknown as Record<string, unknown>, builtinRegistry.get('world.tech-level')));
+      attrs.push(...fieldsToAttrs(id, { ...wv.technologyLevel }, builtinRegistry.get('world.tech-level')));
     }
     if (wv.history) {
       const id = `${bookId}:world.history`;
       nodes.push(makeNode(id, 'world.history', '世界历史', bookId, '', wv.createdAt, wv.updatedAt));
       edges.push(makeEdge(bookId, id, 'contain', 'world', 2, bookId));
-      attrs.push(...fieldsToAttrs(id, wv.history as unknown as Record<string, unknown>, builtinRegistry.get('world.history')));
+      attrs.push(...fieldsToAttrs(id, { ...wv.history }, builtinRegistry.get('world.history')));
     }
   }
 
@@ -268,11 +295,205 @@ export function projectToEntities(project: Project, now = Date.now()): BookEntit
     (tl.events ?? []).forEach((ev, index) => {
       nodes.push(makeNode(ev.id, 'meta.timeline-event', ev.title ?? '', bookId, '', now, now));
       edges.push(makeEdge(tl.id, ev.id, 'contain', 'event', typeof ev.order === 'number' ? ev.order : index, bookId));
-      attrs.push(...fieldsToAttrs(ev.id, ev as unknown as Record<string, unknown>, builtinRegistry.get('meta.timeline-event')));
+      attrs.push(...fieldsToAttrs(ev.id, { ...ev }, builtinRegistry.get('meta.timeline-event')));
     });
   }
 
   return { nodes, edges, attrs };
+}
+
+/** 读侧窄化函数组：属性反序列化的产物是 Record<string, unknown>，按结构体逐字段校验后再使用，
+ * 不做整体强转（脏字段不能绕过领域类型）。必填字段缺失或类型不符即丢弃该对象；
+ * 可选字段逐项窄化后补，未声明字段由展开保留（与写入侧的宽容兜底一致）。 */
+
+/** 事件类型枚举（TimelineEvent.type 的合法值）。 */
+const TIMELINE_EVENT_TYPES = ['plot', 'character', 'world', 'faction', 'battle', 'discovery', 'other'] as const;
+
+/** 读字符串；空串是合法领域值（空描述/空概述），只有非字符串判脏。 */
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+/** 读字符串数组：任一元素不是字符串即整体判脏，不静默丢元素。 */
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') return undefined;
+    items.push(entry);
+  }
+  return items;
+}
+
+/** 读有限数；NaN/Infinity 判脏。 */
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/** 读布尔值。 */
+function readBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+/** 读事件影响级别（significance）：只认已定义的枚举值。 */
+function readImpactId(value: unknown): TimelineImpactId | undefined {
+  return value === 'major' || value === 'minor' ? value : undefined;
+}
+
+/** 读时间线事件类型：按枚举逐个比对（不用 includes + 强转）。 */
+function readEventType(value: unknown): TimelineEvent['type'] | undefined {
+  for (const type of TIMELINE_EVENT_TYPES) {
+    if (value === type) return type;
+  }
+  return undefined;
+}
+
+/** 把未知值当对象读（非对象返回 undefined）。 */
+function readRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+/** 读魔法等级：name/description/order 必填；requirements/abilities 可选。 */
+function readMagicLevel(data: Record<string, unknown>): MagicLevel | undefined {
+  const name = readString(data.name);
+  const description = readString(data.description);
+  const order = readNumber(data.order);
+  if (name === undefined || description === undefined || order === undefined) return undefined;
+  const level: MagicLevel = { name, description, order };
+  const requirements = readString(data.requirements);
+  if (requirements !== undefined) level.requirements = requirements;
+  const abilities = readString(data.abilities);
+  if (abilities !== undefined) level.abilities = abilities;
+  // 未声明字段由展开保留；已校验字段覆盖在后，保证必填项是校验过的值。
+  return { ...data, ...level };
+}
+
+/** 读魔法等级列表：非数组判脏；脏条目只丢自己，其余等级照常读出。 */
+function readMagicLevels(value: unknown): MagicLevel[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const levels: MagicLevel[] = [];
+  for (const entry of value) {
+    const data = readRecord(entry);
+    const level = data === undefined ? undefined : readMagicLevel(data);
+    if (level) levels.push(level);
+  }
+  return levels;
+}
+
+/** 读魔法体系：name/description/rules/limitations 必填；castingMethod/levels 可选。 */
+function readMagicSystem(data: Record<string, unknown>): MagicSystem | undefined {
+  const name = readString(data.name);
+  const description = readString(data.description);
+  const rules = readStringArray(data.rules);
+  const limitations = readString(data.limitations);
+  if (name === undefined || description === undefined || rules === undefined || limitations === undefined) return undefined;
+  const system: MagicSystem = { name, description, rules, limitations };
+  const castingMethod = readString(data.castingMethod);
+  if (castingMethod !== undefined) system.castingMethod = castingMethod;
+  const levels = readMagicLevels(data.levels);
+  if (levels !== undefined) system.levels = levels;
+  return { ...data, ...system };
+}
+
+/** 读科技水平：era/description/keyTechnologies/limitations 必填；能源/交通/通讯可选。 */
+function readTechnologyLevel(data: Record<string, unknown>): TechnologyLevel | undefined {
+  const era = readString(data.era);
+  const description = readString(data.description);
+  const keyTechnologies = readStringArray(data.keyTechnologies);
+  const limitations = readString(data.limitations);
+  if (era === undefined || description === undefined || keyTechnologies === undefined || limitations === undefined) return undefined;
+  const tech: TechnologyLevel = { era, description, keyTechnologies, limitations };
+  const energySource = readString(data.energySource);
+  if (energySource !== undefined) tech.energySource = energySource;
+  const transportation = readString(data.transportation);
+  if (transportation !== undefined) tech.transportation = transportation;
+  const communication = readString(data.communication);
+  if (communication !== undefined) tech.communication = communication;
+  return { ...data, ...tech };
+}
+
+/** 读历史日期：year 必填；月/日/显示格式/虚构历法标记可选。 */
+function readHistoryDate(data: Record<string, unknown>): HistoryDate | undefined {
+  const year = readNumber(data.year);
+  if (year === undefined) return undefined;
+  const date: HistoryDate = { year };
+  const month = readNumber(data.month);
+  if (month !== undefined) date.month = month;
+  const day = readNumber(data.day);
+  if (day !== undefined) date.day = day;
+  const display = readString(data.display);
+  if (display !== undefined) date.display = display;
+  const isFictional = readBoolean(data.isFictional);
+  if (isFictional !== undefined) date.isFictional = isFictional;
+  return { ...data, ...date };
+}
+
+/** 读历史事件：id/date/title/description 必填；impact 与两组关联 id 可选。 */
+function readHistoryEvent(data: Record<string, unknown>): HistoryEvent | undefined {
+  const id = readString(data.id);
+  const dateData = readRecord(data.date);
+  const date = dateData === undefined ? undefined : readHistoryDate(dateData);
+  const title = readString(data.title);
+  const description = readString(data.description);
+  if (id === undefined || date === undefined || title === undefined || description === undefined) return undefined;
+  const event: HistoryEvent = { id, date, title, description };
+  const impact = readString(data.impact);
+  if (impact !== undefined) event.impact = impact;
+  const relatedCharacterIds = readStringArray(data.relatedCharacterIds);
+  if (relatedCharacterIds !== undefined) event.relatedCharacterIds = relatedCharacterIds;
+  const relatedLocationIds = readStringArray(data.relatedLocationIds);
+  if (relatedLocationIds !== undefined) event.relatedLocationIds = relatedLocationIds;
+  return { ...data, ...event };
+}
+
+/** 读历史事件列表：非数组判脏；脏条目只丢自己。 */
+function readHistoryEvents(value: unknown): HistoryEvent[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const events: HistoryEvent[] = [];
+  for (const entry of value) {
+    const data = readRecord(entry);
+    const event = data === undefined ? undefined : readHistoryEvent(data);
+    if (event) events.push(event);
+  }
+  return events;
+}
+
+/** 读世界历史：overview/keyEvents 必填；calendarSystem 可选。 */
+function readWorldHistory(data: Record<string, unknown>): WorldHistory | undefined {
+  const overview = readString(data.overview);
+  const keyEvents = readHistoryEvents(data.keyEvents);
+  if (overview === undefined || keyEvents === undefined) return undefined;
+  const history: WorldHistory = { overview, keyEvents };
+  const calendarSystem = readString(data.calendarSystem);
+  if (calendarSystem !== undefined) history.calendarSystem = calendarSystem;
+  return { ...data, ...history };
+}
+
+/** 读时间线事件：id/date/title/description/type 必填；影响、三组关联 id、章节关联、顺序可选。 */
+function readTimelineEvent(data: Record<string, unknown>): TimelineEvent | undefined {
+  const id = readString(data.id);
+  const dateData = readRecord(data.date);
+  const date = dateData === undefined ? undefined : readHistoryDate(dateData);
+  const title = readString(data.title);
+  const description = readString(data.description);
+  const type = readEventType(data.type);
+  if (id === undefined || date === undefined || title === undefined || description === undefined || type === undefined) return undefined;
+  const event: TimelineEvent = { id, date, title, description, type };
+  const impact = readString(data.impact);
+  if (impact !== undefined) event.impact = impact;
+  const significance = readImpactId(data.significance);
+  if (significance !== undefined) event.significance = significance;
+  const relatedCharacterIds = readStringArray(data.relatedCharacterIds);
+  if (relatedCharacterIds !== undefined) event.relatedCharacterIds = relatedCharacterIds;
+  const relatedLocationIds = readStringArray(data.relatedLocationIds);
+  if (relatedLocationIds !== undefined) event.relatedLocationIds = relatedLocationIds;
+  const relatedFactionIds = readStringArray(data.relatedFactionIds);
+  if (relatedFactionIds !== undefined) event.relatedFactionIds = relatedFactionIds;
+  const relatedChapterId = readString(data.relatedChapterId);
+  if (relatedChapterId !== undefined) event.relatedChapterId = relatedChapterId;
+  const order = readNumber(data.order);
+  if (order !== undefined) event.order = order;
+  return { ...data, ...event };
 }
 
 /** 实体 → Project（书级）。erased 实体退出投影。 */
@@ -342,9 +563,9 @@ export function entitiesToProject(entities: BookEntities): Project {
     const spec = COLLECTIONS.find((c) => c.type === node.type && c.role === edge.role);
     if (spec) {
       const obj = nodeToObj(node, spec.titleField, spec.bodyField);
-      const bag = project as unknown as Record<string, unknown[] | undefined>;
-      const list = (bag[spec.key] ??= []);
+      const list = readCollection(project, spec.key) ?? [];
       list.push(obj);
+      writeCollection(project, spec.key, list);
       continue;
     }
     if (node.type === 'meta.timeline') {
@@ -354,7 +575,8 @@ export function entitiesToProject(entities: BookEntities): Project {
         .sort((a, b) => a.position - b.position)
         .map((e) => nodes.find((n) => n.id === e.toId))
         .filter((n): n is NodeEntity => n !== undefined)
-        .map((ev) => nodeToObj(ev, 'title') as unknown as TimelineEvent);
+        .map((ev) => readTimelineEvent(nodeToObj(ev, 'title')))
+        .filter((ev): ev is TimelineEvent => ev !== undefined);
       project.timeline = {
         id: node.id,
         projectId: bookId,
@@ -376,9 +598,16 @@ export function entitiesToProject(entities: BookEntities): Project {
         createdAt: node.createdAt,
         updatedAt: node.updatedAt,
       };
-      if (node.type === 'world.magic-system') project.worldView.magicSystem = obj as unknown as MagicSystem;
-      else if (node.type === 'world.tech-level') project.worldView.technologyLevel = obj as unknown as TechnologyLevel;
-      else if (node.type === 'world.history') project.worldView.history = obj as unknown as WorldHistory;
+      if (node.type === 'world.magic-system') {
+        const magicSystem = readMagicSystem(obj);
+        if (magicSystem) project.worldView.magicSystem = magicSystem;
+      } else if (node.type === 'world.tech-level') {
+        const technologyLevel = readTechnologyLevel(obj);
+        if (technologyLevel) project.worldView.technologyLevel = technologyLevel;
+      } else if (node.type === 'world.history') {
+        const history = readWorldHistory(obj);
+        if (history) project.worldView.history = history;
+      }
     } else {
       // 未知（插件扩展）类型：按 node.type 归入 extensions，核心不解释其结构
       const bag = (project.extensions ??= {});

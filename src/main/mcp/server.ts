@@ -98,7 +98,7 @@ function listBooks(): Array<{ bookId: string; nodes: number; updatedAt: number }
 export function listNodes(database: Database.Database, bookId: string): NodeRow[] {
   return database
     .prepare(`SELECT id, book_id, type, title, body, updated_at FROM nodes WHERE book_id = ? AND erased = 0 ORDER BY type, title`)
-    .all(bookId) as unknown as NodeRow[];
+    .all(bookId) as NodeRow[];
 }
 
 /** 读单节点与属性；传入连接以便单测直接复用内存库。 */

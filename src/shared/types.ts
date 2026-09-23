@@ -1569,8 +1569,10 @@ export interface ElectronAPI {
   db: {
     exec: (id: string) => Promise<void>;
     run: (id: string, params?: unknown[]) => Promise<{ changes: number; lastInsertRowid: number }>;
-    all: (id: string, params?: unknown[]) => Promise<Record<string, unknown>[]>;
-    get: (id: string, params?: unknown[]) => Promise<Record<string, unknown> | undefined>;
+    /** 查询多行：T 为调用方按 catalog 语句声明的行结构（缺省为通用字典）。 */
+    all: <T = Record<string, unknown>>(id: string, params?: unknown[]) => Promise<T[]>;
+    /** 查询单行：T 为调用方按 catalog 语句声明的行结构（缺省为通用字典）。 */
+    get: <T = Record<string, unknown>>(id: string, params?: unknown[]) => Promise<T | undefined>;
     batch: (statements: Array<{ id: string; params?: unknown[]; exec?: boolean }>) => Promise<void>;
     integrityCheck: () => Promise<{ ok: boolean; result: string }>;
     fullIntegrityCheck: () => Promise<{ ok: boolean; result: string }>;

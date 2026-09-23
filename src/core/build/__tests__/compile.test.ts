@@ -258,4 +258,20 @@ describe('格式序列化与产物稳定性', () => {
       parseProfileYaml(['name: x', 'format: md', 'selection: { includeTypes: [], includeInactive: false, exclude: [], rootSwitches: { cards: false, meta: false } }', 'transform: { headings: { chapter: "%T", scene: "", hide: [], renumber: false }, content: { includeSynopsis: false, includeComments: false, stripTags: [], resolveRefs: raw } }', 'render: { chapterPageBreak: false, stripUnicode: false }', 'compile: { toc: { enabled: true, title: 目录, maxDepth: 0 } }'].join('\n')),
     ).toThrow(/目录深度/);
   });
+
+  it('结构判脏：必填字段类型不符即拒绝，不猜默认值', () => {
+    const broken = [
+      'name: x',
+      'format: md',
+      'selection: { includeTypes: [], includeInactive: false, exclude: [], rootSwitches: { cards: false, meta: false } }',
+      'transform: { headings: { chapter: "%T", scene: "", hide: [], renumber: false }, content: { includeSynopsis: false, includeComments: false, stripTags: [], resolveRefs: raw } }',
+      'render: { chapterPageBreak: false, stripUnicode: "否" }',
+    ].join('\n');
+    expect(() => parseProfileYaml(broken)).toThrow(/结构无效/);
+  });
+
+  it('未在类型中声明的键由档案保留（版本前向兼容）', () => {
+    const yamlText = `${serializeProfileYaml(DEFAULT_BUILD_PROFILE)}\nfutureField: keep-me`;
+    expect(parseProfileYaml(yamlText)).toEqual({ ...DEFAULT_BUILD_PROFILE, futureField: 'keep-me' });
+  });
 });

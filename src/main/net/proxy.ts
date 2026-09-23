@@ -185,7 +185,9 @@ export async function proxiedFetch(url: string, init?: RequestInit): Promise<Res
       : await fetch(url, withSignal);
     if (connectTimer) clearTimeout(connectTimer);
     connectTimer = null;
-    return withStreamIdleTimeout(res as unknown as Response, AI_STREAM_IDLE_TIMEOUT_MS, controller, finish);
+    // undici 的 Response 与全局 fetch 的 Response 来自两个类型包、结构不互通；
+    // 上游两条 fetch 分支的返回值取并集，这里收敛到全局 Response（本函数只读 status/headers/body）。
+    return withStreamIdleTimeout(res as Response, AI_STREAM_IDLE_TIMEOUT_MS, controller, finish);
   } catch (error) {
     finish();
     throw error;

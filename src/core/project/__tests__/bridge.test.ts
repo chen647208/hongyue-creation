@@ -113,3 +113,49 @@ describe('投影桥往返（M0 硬验收）', () => {
     expect(list[0]).toMatchObject({ id: 'q1', title: '任务一', body: '正文' });
   });
 });
+
+describe('读侧窄化：脏结构化数据被拒', () => {
+  /** 把指定节点的指定属性值改成脏值，模拟存储里被写坏的字段。 */
+  function breakAttr(entities: ReturnType<typeof projectToEntities>, nodeId: string, name: string, value: string) {
+    return {
+      ...entities,
+      attrs: entities.attrs.map((a) => (a.nodeId === nodeId && a.name === name ? { ...a, value } : a)),
+    };
+  }
+
+  it('魔法体系必填字段损坏：整个子对象丢弃，同书其它世界观分块不受影响', () => {
+    const original = richProject();
+    const broken = breakAttr(projectToEntities(original, 500), 'book-1:world.magic-system', 'rules', '"守恒"');
+    const restored = entitiesToProject(broken);
+    expect(restored.worldView?.magicSystem).toBeUndefined();
+    expect(restored.worldView?.technologyLevel).toEqual(original.worldView?.technologyLevel);
+    expect(restored.worldView?.history).toEqual(original.worldView?.history);
+  });
+
+  it('魔法等级列表里的脏条目只丢自己：合法等级照常读出', () => {
+    const original = richProject();
+    const dirty = JSON.stringify([{ name: '一品', description: '', order: 'not-a-number' }]);
+    const broken = breakAttr(projectToEntities(original, 500), 'book-1:world.magic-system', 'levels', dirty);
+    const restored = entitiesToProject(broken);
+    expect(restored.worldView?.magicSystem?.levels).toEqual([]);
+    // 必填字段未损坏，体系本体仍在
+    expect(restored.worldView?.magicSystem?.name).toBe('灵力');
+  });
+
+  it('时间线事件 type 非法：该事件被丢弃，事件容器保留', () => {
+    const original = richProject();
+    const broken = breakAttr(projectToEntities(original, 500), 'ev1', 'type', 'not-a-type');
+    const restored = entitiesToProject(broken);
+    expect(restored.timeline?.events).toHaveLength(0);
+    expect(restored.timeline?.config).toEqual(original.timeline?.config);
+  });
+
+  it('历史事件缺必填日期：该事件被丢弃，历史本体与其余事件保留', () => {
+    const original = richProject();
+    const dirty = JSON.stringify([{ id: 'he1', title: '建国', description: '' }]);
+    const broken = breakAttr(projectToEntities(original, 500), 'book-1:world.history', 'keyEvents', dirty);
+    const restored = entitiesToProject(broken);
+    expect(restored.worldView?.history?.keyEvents).toEqual([]);
+    expect(restored.worldView?.history?.overview).toBe('大陆编年');
+  });
+});

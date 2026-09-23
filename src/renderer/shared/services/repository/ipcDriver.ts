@@ -46,11 +46,11 @@ export class IpcSqlDriver implements SqlDriver {
   }
 
   all<T = Record<string, SqlValue>>(id: SqlId, params: SqlValue[] = []): Promise<T[]> {
-    return this.enqueue(async () => (await this.api.all(id, params)) as unknown as T[]);
+    return this.enqueue(() => this.api.all<T>(id, params));
   }
 
   get<T = Record<string, SqlValue>>(id: SqlId, params: SqlValue[] = []): Promise<T | undefined> {
-    return this.enqueue(async () => (await this.api.get(id, params)) as unknown as T | undefined);
+    return this.enqueue(() => this.api.get<T>(id, params));
   }
 
   transaction<T>(fn: (tx: SqlDriver) => Promise<T>): Promise<T> {
@@ -73,11 +73,11 @@ export class IpcSqlDriver implements SqlDriver {
         },
         all: async <R>(id: SqlId, p: SqlValue[] = []) => {
           await drain();
-          return (await this.api.all(id, p)) as unknown as R[];
+          return this.api.all<R>(id, p);
         },
         get: async <R>(id: SqlId, p: SqlValue[] = []) => {
           await drain();
-          return (await this.api.get(id, p)) as unknown as R | undefined;
+          return this.api.get<R>(id, p);
         },
         // SQLite 不支持嵌套 BEGIN：内层事务直接内联执行。
         transaction: (inner) => inner(direct),
