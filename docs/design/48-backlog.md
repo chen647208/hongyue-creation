@@ -126,14 +126,6 @@
 - 验收：图表区可为 `y` 通道选聚合方式（sum/avg/min/max/count）、为 `x` 通道选维度类型（category/time/quantitative）；选择经 `parseChartBinding` 往返不丢；默认声明不变。
 - 规模：S。
 
-### 6. 画布视图接入协作运行时
-
-- 现状：收敛纯函数契约在 `features/collaboration/elementConvergence.ts`（版本号/随机决胜/墓碑/分数排序），只有契约单测，非测试代码零消费。Yjs 运行时接的是章节协同（`collaboration/projectDoc.ts` 的 Y.Array 章节列表 + Y.XmlFragment 正文），画布（`ViewCanvas.tsx`、`canvasView.ts`）完全不走 Yjs，布局只存 `ViewDefinition.config.canvas`。
-- 缺口：元素级状态与 Yjs 删除集 / awareness 的接线，以及多端画布收敛的实测。
-- 依赖：无（可独立接线，不影响章节协同）。
-- 验收：画布元素的增删改经由 Yjs 文档，两端并发编辑按 `elementConvergence` 的规则收敛；断线重连后墓碑元素被清除；补一条双端 e2e。
-- 规模：L。
-
 ### 7. 跨章块跳转改事件驱动
 
 - 现状：`features/writing/WritingEditor.tsx` 的 `handleJumpToBlock` 在目标块位于其它章时记下待跳并切换活动章节，随后用 `setTimeout(…, 50)` 等编辑器就绪。`NovelEditorHandle` 与 `TipTapCanvas` 都没有就绪回调，50ms 是猜的值。
