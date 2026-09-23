@@ -241,14 +241,27 @@ export interface ChapterSnapshot {
 export type RevisionDecision = 'accept' | 'reject';
 
 /**
+ * 修订基线来源引用：`ChapterSnapshot`（章节快照）或修订记录（revisions 表）的 id。
+ * 引用而不是正文：同一份内容数据库里只存一份，对比字段的体积与章节长度无关。
+ */
+export interface RevisionBaselineRef {
+  source: 'snapshot' | 'revision';
+  id: string;
+}
+
+/**
  * 修订对比中间态（侧车，随章节序列化）：选定基线与逐处决定。
- * 基线文本随字段保存，来源快照/修订被删也能续审；缺省不写，免迁移。
+ * 基线按 `baselineRef` 引用快照/修订 id，不随字段存正文副本；
+ * `baseline` 只是全文兜底，只有历史数据（只存全文、无引用）迁移时匹配不到 id 才保留。
+ * 缺省不写，免迁移。
  */
 export interface RevisionReviewState {
   /** 基线来源标签（快照时间或修订序号），仅用于界面展示。 */
   label: string;
-  /** 基线文本（选定版本的完整内容）。 */
-  baseline: string;
+  /** 基线引用（快照/修订 id）；解析不到对应记录时回落 `baseline` 全文。 */
+  baselineRef?: RevisionBaselineRef;
+  /** 基线全文兜底：仅历史数据未匹配到 id 时写入；新写入恒为引用。 */
+  baseline?: string;
   /** 改动处 id（`h0`、`h1`…）→ 决定；缺省视为拒绝（保留当前）。 */
   decisions: Record<string, RevisionDecision>;
 }

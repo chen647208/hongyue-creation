@@ -26,11 +26,16 @@ import {
   changeHunks,
   diffChars,
   fromRevisionReviewState,
+  matchRevisionBaseline,
+  matchSnapshotBaseline,
   mergeRevisionDecisions,
+  type RevisionBaseline,
+  type RevisionBaselineRef,
   type RevisionDecision,
   stepChangeIndex,
   toRevisionReviewState,
   uniformDecisions,
+  withBaselineRef,
 } from '../../../editor/revisionDiff';
 import { diffLines } from '../services/historyDiff';
 import { computeChapterStats } from '../services/writingStatsService';
@@ -38,7 +43,10 @@ import { formatHistoryTimestamp, getGenerationType, getProviderIcon } from '../u
 
 interface ReviewBaseline {
   label: string;
+  /** 基线正文（引用解析结果或全文兜底），用于计算差异。 */
   text: string;
+  /** 续存写回侧车字段的基线形式：快照/修订 id 引用优先。 */
+  baseline: RevisionBaseline;
 }
 
 interface ChapterHistoryModalProps {
@@ -74,6 +82,10 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
   const [activeChangeIndex, setActiveChangeIndex] = useState(0);
   const changeRefs = useRef(new Map<string, HTMLLIElement>());
   const hydratedChapterRef = useRef<string | null>(null);
+  /** 最近一次渲染拿到的章节：异步迁移写回时以最新章节为准，避免覆盖期间产生的新决定。 */
+  const latestChapterRef = useRef<Chapter | null>(null);
+  /** 同步跟随渲染的 onUpdateChapter：迁移写回经 ref 读取， hydration effect 不必重复订阅。 */
+  const onUpdateChapterRef = useRef(onUpdateChapter);
 
   const reviewHunks = useMemo(
     () => (review ? diffChars(review.text, chapter?.content ?? '') : []),
@@ -83,19 +95,28 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
   const reviewMerged = useMemo(() => mergeRevisionDecisions(reviewHunks, decisions), [reviewHunks, decisions]);
 
   /** 把中间态写回章节侧车字段；缺 onUpdateChapter 时只留会话内（旧调用方）。 */
-  const persistReview = (state: { label: string; text: string; decisions: Record<string, RevisionDecision> } | null) => {
+  const persistReview = (state: { label: string; text: string; baseline: RevisionBaseline; decisions: Record<string, RevisionDecision> } | null) => {
     if (!onUpdateChapter || !chapter) return;
     const next: Chapter = { ...chapter };
-    if (state) next.revisionReview = toRevisionReviewState(state.label, state.text, state.decisions);
+    if (state) next.revisionReview = toRevisionReviewState(state.label, state.baseline, state.decisions);
     else delete next.revisionReview;
     onUpdateChapter(next);
   };
 
-  const startReview = (label: string, text: string) => {
+  /** 续存基线：快照引用仍有效（快照还在）时写 id；快照已被删则回落全文，保证续审不中断。 */
+  const baselineForPersist = (review: ReviewBaseline): RevisionBaseline => {
+    const { baseline } = review;
+    if (baseline.source === 'snapshot' && !chapter?.snapshots?.some((item) => item.id === baseline.id)) {
+      return { source: 'inline', text: review.text };
+    }
+    return baseline;
+  };
+
+  const startReview = (label: string, text: string, baseline: RevisionBaseline) => {
     setDecisions({});
-    setReview({ label, text });
+    setReview({ label, text, baseline });
     setActiveChangeIndex(0);
-    persistReview({ label, text, decisions: {} });
+    persistReview({ label, text, baseline, decisions: {} });
   };
   const stopReview = () => {
     setReview(null);
@@ -106,13 +127,13 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
     if (!review) return;
     const next = { ...decisions, [hunkId]: decision };
     setDecisions(next);
-    persistReview({ label: review.label, text: review.text, decisions: next });
+    persistReview({ label: review.label, text: review.text, baseline: baselineForPersist(review), decisions: next });
   };
   const decideAll = (decision: RevisionDecision) => {
     if (!review) return;
     const next = Object.fromEntries(uniformDecisions(reviewHunks, decision)) as Record<string, RevisionDecision>;
     setDecisions(next);
-    persistReview({ label: review.label, text: review.text, decisions: next });
+    persistReview({ label: review.label, text: review.text, baseline: baselineForPersist(review), decisions: next });
   };
 
   // 修订记录按需加载：节点 id 即章节 id（bridge 平铺时原样透传）；
@@ -138,6 +159,13 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
   }, [isOpen, chapter, tab]);
 
   // 打开时从侧车字段恢复进行中的对比（重开页面可续审）；换章或关闭即重置。
+  // 本 effect 是 revisionReview 的唯一读取入口，也是「历史全文基线 → id 引用」读时迁移的唯一落点：
+  // 检测旧字段（无 baselineRef）→ 匹配快照/修订 id → 合并当前逐处决定写回，项目文件随即去掉全文副本。
+  useEffect(() => {
+    latestChapterRef.current = chapter ?? null;
+    onUpdateChapterRef.current = onUpdateChapter;
+  });
+
   useEffect(() => {
     if (!isOpen || !chapter) {
       hydratedChapterRef.current = null;
@@ -148,15 +176,76 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
     }
     if (hydratedChapterRef.current === chapter.id) return;
     hydratedChapterRef.current = chapter.id;
-    const restored = fromRevisionReviewState(chapter.revisionReview);
-    if (restored) {
-      setReview({ label: restored.label, text: restored.text });
+    let cancelled = false;
+
+    /** 迁移写回：把解析出的引用并入当前侧车字段（保留当前逐处决定、丢掉全文副本）。 */
+    const writeBackRef = (ref: RevisionBaselineRef) => {
+      const current = latestChapterRef.current;
+      const reviewField = current?.revisionReview;
+      // 换章、对比已结束、已是引用格式时都不写回
+      if (!current || current.id !== chapter.id || !reviewField || reviewField.baselineRef !== undefined) return;
+      const update = onUpdateChapterRef.current;
+      if (!update) return;
+      update({ ...current, revisionReview: withBaselineRef(reviewField, ref) });
+    };
+
+    const loadRevisions = (): Promise<RevisionEntity[] | null> =>
+      repository.loadRevisions
+        ? repository.loadRevisions(chapter.id).catch(() => null)
+        : Promise.resolve(null);
+
+    const restored = fromRevisionReviewState(chapter.revisionReview, chapter);
+    if (!restored) {
+      setReview(null);
+      setDecisions({});
+    } else if (restored.text !== null) {
+      // 快照引用或全文（历史数据/兜底）已能解析正文
+      const snapshotRef = restored.baseline.source === 'inline' ? matchSnapshotBaseline(chapter, restored.text) : null;
+      setReview({
+        label: restored.label,
+        text: restored.text,
+        baseline: snapshotRef ?? restored.baseline,
+      });
       setDecisions(restored.decisions);
+      if (snapshotRef) {
+        writeBackRef(snapshotRef);
+      } else if (restored.baseline.source === 'inline') {
+        // 未匹配快照：再按正文匹配修订记录 id，匹配到才升级（不匹配则保留全文兜底）
+        void loadRevisions().then((rows) => {
+          if (cancelled || !rows) return;
+          const revisionRef = matchRevisionBaseline(rows, restored.text ?? '');
+          if (!revisionRef) return;
+          setReview((previous) => (previous ? { ...previous, baseline: revisionRef } : previous));
+          writeBackRef(revisionRef);
+        });
+      }
+    } else if (restored.baseline.source === 'revision') {
+      // 修订 id 引用：正文在 revisions 表，异步载入；引用失效时回落全文兜底
+      const ref = restored.baseline;
+      void loadRevisions().then((rows) => {
+        if (cancelled) return;
+        const found = rows?.find((row) => row.id === ref.id);
+        const text = found ? found.body : restored.fallbackText;
+        if (text === null) {
+          setReview(null);
+          setDecisions({});
+          return;
+        }
+        setReview({
+          label: restored.label,
+          text,
+          baseline: found ? { source: 'revision', id: ref.id } : { source: 'inline', text },
+        });
+        setDecisions(restored.decisions);
+      });
     } else {
       setReview(null);
       setDecisions({});
     }
     setActiveChangeIndex(0);
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, chapter]);
 
   // 逐处导航：进入对比或改动数变化时回到第一处。
@@ -420,7 +509,7 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => startReview(formatHistoryTimestamp(snap.timestamp), snap.content)}
+                        onClick={() => startReview(formatHistoryTimestamp(snap.timestamp), snap.content, { source: 'snapshot', id: snap.id })}
                         title={t('chapterHistory.compareAsBaselineTitle')}
                       >
                         <History className="size-3.5" /> {t('chapterHistory.compareAsBaseline')}
@@ -466,7 +555,7 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => startReview(`#${rev.seq}`, rev.body)}
+                        onClick={() => startReview(`#${rev.seq}`, rev.body, { source: 'revision', id: rev.id })}
                         title={t('chapterHistory.compareAsBaselineTitle')}
                       >
                         <History className="size-3.5" /> {t('chapterHistory.compareAsBaseline')}

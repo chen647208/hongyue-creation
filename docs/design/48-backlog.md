@@ -142,14 +142,6 @@
 - 验收：编辑器就绪后主动回调（或等价事件）驱动待跳队列，删掉该处定时等待；用一把延迟注入把渲染推迟到远超 50ms 仍能跳成功；原有跳转用例保持通过。
 - 规模：S。
 
-### 8. 修订基线改按 id 引用
-
-- 现状：`Chapter.revisionReview` 的 `baseline` 存整章全文，随章节序列化进项目文件（`toRevisionReviewState` 原样保留，`ChapterHistoryModal` 消费）。设计意图是快照或修订记录被删后仍能续审。
-- 缺口：项目文件体积随每章基线线性增长；没有按 id 引用 `ChapterSnapshot` 再压缩的机制。
-- 依赖：无（改存储结构需带迁移，旧数据仍可读）。
-- 验收：基线改为引用快照/修订 id，仅在引用失效时回落全文；同卷项目文件体积随修订数不再线性增长；旧格式项目打开后自动迁移且修订续审、逐处接受/拒绝行为不变。
-- 规模：M。
-
 ### 9. Service Worker 产物与移动端实测
 
 - 现状：manifest 在 `src/assets/manifest.webmanifest` 并由 `src/renderer/index.html` 引入；`scripts/build-service-worker.mjs` 由 build 联动产出 `build/renderer/sw.js`，注册门 `src/renderer/app/registerServiceWorker.ts` 限定生产、非 Electron、非 `file:`；响应式单源在 `src/renderer/shared/utils/layout.ts`（`MOBILE_MAX_WIDTH` 639 / `TABLET_MAX_WIDTH` 1023 / 44px 命中区）；e2e 已有 390×844 手机宽度的 axe 用例。
