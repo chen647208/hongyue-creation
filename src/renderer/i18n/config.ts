@@ -7,16 +7,40 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { DEFAULT_LANGUAGE, NAMESPACES, normalizeLanguage,resources, SUPPORTED_LANGUAGES } from '@shared/i18n/catalog';
+import { loadDictionary } from '@shared/i18n/bundle';
+import { DEFAULT_LANGUAGE, NAMESPACES, normalizeLanguage, SUPPORTED_LANGUAGES } from '@shared/i18n/catalog';
 import type { AppLanguage } from '@shared/types';
 import i18n from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import { initReactI18next } from 'react-i18next';
 
-// 语言清单、字典与归一化逻辑在 src/shared/i18n/catalog（主进程网关同样消费），此处只维护渲染端实例。
-export { DEFAULT_LANGUAGE, NAMESPACES, normalizeLanguage,resources, SUPPORTED_LANGUAGES };
+// 语言清单、命名空间清单与归一化逻辑在 src/shared/i18n/catalog，字典在 src/shared/i18n/bundle。
+export { DEFAULT_LANGUAGE, NAMESPACES, normalizeLanguage, SUPPORTED_LANGUAGES };
 
+/** init 幂等闸门；置 true 后重复调用直接返回现有实例。 */
 let initialized = false;
+
+/**
+ * i18next 后端：按语言从 bundle 取字典。经 `.use()` 注册（i18next 只从
+ * `.use()` 认识后端，init 的 `backend` 项只是配置项）；i18next 对未装载的语言
+ * 先调 read 再触发 languageChanged，切换语言的调用方因此总能拿到译文，
+ * 无「切完还是上一语言」的竞态。
+ */
+const dictionaryBackend = {
+  type: 'backend' as const,
+  read(language: string, namespace: string, callback: (error: unknown, data: Record<string, unknown> | undefined) => void): void {
+    const lang = normalizeLanguage(language);
+    if (!lang) {
+      callback(new Error(`不受支持的语言：${language}`), undefined);
+      return;
+    }
+    // 回参是单个命名空间的译文；先取整语言字典，再按 namespace 取一层。
+    void loadDictionary(lang).then(
+      (dictionary) => callback(null, dictionary?.[namespace]),
+      (error) => callback(error, undefined),
+    );
+  },
+};
 
 /**
  * 初始化 i18next。传入 initialLanguage 时以其为准（如已持久化的用户选择），
@@ -24,8 +48,11 @@ let initialized = false;
  */
 export async function initI18n(initialLanguage?: AppLanguage): Promise<typeof i18n> {
   if (initialized) return i18n;
-  await i18n.use(LanguageDetector).use(initReactI18next).init({
-    resources,
+  await i18n
+    .use(LanguageDetector)
+    .use(dictionaryBackend)
+    .use(initReactI18next)
+    .init({
     lng: initialLanguage,
     fallbackLng: DEFAULT_LANGUAGE,
     supportedLngs: [...SUPPORTED_LANGUAGES],
@@ -37,6 +64,7 @@ export async function initI18n(initialLanguage?: AppLanguage): Promise<typeof i1
     // React 以文本节点渲染所有译文，已负责转义；i18next 再转义会对插值内容（如含 & 的书名）二次转义。
     interpolation: { escapeValue: false },
     returnNull: false,
+    partialBundledLanguages: true,
   });
   initialized = true;
   return i18n;
