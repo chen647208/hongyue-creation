@@ -47,6 +47,7 @@
     "types:escapes": "node scripts/check-type-escapes.mjs",
     "lint:dead": "knip --include files,dependencies,devDependencies,unlisted,binaries",
     "bundle:check": "node scripts/check-bundle-size.mjs",
+    "bundle:analyze": "node scripts/bundle-analyze.mjs",
     "bench": "node scripts/bench-db.mjs",
     "lint": "eslint src --max-warnings=0",
     "lint:fix": "eslint src --fix && node scripts/add-license-headers.mjs",

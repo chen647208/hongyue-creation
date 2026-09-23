@@ -17,6 +17,7 @@ import { useEffect } from 'react';
 import { vectorIntegrationService } from '@/shared/services/knowledge/vectorIntegrationService';
 import { normalizeProjectKinds } from '@/shared/utils/characterKinds';
 
+import { loadUserSkills } from '../features/assistant/services/userSkillsService';
 import { bootCustomFonts } from '../features/settings/services/customFontService';
 import { changeLanguage } from '../i18n';
 import { dt } from '../i18n';
@@ -126,10 +127,10 @@ export function useAppBootstrap(): void {
         void offerPendingExitExportRetry().catch((error) => logger.warn('退出导出重试失败:', error));
         // 托盘/自启/代理下发主进程（hydrate 之后，读到用户真实配置）
         startShellSync();
-        // 用户写法技能装载（<userData>/skills/user，失败不挡启动）
-        void import('../features/assistant/services/userSkillsService')
-          .then((m) => m.loadUserSkills())
-          .catch((error) => logger.warn('用户技能装载失败:', error));
+        // 用户写法技能装载（<userData>/skills/user，失败不挡启动）。
+        // 该模块经 assistantRuntimeSetup 进启动图，本就随首屏加载，此处用静态引用即可：
+        // 写动态 import 只会拿到构建告警 INEFFECTIVE_DYNAMIC_IMPORT，搬不动 chunk。
+        void loadUserSkills().catch((error) => logger.warn('用户技能装载失败:', error));
       } catch (error) {
         logger.error('Failed to load initial state:', error);
         dialogService.alert(dt('app:storage.loadFailed', { message: error instanceof Error ? error.message : String(error) }));
