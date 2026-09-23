@@ -13,7 +13,7 @@
  * YAML（.novel/builds/*.yml，js-yaml 双向往返，验收 2）。
  * 编译档案（docs/design/39）：在 profile 上追加 compile 编排（分卷/前后置页/目录/标题层级）。
  */
-import yaml from 'js-yaml';
+import { dump, load } from 'js-yaml';
 
 /** 素材口径：exclude 剔除素材；include 保留原序；prefer 保留并前移。 */
 export type MaterialPolicy = 'exclude' | 'include' | 'prefer';
@@ -222,12 +222,12 @@ export function clampHeadingLevel(level?: number): number {
 
 /** Profile → YAML 文本（.yml 分享单元）。 */
 export function serializeProfileYaml(profile: BuildProfile): string {
-  return yaml.dump(profile, { lineWidth: 120, noRefs: true });
+  return dump(profile, { lineWidth: 120, noRefs: true });
 }
 
 /** YAML 文本 → Profile；结构校验失败抛错（导入 UI 捕获提示）。 */
 export function parseProfileYaml(text: string): BuildProfile {
-  const parsed = yaml.load(text);
+  const parsed = load(text);
   if (typeof parsed !== 'object' || parsed === null) {
     throw new Error('Profile YAML 必须是对象');
   }
