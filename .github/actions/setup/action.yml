@@ -1,0 +1,54 @@
+name: 安装依赖（Node + Electron 二进制缓存）
+description: |
+  配置 Node（版本取 .nvmrc）、缓存 Electron 二进制并安装依赖。
+  npm 缓存不含 Electron 运行时：它由 postinstall 从 GitHub Releases 下载，
+  偶发 504 会让 npm ci 整体失败（run 35615456531 即此原因）。
+  这里按 Electron 版本缓存该二进制，并对 npm ci 做有限重试。
+
+inputs:
+  skip-browsers:
+    description: 置为 '1' 时不下载 Playwright 浏览器（E2E 用仓库自带 electron）
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: 配置 Node
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: '.nvmrc'
+        cache: 'npm'
+
+    # Electron 版本参与缓存键：升级 Electron 会自动换一份缓存，不会读到旧二进制。
+    - name: 读取 Electron 版本
+      id: electron-version
+      shell: bash
+      run: |
+        version=$(node -p "require('./package-lock.json').packages['node_modules/electron'].version")
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: 缓存 Electron 二进制
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/.cache/electron
+          ~/Library/Caches/electron
+          ~/AppData/Local/electron/Cache
+        key: electron-${{ runner.os }}-${{ runner.arch }}-${{ steps.electron-version.outputs.version }}
+
+    - name: 安装依赖
+      shell: bash
+      env:
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: ${{ inputs.skip-browsers }}
+      run: |
+        # 下载失败多为瞬时网络错误，重试 3 次；真正的依赖冲突会连续失败并如实报错。
+        for attempt in 1 2 3; do
+          if npm ci; then
+            exit 0
+          fi
+          echo "npm ci 第 $attempt 次失败，10 秒后重试"
+          sleep 10
+        done
+        echo "npm ci 连续 3 次失败"
+        exit 1

@@ -1,13 +1,17 @@
 name: Docs Pages
 
 # 构建 VitePress 文档站并发布到 GitHub Pages。
-# 触发：main 上 docs/、docs-site/ 或同步脚本变更；也支持手动运行。
+# 触发：main 上内容源（docs/、USER_GUIDE*.md）、站点或同步脚本变更；也支持手动运行。
 # VitePress 的 base 由 docs-site/.vitepress/config.mts 决定，本工作流不重复设置。
 on:
   push:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'USER_GUIDE.md'
+      - 'USER_GUIDE_EN.md'
+      - 'src/assets/logo.svg'
+      - 'src/assets/app-icon.svg'
       - 'docs-site/**'
       - 'scripts/sync-docs.mjs'
   workflow_dispatch:
@@ -33,14 +37,8 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v7
 
-      - name: 配置 Node（读取 .nvmrc）
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
       - name: 安装依赖
-        run: npm ci
+        uses: ./.github/actions/setup
 
       - name: 构建文档站
         run: npm run docs:build

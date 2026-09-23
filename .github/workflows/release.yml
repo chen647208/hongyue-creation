@@ -34,14 +34,8 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v7
 
-      - name: 配置 Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'npm'
-
       - name: 安装依赖
-        run: npm ci
+        uses: ./.github/actions/setup
 
       - name: 类型检查与测试（含覆盖率锁线，与 CI 一致）
         run: npm run typecheck:all && npm run test:coverage
