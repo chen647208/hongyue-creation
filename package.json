@@ -157,7 +157,7 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "knip": "^6.35.1",
-    "lint-staged": "^16.4.0",
+    "lint-staged": "^17.5.1",
     "lucide-react": "^1.40.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
