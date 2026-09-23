@@ -215,7 +215,9 @@ function parseCanvasLayout(value: unknown): CanvasLayout | undefined {
     }
   }
   // 自由节点与连线复用 JSON Canvas 校验；单条非法即降级丢弃。
-  const parsed = parseCanvasDocument({ nodes: record.nodes, edges: record.edges });
+  // 连线的端点存在性这里不查：端点可以是投影行节点（章节等），其 id 由 projectCanvas
+  // 从行投影产生，不在 nodes 数组里。失链过滤统一由 projectCanvas 对照真实行完成。
+  const parsed = parseCanvasDocument({ nodes: record.nodes, edges: record.edges, requireKnownEndpoints: false });
   const nodes = parsed.ok ? parsed.document.nodes : [];
   const edges = parsed.ok ? parsed.document.edges : [];
   const canvas: CanvasLayout = {};

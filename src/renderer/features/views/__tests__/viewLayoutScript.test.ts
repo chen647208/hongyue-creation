@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { projectCanvas } from '../canvasView';
 import type { ViewLayout } from '../types';
 import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from '../viewLayout';
 
@@ -69,5 +70,25 @@ describe('viewLayout 计算列键冲突', () => {
 
   it('不冲突的计算列往返不变', () => {
     expect(parseViewLayout(serializeViewLayout({ ...DEFAULT_VIEW_LAYOUT, computed: [flat] })).computed).toEqual([flat]);
+  });
+
+  it('连线端点是投影行节点：存档往返后仍保留，失链由 projectCanvas 过滤', () => {
+    // 章节行的 id 由 projectCanvas 从行投影产生，不在文档 nodes 数组里。
+    const layout = {
+      positions: {},
+      nodes: [],
+      edges: [{ id: 'e1', fromNode: 'chapter-1', toNode: 'chapter-2' }],
+    };
+    const parsed = parseViewLayout({ canvas: layout });
+    expect(parsed?.canvas?.edges).toEqual([{ id: 'e1', fromNode: 'chapter-1', toNode: 'chapter-2' }]);
+    // 真实行不存在时 projectCanvas 才会把它当失链滤掉
+    const projected = projectCanvas(parsed?.canvas, []);
+    expect(projected.edges).toEqual([]);
+    // 行存在时投影出来
+    const withRows = projectCanvas(parsed?.canvas, [
+      { id: 'chapter-1', kind: 'chapter', title: '第一章', values: {}, cells: {} },
+      { id: 'chapter-2', kind: 'chapter', title: '第二章', values: {}, cells: {} },
+    ]);
+    expect(withRows.edges).toEqual([{ id: 'e1', fromNode: 'chapter-1', toNode: 'chapter-2' }]);
   });
 });
