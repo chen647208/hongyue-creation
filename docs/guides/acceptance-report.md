@@ -1,14 +1,15 @@
-# M0–M5 验收报告
+# 设计验收报告（2026-09 时点快照）
 
 > 逐项核对各设计篇验收标准的落地状态。证据 = 提交哈希 + 测试名；
 > 测试全部随 `npm run verify` 运行（lint + typecheck + vitest + 许可头 + Electron 构建）。
+> 本文是时点快照：此后新增能力不回填此处，当前状态以 `docs/features/` 为准。
 
 ## 05 AI 层（§8 五条）
 
 | # | 标准 | 状态 | 证据 |
 |---|---|---|---|
 | 1 | 断网/无 Key：纯写作正常，AI 按钮提示未配置原因 | ✅ | 网关错误一律经 `AIResponse.error` 返回；minimal 发行档整体拒绝 AI 请求（2354e7d，`ai.request` 拦截门） |
-| 2 | AI 改稿全链路留痕：tool call → proposal → diff → 审批 → transaction → Revision → entity_changes(agentId) | ✅ | 会话事件 `tool.call/tool.approval/tool.result` 落 jsonl（20bb6f8）；`ApprovalRouter` write:direct 审计回调（8b3081b）；`CommitOptions.agentId` 写入 entity_changes 与 Revision（M1.3）；callId 贯穿三级 |
+| 2 | AI 改稿全链路留痕：tool call → proposal → diff → 审批 → transaction → Revision → entity_changes(agentId) | ✅ | 会话事件 `tool.call/tool.approval/tool.result` 落 jsonl（20bb6f8）；`ApprovalRouter` write:direct 审计回调（8b3081b）；`CommitOptions.agentId` 写入 entity_changes 与 Revision（见 08 篇 M1.3）；callId 贯穿三级 |
 | 3 | 技能渐进加载：清单 <500 token，激活全文注入可卸载 | ✅ | SkillCatalog manifest 预算 1600 字（≈500 token 中文）+ 测试（0feb8c6） |
 | 4 | MCP 出口：外部 agent 完成「读大纲→改人物卡→写回」 | ✅ | stdio server 冒烟实测（list_books/get_node/propose_card_write，7a2b8ea）；写走待审箱桥（ApprovalHost 轮询） |
 | 5 | 审批超时不阻塞：挂起待审箱，UI 角标 | ✅ | ApprovalBroker 超时降级测试（8b3081b）+ ApprovalHost 角标（d72b8cb） |

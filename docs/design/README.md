@@ -1,11 +1,11 @@
 # 红月创作 v2 设计文档索引
 
-> 生成于 2026-08-31 ｜ 依据：当前代码实测（01 篇）+ 九项目调研拆解（novelWriter/Zettlr/Trilium/Twine/Manuskript/bibisco/codex/deepseek-harness/编辑器内核与插件规范；调研归档于 git 历史 research/ 目录）。
+> 生成于 2026-08-31 ｜ 依据：起点代码实测（01 篇，时点快照）+ 九项目调研拆解（novelWriter/Zettlr/Trilium/Twine/Manuskript/bibisco/codex/deepseek-harness/编辑器内核与插件规范；调研归档于 git 历史 research/ 目录）。
 > **性质声明**：本目录是目标设计（前瞻性），与 `docs/features/`（现状描述）分工不同；功能落地后应把对应设计回写进 features 文档。
 
 ## 阅读顺序
 
-1. **[01 现状评估](01-current-state.md)** — 一切从实测出发：技术栈、数据模型、44 个服务、与蓝图的差距矩阵
+1. **[01 起点基线](01-current-state.md)** — 蓝图绘制前的代码底色快照：技术栈、数据模型、44 个服务、与蓝图的差距矩阵（附当前处置对照）
 2. **[02 目标架构](02-target-architecture.md)** — 进程模型、core 分层与导入边界、目标目录树、状态管理决策
 3. **[03 数据层](03-data-layer.md)** — 六实体、类型注册表（首批 17 模板）、开放文本 DSL、索引器、schema v2、迁移框架
 4. **[04 插件系统](04-plugin-system.md)** — manifest v0、9 类贡献点、生命周期与故障隔离、命名空间、沙箱、bundle/profile/patch
