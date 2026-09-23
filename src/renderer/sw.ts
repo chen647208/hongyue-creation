@@ -21,6 +21,7 @@
  * 失效：缓存名带构建版本号，activate 时清掉旧版本缓存；在线导航始终取最新 index.html。
  */
 declare const __SW_VERSION__: string;
+declare const __SW_PRECACHE__: string[];
 
 interface CacheLike {
   addAll(requests: string[]): Promise<void>;
@@ -56,7 +57,8 @@ const scope = scopeGlobal as ServiceWorkerScopeLike;
 const cacheStorage = caches as CacheStorageLike;
 
 const CACHE_NAME = `hongyue-shell-${__SW_VERSION__}`;
-const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icon.png', './app-icon.svg'];
+/** 构建期算全的预缓存清单（见 scripts/build-service-worker.mjs）：应用壳 + 全部 assets。 */
+const APP_SHELL = __SW_PRECACHE__;
 
 scope.addEventListener('install', (event) => {
   event.waitUntil(
