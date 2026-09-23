@@ -1,7 +1,24 @@
 # 开篇钩子示例插件
 
 官方示例（MIT）：演示红月创作的**全部贡献点**，含沙箱执行的逻辑型贡献。
-安装：整目录拷到应用数据目录的 `plugins/` 下并重启，在设置 → 插件可见。
+安装前必须签名（本插件带 `logic` 与 `editor` 可执行贡献点），步骤见下。
+
+## 安装（含签名）
+
+```bash
+# 1. 生成一把密钥对（只做一次；私钥自留，公钥给宿主信任）
+npm run plugin:keygen -- keys/demo.pub keys/demo.pem
+
+# 2. 用私钥给本插件签名，产出 plugin.sig
+npm run plugin:sign -- keys/demo.pem examples/plugins/opening-hook
+
+# 3. 把 keys/demo.pub 的内容整段贴进 设置 → 插件 的信任清单
+
+# 4. 整目录拷到应用数据目录的 plugins/ 下并重启，在 设置 → 插件 查看状态
+```
+
+签名对象是 `plugin.json` 的 UTF-8 文本；改动 `plugin.json` 后要重跑第 2 步，否则安装被
+「签名校验失败」拒绝。公钥不在信任清单同样拒装——信任清单为空时一律拒装。
 
 ## 贡献点
 

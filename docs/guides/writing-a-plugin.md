@@ -33,7 +33,27 @@
 ## 4. 资源与路径限制
 
 - 路径必须相对且不含 `..`；单文件 ≤128KiB、单贡献键 ≤32 文件、总计 ≤96 文件 / 2MiB。
-- 签名（可选）：`plugin.sig`（Ed25519 信封）存在即强制校验，公钥须在 设置 → 插件 的信任清单内。
+
+### 可执行贡献点必须签名
+
+插件声明 `logic` / `editor` / `scripts` / `renderers` 任一可执行贡献点，目录里就必须有 `plugin.sig`，
+否则安装被拒（`缺少签名：可执行贡献或强制签名要求的插件必须带 plugin.sig`）。只发资源
+（`types` / `skills` 的 Markdown）的插件可以不签。
+
+`plugin.sig` 是 Ed25519 detached 签名信封：`{ "algorithm": "ed25519", "signature": "<base64>", "publicKey": "<PEM>" }`，
+签名对象是 `plugin.json` 的 UTF-8 文本。宿主判定两件事：签名能验过，且 `publicKey` 出现在
+设置 → 插件 的信任清单里。清单为空时一律拒装。
+
+发布者侧（私钥自留，公钥随插件分发）：
+
+```bash
+npm run plugin:keygen -- keys/my.pub keys/my.pem   # 只做一次；keys/ 加进 .gitignore
+npm run plugin:sign -- keys/my.pem examples/plugins/my-plugin
+npm run plugin:sign:check -- examples/plugins/my-plugin
+```
+
+使用者侧：把公钥文本整段（含 `-----BEGIN PUBLIC KEY-----` 头尾）贴进 设置 → 插件 的信任清单，
+再把插件目录拷到应用数据目录的 `plugins/` 并重启。改了 `plugin.json` 必须重新签名，否则校验不过。
 
 ## 5. 许可：插件不必开源
 
