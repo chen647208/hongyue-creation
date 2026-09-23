@@ -194,6 +194,34 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
     editor.commands.setContent(dslToPmDoc(content), { emitUpdate: false });
   }, [content, editor, collaborative]);
 
+  // 就绪信号（跨章跳转的驱动事件）：当前章正文进入编辑器文档后通知订阅者。
+  // 订阅集合随组件实例存活：协作模式切章会重建编辑器实例，订阅不随之丢失。
+  const readyListeners = useRef<Set<() => void>>(new Set());
+  const notifyReady = useCallback(() => {
+    for (const listener of [...readyListeners.current]) listener();
+  }, []);
+  // 已发信号的章节：同一章内的重复渲染（本地输入、装饰刷新）不重复触发。
+  const readyChapterRef = useRef<string | null>(null);
+
+  // 声明顺序在受控同步之后：非协作模式切章时 setContent 已执行；协作模式换绑后
+  // editor 指向新实例（重建过程中间的已销毁实例不发信号）。内容相同的两章也发信号，
+  // 因为文档已等价含目标章正文。
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    if (readyChapterRef.current === activeChapterId) return;
+    readyChapterRef.current = activeChapterId;
+    notifyReady();
+  }, [editor, activeChapterId, notifyReady]);
+
+  // 协作模式正文经 Y 片段异步到位（远端合并、延迟播种）：片段深层变化补发信号，
+  // 让晚于编辑器创建进入文档的块也能被待跳队列消费。
+  useEffect(() => {
+    if (!editor || !fragment) return;
+    const observer = () => notifyReady();
+    fragment.observeDeep(observer);
+    return () => fragment.unobserveDeep(observer);
+  }, [editor, fragment, notifyReady]);
+
   // 可编辑态：无章节或生成中（非流式）时锁定。
   useEffect(() => {
     if (!editor) return;
@@ -413,6 +441,12 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
         refreshBlockEmbedViews();
         // 空事务触发装饰重算，让行内引用的失链标记随项目数据刷新。
         if (editor) editor.view.dispatch(editor.state.tr);
+      },
+      onEditorReady(listener: () => void) {
+        readyListeners.current.add(listener);
+        return () => {
+          readyListeners.current.delete(listener);
+        };
       },
       splitAtCursor() {
         if (!editor) return null;

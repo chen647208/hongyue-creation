@@ -425,7 +425,9 @@
     "saveProfile": "Save profile",
     "profileNameRequired": "Enter a profile name",
     "deleteProfileTitle": "Delete this profile",
-    "configError": "Invalid export settings: {{errors}}"
+    "configError": "Invalid export settings: {{errors}}",
+    "rendererPluginInactive": "Plugin not active ({{plugin}})",
+    "rendererUnavailable": "Plugin renderers unavailable: {{items}}"
   },
   "summarySection": {
     "title": "Chapter Content Summary",

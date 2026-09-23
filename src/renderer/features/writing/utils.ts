@@ -9,6 +9,7 @@
 
 import { buildDocxFiles, buildEpubFiles, buildOdtFiles, type BuildProfile,clampHeadingLevel, COMPILE_DEFAULTS, referenceEntities,roundtripProfile, runBuild } from '@core/build';
 import type { AttributeEntity, EdgeEntity,NodeEntity } from '@core/entities';
+import type { PluginHost } from '@core/plugin';
 import { builtinRegistry } from '@core/types-registry';
 import { Bot, Brain, Cpu, Feather, type LucideIcon,Server } from 'lucide-react';
 
@@ -230,6 +231,53 @@ export const buildQuickExportProfile = (format: ExportFormat): BuildProfile => {
   };
 };
 
+/** 导出对话框格式条中的插件渲染器候选项。 */
+export interface PluginRendererOption {
+  /** 命名空间化渲染器 id（`<插件短名>.renderer.<声明 id>`），即显式 rendererId。 */
+  id: string;
+  /** 目标导出格式 id（决定落盘扩展名与打印/打包分支）。 */
+  format: string;
+  /** 所属插件 id。 */
+  pluginId: string;
+  /** 不可用原因（所属插件未激活）；null 即可用。 */
+  unavailableReason: string | null;
+}
+
+/**
+ * 列出已注册的插件渲染器，供导出对话框的格式条在内置格式之后追加。
+ * host 为 null（插件宿主未装配或尚未就绪）时返回空清单，格式条只显示内置格式。
+ * 渲染器已注册但所属插件未激活时不可用：携带可读原因，由调用方置灰。
+ */
+export function listPluginRendererOptions(host: PluginHost | null): PluginRendererOption[] {
+  const port = getBuildRendererPort();
+  if (!port || !host) return [];
+  return port.list().map((info) => ({
+    id: info.id,
+    format: info.format,
+    pluginId: info.pluginId,
+    unavailableReason: host.isActive(info.pluginId)
+      ? null
+      : i18n.t('writing:export.rendererPluginInactive', { plugin: info.pluginId }),
+  }));
+}
+
+/**
+ * 导出对话框显式选中的插件渲染器 id（null = 用内置渲染器）。
+ *
+ * 写入只发生在导出对话框的格式条（见 setSelectedExportRenderer）：选中插件渲染器时
+ * 写入其命名空间化 id，选中内置格式或关闭对话框时写 null。
+ * buildExportContent 读取它并作为 runBuild 的显式 rendererId（命中已注册渲染器时
+ * 优先于同格式内置渲染器）；id 未注册（插件已停用或卸载）时忽略，回落内置渲染器。
+ * 取模块级单值的原因：落盘执行在 useChapterExport，对话框与它之间只经此模块通信，
+ * 不必为单个字符串透传多层 props。
+ */
+let selectedExportRendererId: string | null = null;
+
+/** 设置导出对话框当前显式选择的插件渲染器；null 表示回到内置渲染器。 */
+export function setSelectedExportRenderer(rendererId: string | null): void {
+  selectedExportRendererId = rendererId;
+}
+
 export const buildExportContent = (project: Project, selectedChapterIds: Set<string>, format: ExportFormat = 'txt', profileOverride?: BuildProfile, compileOptions?: ExportCompileOptions) => {
   // 导出统一走 core/build 三段式管线（选择→变换→渲染），
   // 与写作统计、插件渲染器共享同一实现（单一口径，无双轨）。
@@ -256,7 +304,14 @@ export const buildExportContent = (project: Project, selectedChapterIds: Set<str
   if (compileOptions) profile = applyExportCompileOptions(profile, compileOptions);
 
   // 插件渲染器经宿主端口注入；未装配宿主时 getBuildRendererPort 返回 undefined，只用内置渲染器。
-  const { text } = runBuild(profile, { nodes, attrs, edges: [] }, { rendererPort: getBuildRendererPort() });
+  // 对话框显式选中的渲染器作为 runBuild 的 rendererId 传入（优先于档案内的 renderer 字段）；
+  // 选中项已不在注册清单（插件停用/卸载）时忽略，回落内置渲染器。
+  const rendererPort = getBuildRendererPort();
+  const explicitRendererId =
+    selectedExportRendererId !== null && rendererPort?.list().some((item) => item.id === selectedExportRendererId)
+      ? selectedExportRendererId
+      : undefined;
+  const { text } = runBuild(profile, { nodes, attrs, edges: [] }, { rendererPort, rendererId: explicitRendererId });
 
   // RTF 是完整文档（首行文档头 + 尾行括号）：书名块插在首行之后，保持管线纯净
   if (format === 'rtf') {
@@ -300,12 +355,18 @@ export const buildExportContent = (project: Project, selectedChapterIds: Set<str
   return `${header}${text}\n\n`;
 };
 
-const EXPORT_EXT: Record<ExportFormat, string> = { txt: 'txt', md: 'md', html: 'html', rtf: 'rtf', pdf: 'pdf', epub: 'epub', docx: 'docx', odt: 'odt' };
-const EXPORT_MIME: Record<ExportFormat, string> = { txt: 'text/plain', md: 'text/markdown', html: 'text/html', rtf: 'application/rtf', pdf: 'application/pdf', epub: 'application/epub+zip', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', odt: 'application/vnd.oasis.opendocument.text' };
+// 键为导出格式 id：内置 8 格式之外，插件渲染器可声明新格式（查表未命中时见 exportFileExtension）。
+const EXPORT_EXT: Record<string, string> = { txt: 'txt', md: 'md', html: 'html', rtf: 'rtf', pdf: 'pdf', epub: 'epub', docx: 'docx', odt: 'odt' };
+const EXPORT_MIME: Record<string, string> = { txt: 'text/plain', md: 'text/markdown', html: 'text/html', rtf: 'application/rtf', pdf: 'application/pdf', epub: 'application/epub+zip', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', odt: 'application/vnd.oasis.opendocument.text' };
+
+/** 导出格式 → 文件扩展名：内置格式按表取值，插件渲染器声明的新格式用格式 id 本身。 */
+export function exportFileExtension(format: ExportFormat): string {
+  return EXPORT_EXT[format] ?? format;
+}
 
 export const buildExportFilename = (projectTitle: string, format: ExportFormat = 'txt', now: Date = new Date()) => {
   const safeTitle = projectTitle.replace(/[\\/:*?"<>|]/g, '_');
-  return `${safeTitle}_${i18n.t('writing:export.fileSuffix')}_${now.toISOString().split('T')[0]}.${EXPORT_EXT[format]}`;
+  return `${safeTitle}_${i18n.t('writing:export.fileSuffix')}_${now.toISOString().split('T')[0]}.${exportFileExtension(format)}`;
 };
 
 /**
@@ -338,7 +399,7 @@ export const saveExportFile = async (filename: string, content: string, format: 
     const result = await api.saveFileDialog({
       title: i18n.t('writing:export.fileDialogTitle'),
       defaultPath: filename,
-      filters: [{ name: i18n.t('writing:export.fileFilterName'), extensions: [EXPORT_EXT[format]] }],
+      filters: [{ name: i18n.t('writing:export.fileFilterName'), extensions: [exportFileExtension(format)] }],
     });
     if (result.canceled || !result.filePath) return; // 用户取消
     await api.writeFile(result.filePath, content);

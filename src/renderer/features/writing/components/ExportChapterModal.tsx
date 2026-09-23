@@ -8,10 +8,12 @@
  */
 
 import type { BuildProfile } from '@core/build';
-import { AlignLeft, Check, Code, FileDown, FileOutput, FileText, Globe, type LucideIcon,Package, Trash2 } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import type { PluginHost } from '@core/plugin';
+import { AlignLeft, Check, Code, FileDown, FileOutput, FileText, Globe, type LucideIcon,Package, Puzzle, Trash2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { assistantRuntime } from '@/shared/services/assistantRuntime';
 import { buildProfileRegistry, profileKey } from '@/shared/services/buildProfiles';
 import { Button } from '@/shared/ui/Button';
 import { Checkbox } from '@/shared/ui/Checkbox';
@@ -25,7 +27,7 @@ import { cn } from '@/shared/utils/cn';
 import type { Chapter, Project } from '../../../../shared/types';
 import { computeChapterStats } from '../services/writingStatsService';
 import type { ExportCompileOptions,ExportFormat } from '../types';
-import { buildExportContent, listBuildContentTypes } from '../utils';
+import { buildExportContent, listBuildContentTypes, listPluginRendererOptions, setSelectedExportRenderer } from '../utils';
 
 interface ExportChapterModalProps {
   isOpen: boolean;
@@ -174,6 +176,38 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
   const volumeTypeOptions = useMemo(() => listBuildContentTypes(project), [project]);
   const [showPreview, setShowPreview] = useState(false);
   const [profileName, setProfileName] = useState('');
+  // 显式选中的插件渲染器（null = 用内置渲染器）；关闭对话框时复位。
+  const [selectedRendererId, setSelectedRendererId] = useState<string | null>(null);
+  // 插件宿主就绪后列出已注册渲染器；未就绪（无插件系统）时格式条只有内置格式。
+  const [rendererHost, setRendererHost] = useState<PluginHost | null>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const runtime = assistantRuntime();
+    if (!runtime) return;
+    let alive = true;
+    void runtime.pluginHostPromise.then((host) => {
+      if (alive) setRendererHost(host);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [isOpen]);
+  const rendererOptions = useMemo(() => listPluginRendererOptions(rendererHost), [rendererHost]);
+  const unavailableRenderers = rendererOptions.filter((option) => option.unavailableReason !== null);
+  // 落盘执行在 useChapterExport：当前选择经 utils 的显式渲染器 seam 传给 runBuild。
+  useEffect(() => {
+    setSelectedExportRenderer(selectedRendererId);
+  }, [selectedRendererId]);
+  // 关闭即回到内置渲染器，避免下次打开误用上次选择的插件渲染器。
+  useEffect(() => {
+    if (!isOpen) setSelectedRendererId(null);
+  }, [isOpen]);
+
+  /** 切换导出格式：选内置格式清空显式渲染器；选插件渲染器记住其 id 并切到目标格式。 */
+  const selectFormat = (value: ExportFormat, rendererId: string | null = null) => {
+    setSelectedRendererId(rendererId);
+    onFormatChange(value);
+  };
   const profiles = buildProfileRegistry.list();
   const selectedProfile = profiles.find((p) => profileKey(p) === exportProfileId);
   const isUserProfile = selectedProfile ? exportUserProfiles.some((p) => profileKey(p) === exportProfileId) : false;
@@ -366,20 +400,54 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
             <span className="font-medium tabular-nums text-foreground">{selectedChapterIds.size}</span>
             {t('export.selectedAfter', { total: chapters.length })}
           </div>
-          <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
-            {FORMAT_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => onFormatChange(opt.value)}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                  format === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                )}
-                title={t('export.exportAsTitle', { format: opt.label })}
-              >
-                <opt.icon className="size-3.5" /> {opt.label}
-              </button>
-            ))}
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
+              {FORMAT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => selectFormat(opt.value)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                    format === opt.value && selectedRendererId === null ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  title={t('export.exportAsTitle', { format: opt.label })}
+                >
+                  <opt.icon className="size-3.5" /> {opt.label}
+                </button>
+              ))}
+              {rendererOptions.map((opt) => {
+                const active = selectedRendererId === opt.id;
+                const reason = opt.unavailableReason;
+                // 提示同时给渲染器标识与原因；不可用时原因就是全部提示内容。
+                const hint = reason ? `${opt.id}: ${reason}` : t('export.exportAsTitle', { format: `${opt.id}（${opt.format}）` });
+                return (
+                  <button
+                    key={opt.id}
+                    // 插件渲染器可声明内置之外的新格式 id：落盘分支（扩展名/打印/打包）按格式 id 分发
+                    onClick={() => selectFormat(opt.format as ExportFormat, opt.id)}
+                    disabled={reason !== null}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                      active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                      reason !== null && 'cursor-not-allowed opacity-50 hover:text-muted-foreground'
+                    )}
+                    title={hint}
+                    aria-label={hint}
+                  >
+                    <Puzzle className="size-3.5" /> {opt.id}
+                  </button>
+                );
+              })}
+            </div>
+            {unavailableRenderers.length > 0 && (
+              <p className="text-2xs text-muted-foreground">
+                {t('export.rendererUnavailable', {
+                  items: unavailableRenderers
+                    .map((opt) => `${opt.id}: ${opt.unavailableReason ?? ''}`)
+                    .join('; '),
+                })}
+              </p>
+            )}
           </div>
           <Button variant="link" size="sm" className="h-auto shrink-0 p-0 text-xs whitespace-nowrap" onClick={onToggleAll}>
             {selectedChapterIds.size === chapters.length ? t('export.deselectAll') : t('export.selectAll')}

@@ -151,6 +151,13 @@ export interface NovelEditorHandle {
   insertBlockEmbed(id: string): boolean;
   /** 选中并滚动到指定块；当前文档不含该块返回 false。 */
   jumpToBlock(id: string): boolean;
+  /**
+   * 订阅编辑器就绪信号：当前章正文进入编辑器文档后触发一次
+   * （切章、编辑器重建、协作正文经 Y 片段晚到时各触发一次）。
+   * 返回退订函数；同一监听器重复订阅只存一份。
+   * 用途：跨章跳转的待跳队列由本信号驱动，取代按固定时延猜测渲染完成。
+   */
+  onEditorReady(listener: () => void): () => void;
   /** 项目正文变化后重新投影全部嵌入。 */
   refreshEmbeds(): void;
 }

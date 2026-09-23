@@ -425,7 +425,9 @@
     "saveProfile": "保存档案",
     "profileNameRequired": "请输入档案名称",
     "deleteProfileTitle": "删除该档案",
-    "configError": "导出配置错误：{{errors}}"
+    "configError": "导出配置错误：{{errors}}",
+    "rendererPluginInactive": "所属插件未激活（{{plugin}}）",
+    "rendererUnavailable": "插件渲染器暂不可用：{{items}}"
   },
   "summarySection": {
     "title": "章节正文摘要",
