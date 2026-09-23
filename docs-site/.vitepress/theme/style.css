@@ -1,0 +1,29 @@
+/* 站点样式补充。颜色一律取默认主题的语义变量，不写死色值。 */
+
+/* 前瞻设计横幅：出现在 design/ 每页正文之前 */
+.design-banner {
+  margin: 0 0 24px;
+  padding: 12px 16px;
+  border: 1px solid var(--vp-c-warning-1);
+  border-radius: 8px;
+  background-color: var(--vp-c-warning-soft);
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.design-banner strong {
+  margin-right: 6px;
+  color: var(--vp-c-warning-1);
+}
+
+.design-banner a {
+  color: var(--vp-c-brand-1);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* 教程页与功能页正文较宽时更易读 */
+.vp-doc > div > h2 {
+  scroll-margin-top: 88px;
+}
