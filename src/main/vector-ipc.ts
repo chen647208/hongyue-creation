@@ -38,6 +38,9 @@ interface LocalIndexInstance {
 let LocalIndexCtorCache: LocalIndexCtor | null = null;
 async function loadLocalIndex(): Promise<LocalIndexCtor> {
   if (LocalIndexCtorCache) return LocalIndexCtorCache;
+  // 单段 as 两侧都不成立：vectra 的 insertItem 元数据只接受 number|string|boolean，
+  // 而本文件的窄接口按 Record<string, unknown> 收文档元数据（刻意与 vectra 类型解耦，
+  // 保证线格式与磁盘索引兼容），只能用双段断言落到窄接口。
   const mod = (await import('vectra')) as unknown as { LocalIndex: LocalIndexCtor; default?: { LocalIndex: LocalIndexCtor } };
   const ctor = mod.LocalIndex ?? mod.default?.LocalIndex;
   if (!ctor) throw new Error('Vectra LocalIndex 不可用');

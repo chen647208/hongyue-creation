@@ -21,6 +21,7 @@ import { isOverHourlyLimit } from '@/shared/services/ai/usageTracker';
 import { buildProfileRegistry } from '@/shared/services/buildProfiles';
 import { localStore } from '@/shared/services/localStore';
 import type { CapabilityHostBindings } from '@/shared/services/pluginCapabilityPort';
+import { bootstrapPlugins, reloadPluginHost } from '@/shared/services/pluginService';
 import { formulaRegistry } from '@/shared/services/viewFormulas';
 import { APP_VERSION } from '@/shared/version';
 
@@ -95,13 +96,10 @@ const capabilityBindings: CapabilityHostBindings = {
   },
 };
 
-export const pluginHostPromise = import('@/shared/services/pluginService').then((m) =>
-  m.bootstrapPlugins(pluginDeps, APP_VERSION, readDisabledList(), capabilityBindings),
-);
+export const pluginHostPromise = bootstrapPlugins(pluginDeps, APP_VERSION, readDisabledList(), capabilityBindings);
 
 /** 安装/卸载后重建宿主：释放旧宿主贡献再重新发现，返回新宿主供面板刷新。 */
 export async function reloadPlugins(): Promise<PluginHost> {
-  const { reloadPluginHost } = await import('@/shared/services/pluginService');
   const previous = await pluginHostPromise.catch(() => null);
   return reloadPluginHost(pluginDeps, APP_VERSION, previous, capabilityBindings);
 }

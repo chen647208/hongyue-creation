@@ -40,9 +40,16 @@ export function registerServiceWorker(): void {
     protocol: window.location.protocol,
   });
   if (!allowed) return;
-  window.addEventListener('load', () => {
+  const register = (): void => {
     void navigator.serviceWorker.register('./sw.js').catch((error: unknown) => {
       logger.warn('[sw] 离线壳注册失败', error);
     });
-  });
+  };
+  // 本函数在 i18n 引导之后调用，可能晚于 load：此时再挂 'load' 监听永远不会触发，
+  // 离线壳静默失效。已加载完就直接注册。
+  if (document.readyState === 'complete') {
+    register();
+    return;
+  }
+  window.addEventListener('load', register, { once: true });
 }

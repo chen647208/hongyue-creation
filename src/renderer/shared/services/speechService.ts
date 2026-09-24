@@ -46,9 +46,18 @@ interface SpeechRecognitionLike {
 }
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
+/**
+ * 挂载听写构造器的 window 面：标准名 SpeechRecognition、Chrome 前缀名 webkitSpeechRecognition，
+ * 均为可选（lib.dom 未声明这两个全局，支持与否由浏览器决定）。
+ */
+type SpeechRecognitionWindow = Window & {
+  SpeechRecognition?: SpeechRecognitionCtor;
+  webkitSpeechRecognition?: SpeechRecognitionCtor;
+};
+
 function recognitionCtor(): SpeechRecognitionCtor | undefined {
   if (typeof window === 'undefined') return undefined;
-  const w = window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor };
+  const w: SpeechRecognitionWindow = window;
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 }
 

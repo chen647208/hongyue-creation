@@ -81,6 +81,83 @@
 
 未做：结构页 CodeMirror `.cm-placeholder` 对比度仍登记为欠账 1（第三方渲染，未改内核源码）；视图 feature 与编辑器内核其余低对比类已改语义变量。win32 视觉基线已重生，Linux 基线由 CI 校验通过。
 
+## 未落地项（v0 分诊「可拖」，逐条给验收）
+
+阶段 0–11 的能力已全部落地，下表是 `docs/guides/v0-readiness.md` §二 分诊清单里标「可拖」的残项。
+每条给现状、缺口、依赖、验收、规模（S/M/L 为相对值）；落地后移出本表，回写 `docs/features/` 对应篇。
+
+### 1. 渲染产物体积：补 bundle 组成分析
+
+- 现状：`scripts/check-bundle-size.mjs` 只输出总量与超限时的 Top-8 文件。已有的按需加载共四处：`src/renderer/app/App.tsx`（助手与设置等四个挂载层）、`app-shell/WorkspaceView.tsx`（各分区 Step）、`features/views/MultiViewPanel.tsx`（ChartView 与 ViewCanvas）、`shared/services/rendererExecutionPort.ts`（quickjs 动态 import）。
+- 缺口：无组成分析口径；导出链（`core/build` + `zipStore`）与插件运行时未系统拆出；i18n 未分片，`src/renderer/i18n/config.ts` 静态引入全部语料，中英语料随主包进默认 chunk。`vite.config.ts` 明确放弃 `manualChunks`（分包环曾致白屏），当前完全靠 Rollup 自动切分。
+- 依赖：无。
+- 验收：`npm run bundle:check` 之外补一步输出各 chunk 体积与 top 依赖占比；导出与插件运行时改为按需加载后总量下降且 `npm run test:e2e` 全绿（防分包环复现）；i18n 语料拆出后首屏 chunk 不再含未启用语言。
+- 规模：M。
+
+### 2. 视图条件编辑器支持 OR/NOT 与嵌套
+
+- 现状：引擎完整支持任意嵌套，`features/views/viewQuery.ts` 的 `evaluateCondition` 递归处理 and/or/not，`viewLayout.ts` 的 `parseCondition` 可把任意嵌套树存回 `ViewLayout.conditions`。
+- 缺口：条件编辑器全内联在 `features/views/MultiViewPanel.tsx`——`conditionLeaves` 只取 `type === 'and'` 的叶子，增删都按平铺 AND 重写。配置里若是 or/not 树（插件或手写 JSON 写入），面板显示「无条件」，首次添加会用平铺 AND 静默替换整棵树。
+- 依赖：无。
+- 验收：面板可建 OR/NOT 分组并嵌套编辑；非 AND 根树的配置能被无损显示，不再被首次编辑替换；既有平铺 AND 配置读写往返不变；`viewQuery` 的递归求值补 UI 层单测。
+- 规模：M。
+
+### 3. 视图行标签缺失扩展字段
+
+- 现状：`Project.extensions` 的条目已由 `features/views/buildEntityView.tsx` 把自有键 spread 进行字段，并写入 `row.values` 与 `row.cells`；六实体本身没有自定义字段概念。
+- 缺口：`MultiViewPanel.tsx` 的 `queryFieldLabels` / `fieldLabel` 映射不含扩展键，条件与计算列里选到扩展字段时回落显示原始键名。
+- 依赖：无。
+- 验收：扩展键在条件、计算列、图表通道的下拉与摘要里显示类型模板的标题（取类型注册表，未命中才回落原键）。
+- 规模：S。
+
+### 4. 计算列 key 冲突校验
+
+- 现状：`viewLayout.ts` 的 `parseComputedColumns` 只校验 key 非空与表达式合法；`viewQuery.ts` 的 `applyViewQuery` 无条件把计算列追加进 `columns` 并把值写进 `row.cells[key]`；`MultiViewPanel.tsx` 的 `addFormula` 只按 `computed:` 前缀自查重。
+- 缺口：计算列 key 与既有列（`ENTITY_VIEW_COLUMNS` 或行字段）撞车时，同名单元格被静默覆盖，列出现两份。
+- 依赖：无。
+- 验收：保存配置时校验计算列 key 不与既有列及彼此重复，冲突给出明确错误并保留原配置不落盘；`viewLayout` 补重复 key 拒绝用例。
+- 规模：S。
+
+### 5. 图表 type 与 aggregate 进 UI
+
+- 现状：引擎完整支持，`features/views/viewChart.ts` 的 `resolveType` 与 `aggregate` 已实现，`viewLayout.ts` 的 `parseChartBinding` 校验并往返 `binding.type` 与 `binding.aggregate`；`viewPresets.ts` 无任何图表声明。
+- 缺口：`MultiViewPanel.tsx` 图表区只暴露 mark 与五通道的字段下拉，`setChartBinding` 只写 `{field, channel}`；type 与 aggregate 目前只能来自手写配置或插件写入。
+- 依赖：无。
+- 验收：图表区可为 `y` 通道选聚合方式（sum/avg/min/max/count）、为 `x` 通道选维度类型（category/time/quantitative）；选择经 `parseChartBinding` 往返不丢；默认声明不变。
+- 规模：S。
+
+### 7. 跨章块跳转改事件驱动
+
+- 现状：`features/writing/WritingEditor.tsx` 的 `handleJumpToBlock` 在目标块位于其它章时记下待跳并切换活动章节，随后用 `setTimeout(…, 50)` 等编辑器就绪。`NovelEditorHandle` 与 `TipTapCanvas` 都没有就绪回调，50ms 是猜的值。
+- 缺口：慢设备上待跳请求被消费但块尚未渲染，跳转丢失。
+- 依赖：无。
+- 验收：编辑器就绪后主动回调（或等价事件）驱动待跳队列，删掉该处定时等待；用一把延迟注入把渲染推迟到远超 50ms 仍能跳成功；原有跳转用例保持通过。
+- 规模：S。
+
+### 9. Service Worker 产物与移动端实测
+
+- 现状：manifest 在 `src/assets/manifest.webmanifest` 并由 `src/renderer/index.html` 引入；`scripts/build-service-worker.mjs` 由 build 联动产出 `build/renderer/sw.js`，注册门 `src/renderer/app/registerServiceWorker.ts` 限定生产、非 Electron、非 `file:`；响应式单源在 `src/renderer/shared/utils/layout.ts`（`MOBILE_MAX_WIDTH` 639 / `TABLET_MAX_WIDTH` 1023 / 44px 命中区）；e2e 已有 390×844 手机宽度的 axe 用例。
+- 缺口：没有 e2e 实跑产出的 `sw.js`（离线壳、缓存失效、安装提示均未测）；`playwright.config.ts` 无 mobile project 与视口配置。
+- 依赖：无。
+- 验收：playwright 增加 mobile 视口 project（已有 390 宽度的断言迁入或保留）；至少一条用例验证 SW 注册成功后断网可再加载写作区、且新版本发布后缓存键变化导致旧缓存失效。
+- 规模：M。
+
+### 10. 导出对话框列出插件渲染器
+
+- 现状：渲染器注册表与解析规则在 `core/build/pipeline.ts`（显式 `options.rendererId` 或 profile 命中插件渲染器优先），profile 字段与校验在 `core/build/profile.ts`，宿主端口在 `features/writing/utils.ts`。
+- 缺口：`features/writing/components/ExportChapterModal.tsx` 的 `FORMAT_OPTIONS` 是硬编码的 8 个内置格式，不调用 `listRenderers()`；用户只能把 `<插件短名>.renderer.<id>` 写进档案 JSON 间接触发。
+- 依赖：无。
+- 验收：导出对话框的格式下拉在 8 个内置格式之后列出已注册的插件渲染器（不可用或未激活的置灰并说明原因）；选中后走 `runBuild` 的 `rendererId` 显式参数，无需改档案 JSON；补一条带注册渲染器的单测。
+- 规模：S。
+
+### 11. `chapter.save` 首帧派发边界
+
+- 现状：派发点在 `src/renderer/app/stores/persistenceBridge.ts` 的 `emitChapterSaveEvents`，只遍历 `persistDiff` 的 ops，且按章节对象引用相等跳过未变章节；`doFlush` 在无前序基线时走 `repository.saveAll` 且 `ops` 为空，随后以空 ops 调派发。基线由 `seedPersistBaseline` 在 hydrate 后建立。
+- 缺口：首帧全量落盘一个 `chapter.save` 都不发（插件订阅者漏掉首次保存）；派发以引用相等判变化，深相等但重建引用的章节会被重复派发。两条边界都无测试。
+- 依赖：无。
+- 验收：首帧全量保存按「基线不存在」语义补派发（或明确记为首帧不派发并在文档与插件协议里写死，二选一，不留给实现细节）；引用相等改为可判定的变化集；`persistenceBridge` 补首帧与重建引用两条用例。
+- 规模：S。
+
 ## 有意挂起（不做，非欠账）
 
 - 卡片服务从 `shared/services/cards` 迁入 `features/cards`：会重新引入 `assistant→cards`、`settings→cards` 跨 feature 依赖债（与 02 的边界规则和既有清理方向相反）；卡片服务属跨功能共享，保留在 `shared/services/cards`，`features/cards` 目录仅在未来出现卡片专属 UI 时使用。
@@ -96,5 +173,5 @@
 - 每项落地走同一门禁：`npm run verify`，运行时/UI 改动跑 `npm run test:e2e`，独立提交。
 - 功能落地同步 `docs/features/` 对应篇，本表移除该项。
 - 许可审查：只借鉴设计，不引入 copyleft 代码；重型运行时仅限可选插件。
-- 体积与性能：渲染器按需加载，纳入体积预算。当前基线约 3766KB（预算 3800KB），随 ODT/文献/分支/插件目录/跨域视图与 QuickJS 运行时接入上调；待精简未引用 wasm、导出与插件模块懒加载、i18n 分片后下调。
+- 体积与性能：渲染器按需加载，纳入体积预算。预算值与当前基线以 `scripts/check-bundle-size.mjs` 为唯一来源（本文件不复制数字）；待精简未引用 wasm、导出与插件模块懒加载、i18n 分片后下调。
 - 插件可执行协议（见 49）：协议层、宿主接线、脚本异步执行、渲染器同步执行、能力派发与审批接线、`core/build` 消费插件渲染器、事件触发（`project.open`/`chapter.open`/`chapter.save`）与 QuickJS 单变体精简均已落地。

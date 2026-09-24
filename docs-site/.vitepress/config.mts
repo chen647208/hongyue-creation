@@ -1,24 +1,81 @@
 import { defineConfig } from 'vitepress';
 
-// 文档站：以 docs/{design,guides,features} 为内容源，VitePress 静态输出。
+/**
+ * 文档站：以 docs/{design,guides,features} 为内容源，VitePress 静态输出。
+ * 面向两类读者：想用软件的人（使用教程 / 功能说明）与想改代码的人（设计蓝图 / 开发指南）。
+ * 导航按这个顺序排，用户视角在前。
+ */
 export default defineConfig({
   lang: 'zh-CN',
   title: '红月创作 (Hongyue Creation)',
-  description: '本地优先的桌面小说创作工具——设计蓝图与使用指南',
+  description: '本地优先的桌面小说创作工具——使用教程、功能说明与设计蓝图',
   base: '/hongyue-creation/',
   srcDir: 'src',
+  head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/hongyue-creation/app-icon.svg' }]],
   themeConfig: {
-    siteTitle: '红月创作 (Hongyue Creation)',
+    logo: '/logo.svg',
+    siteTitle: '红月创作',
     nav: [
-      { text: '设计蓝图', link: '/design/README', activeMatch: '/design/' },
-      { text: '使用指南', link: '/guides/project-structure', activeMatch: '/guides/' },
+      { text: '使用教程', link: '/guide/', activeMatch: '/guide/' },
       { text: '功能说明', link: '/features/workflow', activeMatch: '/features/' },
-      {
-        text: '使用教程',
-        link: 'https://github.com/chen647208/hongyue-creation/blob/main/USER_GUIDE.md',
-      },
+      { text: '设计蓝图', link: '/design/README', activeMatch: '/design/' },
+      { text: '开发指南', link: '/guides/project-structure', activeMatch: '/guides/' },
     ],
+    search: {
+      provider: 'local',
+      options: {
+        translations: {
+          button: { buttonText: '搜索文档', buttonAriaLabel: '搜索文档' },
+          modal: {
+            noResultsText: '没有找到结果',
+            resetButtonTitle: '清除查询条件',
+            footer: { selectText: '选择', navigateText: '切换', closeText: '关闭' },
+          },
+        },
+      },
+    },
+    outline: { level: [2, 3], label: '本页目录' },
+    lastUpdated: { text: '最后更新于' },
+    docFooter: { prev: '上一篇', next: '下一篇' },
+    darkModeSwitchLabel: '外观',
+    lightModeSwitchTitle: '切换到浅色模式',
+    darkModeSwitchTitle: '切换到深色模式',
+    sidebarMenuLabel: '目录',
+    returnToTopLabel: '回到顶部',
+    footer: {
+      message: '以 AGPL-3.0-only 发布，商业闭源集成另获专有授权。',
+      copyright: 'Copyright © 2026 chen647208',
+    },
     sidebar: {
+      '/guide/': [
+        {
+          text: '使用教程',
+          items: [
+            { text: '中文教程', link: '/guide/' },
+            { text: 'User Guide (EN)', link: '/guide/en' },
+          ],
+        },
+      ],
+      '/features/': [
+        {
+          text: '功能说明',
+          items: [
+            { text: '创作主流程', link: '/features/workflow' },
+            { text: 'AI 调用层', link: '/features/ai-layer' },
+            { text: '写作', link: '/features/writing' },
+            { text: '伏笔追踪', link: '/features/foreshadowing' },
+            { text: '知识库', link: '/features/knowledge' },
+            { text: '助手', link: '/features/assistant' },
+            { text: '世界观与一致性', link: '/features/world' },
+            { text: '角色', link: '/features/characters' },
+            { text: '设置', link: '/features/settings' },
+            { text: '插件、同步与加密', link: '/features/plugins-and-sync' },
+            { text: '版本', link: '/features/version' },
+            { text: '备份与崩溃上报', link: '/features/backup-and-crash' },
+            { text: 'UI 组件清单', link: '/features/ui-catalog' },
+          ],
+        },
+      ],
       '/design/': [
         {
           text: '蓝图总纲',
@@ -88,12 +145,13 @@ export default defineConfig({
             { text: '47 跨域视图与脚本层', link: '/design/47-cross-domain-views-and-scripting' },
             { text: '48 后续任务总表', link: '/design/48-backlog' },
             { text: '49 可执行插件描述符协议', link: '/design/49-executable-plugin-protocol' },
+            { text: '50 键位自定义与缩放接管', link: '/design/50-keybindings-and-zoom' },
           ],
         },
       ],
       '/guides/': [
         {
-          text: '指南',
+          text: '开发指南',
           items: [
             { text: '项目结构', link: '/guides/project-structure' },
             { text: '构建与发布', link: '/guides/build-and-release' },
@@ -102,30 +160,6 @@ export default defineConfig({
             { text: '许可说明', link: '/guides/licensing' },
             { text: '验收报告', link: '/guides/acceptance-report' },
             { text: 'v0 就绪度与验收清单', link: '/guides/v0-readiness' },
-            {
-              text: '使用教程（USER_GUIDE）',
-              link: 'https://github.com/chen647208/hongyue-creation/blob/main/USER_GUIDE.md',
-            },
-          ],
-        },
-      ],
-      '/features/': [
-        {
-          text: '功能说明',
-          items: [
-            { text: '创作主流程', link: '/features/workflow' },
-            { text: 'AI 调用层', link: '/features/ai-layer' },
-            { text: '写作', link: '/features/writing' },
-            { text: '伏笔追踪', link: '/features/foreshadowing' },
-            { text: '知识库', link: '/features/knowledge' },
-            { text: '助手', link: '/features/assistant' },
-            { text: '世界观与一致性', link: '/features/world' },
-            { text: '角色', link: '/features/characters' },
-            { text: '设置', link: '/features/settings' },
-            { text: '插件、同步与加密', link: '/features/plugins-and-sync' },
-            { text: '版本', link: '/features/version' },
-            { text: '备份与崩溃上报', link: '/features/backup-and-crash' },
-            { text: 'UI 组件清单', link: '/features/ui-catalog' },
           ],
         },
       ],

@@ -18,7 +18,7 @@
 
 ## 非目标
 
-- 本轮不执行 JS/WASM；沙箱执行与宿主接线属后续阶段。
+- 不给插件裸网络、文件系统与 `eval`（能力只指向宿主契约，见「目标」）。
 - 不改渲染器同步签名（`Renderer.render()` 保持同步）。
 - 不改既有 `contributes` 字段行为；缺省不启用 `renderers`/`scripts` 的可执行路径。
 - 不做脚本语言的语法与语义设计（命令、管道、循环、子程序的语义归 47 篇）。
@@ -116,7 +116,7 @@
 
 - `RendererRegistry` / `ScriptRegistry`（`core/plugin/registries.ts`）：注册返回 `Disposable`，查询、列举、按插件列举、释放；id 强制命名空间前缀（`<插件短名>.renderer.<id>` / `<插件短名>.script.<id>`）；重复 id 拒绝，过期句柄释放不误删替换项。
 - `installExecutableDescriptors`：门序为「无声明放行 → 未签名拒绝 → 逐文件解析与校验 → 根目录作用域核对 → 命名空间重复检查 → 全部通过才登记」。任一描述符非法即整体不注册，原因可读。
-- 执行器在后续阶段注入注册表，消费 `RegisteredExecutable.descriptor` 与插件资源；本层不持有可执行句柄。
+- 执行器经注册表注入，消费 `RegisteredExecutable.descriptor` 与插件资源；描述符解析层不持有可执行句柄。
 
 ### 6. 阶段拆分
 

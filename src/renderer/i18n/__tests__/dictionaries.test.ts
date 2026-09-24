@@ -9,7 +9,8 @@
 
 import { describe, expect,it } from 'vitest';
 
-import { NAMESPACES, resources, SUPPORTED_LANGUAGES } from '../../../shared/i18n/catalog';
+import { NAMESPACES, SUPPORTED_LANGUAGES } from '../../../shared/i18n/catalog';
+import { resources } from '../../../shared/i18n/resources';
 
 /** 把嵌套字典扁平化为「点号键 → 字符串值」。 */
 function flatten(obj: unknown, prefix = ''): Map<string, string> {

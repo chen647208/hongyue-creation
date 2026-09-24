@@ -18,16 +18,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgbm-dev libnss3 libatk-bridge2.0-0 libgtk-3-0 libasound2 xvfb libxss1 libxtst6 libatspi2.0-0 fonts-noto-cjk || true
 
-      - name: 配置 Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'npm'
-
       - name: 安装依赖
-        run: npm ci
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        uses: ./.github/actions/setup
+        with:
+          skip-browsers: '1'
 
       - name: 构建渲染层与主进程产物
         run: npm run electron:build

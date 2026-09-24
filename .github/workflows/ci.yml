@@ -49,14 +49,8 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v7
 
-      - name: 配置 Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'npm'
-
       - name: 安装依赖
-        run: npm ci
+        uses: ./.github/actions/setup
 
       - name: 运行期依赖安全审计（高危/严重即失败）
         run: npm audit --omit=dev --audit-level=high
@@ -78,17 +72,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgbm-dev libnss3 libatk-bridge2.0-0 libgtk-3-0 libasound2 xvfb libxss1 libxtst6 libatspi2.0-0 fonts-noto-cjk || true
 
-      - name: 配置 Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'npm'
-
       - name: 安装依赖
-        run: npm ci
-        env:
+        uses: ./.github/actions/setup
+        with:
           # E2E 只用仓库自带 electron，不下 Playwright 浏览器
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+          skip-browsers: '1'
 
       - name: 构建渲染层与主进程产物
         run: npm run electron:build
@@ -102,7 +90,7 @@ jobs:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
 
       - name: 视觉回归（Linux 基线，见 visual-baselines.yml 生成）
-        run: xvfb-run -a npm run test:e2e:visual
+        run: xvfb-run -a npx playwright test e2e/visual.spec.ts --reporter=list
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
 
@@ -135,14 +123,8 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v7
 
-      - name: 配置 Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'npm'
-
       - name: 安装依赖
-        run: npm ci
+        uses: ./.github/actions/setup
 
       - name: 构建渲染层与主进程产物
         run: npm run electron:build

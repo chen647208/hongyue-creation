@@ -44,6 +44,7 @@ import type { AIMessageImage, CardPromptTemplate, ConsistencyCheckPromptTemplate
 
 import { useSettingsStore } from '@/app/stores/settingsStore';
 import { aiGatewayClient } from '@/shared/services/ai/gatewayClient.js';
+import { vectorIntegrationService } from '@/shared/services/knowledge/vectorIntegrationService';
 import { resolveEffectiveModel } from '@/shared/services/localInferenceService';
 import { syncMcpTools } from '@/shared/services/mcpClient';
 import { runPluginLogic } from '@/shared/services/pluginService';
@@ -316,9 +317,6 @@ export class AiSessionManager {
               semanticSearch: async (query: string, limit: number) => {
                 const projectId = input.project?.id;
                 if (!projectId) throw new Error('当前没有打开的书籍项目');
-                const { vectorIntegrationService } = await import(
-                  '@/shared/services/knowledge/vectorIntegrationService'
-                );
                 const hits = await vectorIntegrationService.semanticSearchKnowledge(projectId, query, { limit });
                 return hits.map((h) => ({
                   name: h.metadata?.name,

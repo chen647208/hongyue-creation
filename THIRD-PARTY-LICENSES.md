@@ -4,7 +4,7 @@
 收录运行期依赖（package-lock.json 中排除 dev/link）的许可证声明；
 各依赖的完整许可证文本随发行包内 `node_modules` 一并分发。
 
-共 400 个运行期依赖。
+共 401 个运行期依赖。
 
 | 依赖 | 版本 | 许可证 |
 | --- | --- | --- |
@@ -72,9 +72,9 @@
 | @radix-ui/rect | 1.1.1 | MIT |
 | @sqlite.org/sqlite-wasm | 3.53.0-build1 | Apache-2.0 |
 | @tanstack/react-table | 8.21.3 | MIT |
-| @tanstack/react-virtual | 3.14.12 | MIT |
+| @tanstack/react-virtual | 3.14.13 | MIT |
 | @tanstack/table-core | 8.21.3 | MIT |
-| @tanstack/virtual-core | 3.17.10 | MIT |
+| @tanstack/virtual-core | 3.17.11 | MIT |
 | @tiptap/core | 3.31.3 | MIT |
 | @tiptap/extension-blockquote | 3.31.3 | MIT |
 | @tiptap/extension-bold | 3.31.3 | MIT |
@@ -223,6 +223,7 @@
 | isomorphic.js | 0.2.5 | MIT |
 | jackspeak | 3.4.3 | BlueOak-1.0.0 |
 | js-yaml | 4.3.2 | MIT |
+| js-yaml | 5.4.2 | MIT |
 | json-bigint | 1.0.0 | MIT |
 | json-colorizer | 3.0.1 | MIT |
 | jsonfile | 6.2.1 | MIT |

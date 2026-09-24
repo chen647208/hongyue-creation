@@ -202,8 +202,21 @@ export async function removeChunkedObject(transport: SyncTransport, key: string)
 
 // ── 本地目录 ────────────────────────────────────────────────────────────────
 
+/**
+ * node:fs/promises 适配到 FileSystemLike：逐个方法显式委托。
+ * 模块命名空间的签名（重载、BufferEncoding 联合）与最小面不能整体互认，逐项调用由入参锁定重载。
+ */
+const nodeFileSystem: FileSystemLike = {
+  stat: (target) => fs.stat(target),
+  mkdir: (target, options) => fs.mkdir(target, options),
+  readFile: (target, encoding) => fs.readFile(target, encoding),
+  writeFile: (target, data, encoding) => fs.writeFile(target, data, encoding),
+  readdir: (target, options) => fs.readdir(target, options),
+  rm: (target, options) => fs.rm(target, options),
+};
+
 export function createLocalTransport(directory: string, deps: TransportDeps = {}): SyncTransport {
-  const fileSystem = deps.fileSystem ?? (fs as unknown as FileSystemLike);
+  const fileSystem = deps.fileSystem ?? nodeFileSystem;
   if (!directory) throw new Error('本地传输缺少目标目录');
   const resolveKey = (key: string): string => path.join(directory, ...sanitizeTransportKey(key).split('/'));
 

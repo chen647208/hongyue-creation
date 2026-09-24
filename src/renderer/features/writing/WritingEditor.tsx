@@ -169,7 +169,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
   const pendingBlockJumpRef = useRef<string | null>(null);
   const resolveBlock = useCallback((id: string) => resolveBlockProjection(blockRefIndexRef.current, id), []);
 
-  // 跨章跳转：目标不在当前章时先切章，编辑器就绪后再定位。
+  // 跨章跳转：目标不在当前章时先切章，待跳请求等编辑器就绪回调再消费。
   const handleJumpToBlock = useCallback((id: string) => {
     const location = blockRefIndexRef.current.blocks.get(id);
     if (location && location.chapterId !== activeChapterId) {
@@ -180,13 +180,32 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
     editorRef.current?.jumpToBlock(id);
   }, [activeChapterId]);
 
-  useEffect(() => {
+  // 活动章经 ref 供就绪回调读取：回调只订阅一次，切章不重订。
+  const activeChapterIdRef = useRef(activeChapterId);
+  activeChapterIdRef.current = activeChapterId;
+
+  // 待跳队列消费者：编辑器就绪（目标章正文已进入文档）时定位。
+  // 就绪信号来自其它章时继续等待；定位失败（协作正文晚到）时保留请求，等下一次信号重试。
+  const consumePendingBlockJump = useCallback(() => {
     const pending = pendingBlockJumpRef.current;
     if (!pending) return;
-    pendingBlockJumpRef.current = null;
-    const timer = setTimeout(() => { editorRef.current?.jumpToBlock(pending); }, 50);
-    return () => clearTimeout(timer);
-  }, [activeChapterId]);
+    const location = blockRefIndexRef.current.blocks.get(pending);
+    // 目标块已不在索引（正文被改过）：丢弃，不再重试。
+    if (!location) {
+      pendingBlockJumpRef.current = null;
+      return;
+    }
+    if (location.chapterId !== activeChapterIdRef.current) return;
+    if (editorRef.current?.jumpToBlock(pending)) pendingBlockJumpRef.current = null;
+  }, []);
+
+  // 就绪订阅按活动章重订：协作模式切章会重建编辑器（订阅集合随画布存活，重订幂等），
+  // 画布重挂（无章/加密章切换）后也能把订阅补回来。
+  useEffect(() => {
+    const handle = editorRef.current;
+    if (!handle) return;
+    return handle.onEditorReady(consumePendingBlockJump);
+  }, [activeChapterId, consumePendingBlockJump]);
 
   // 正文变化后重新投影嵌入内容（源块可能在其它章节）。
   useEffect(() => { editorRef.current?.refreshEmbeds(); }, [blockRefIndex]);

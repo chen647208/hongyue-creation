@@ -1,10 +1,37 @@
 ﻿import path from 'path';
-import { readFileSync } from 'fs';
-import { defineConfig } from 'vite';
+import { readFileSync, writeFileSync } from 'fs';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8')) as { version: string };
+
+/**
+ * 产物体积旁路统计：构建时把每个 chunk 的模块构成（源文件 id + 渲染字节数）
+ * 写到 build/bundle-stats.json，供 `npm run bundle:analyze` 输出各 chunk 体积与
+ * top 依赖占比。只观察、不改产物；文件写在 build/renderer 之外，不随应用打包。
+ */
+function bundleStats(): Plugin {
+  return {
+    name: 'hongyue-bundle-stats',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const chunks: Array<{ fileName: string; modules: Record<string, number> }> = [];
+      for (const [fileName, output] of Object.entries(bundle)) {
+        if (output.type !== 'chunk') continue;
+        const modules: Record<string, number> = {};
+        for (const [id, info] of Object.entries(output.modules ?? {})) {
+          modules[id] = (info as { renderedLength?: number }).renderedLength ?? 0;
+        }
+        chunks.push({ fileName, modules });
+      }
+      writeFileSync(
+        path.resolve(__dirname, 'build/bundle-stats.json'),
+        JSON.stringify({ version: packageJson.version, chunks }, null, 2),
+      );
+    },
+  };
+}
 
 export default defineConfig({
   root: path.resolve(__dirname, 'src/renderer'),
@@ -16,7 +43,7 @@ export default defineConfig({
     port: Number(process.env.HONGYUE_DEV_SERVER_PORT) || 5310,
     host: '127.0.0.1',
   },
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), bundleStats()],
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
   },

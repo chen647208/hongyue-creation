@@ -199,7 +199,15 @@ function normalizeNode(raw: unknown, path: string, seen: Set<string>, issues: Ca
   return node;
 }
 
-function normalizeEdge(raw: unknown, path: string, nodeIds: Set<string>, seen: Set<string>, issues: CanvasValidationIssue[]): CanvasEdge | undefined {
+function normalizeEdge(
+  raw: unknown,
+  path: string,
+  nodeIds: Set<string>,
+  seen: Set<string>,
+  issues: CanvasValidationIssue[],
+  /** 是否要求端点已存在于本文档的节点集合。 */
+  requireKnownEndpoints = true,
+): CanvasEdge | undefined {
   if (!isRecord(raw)) {
     issues.push({ path, message: 'edge must be an object' });
     return undefined;
@@ -220,7 +228,9 @@ function normalizeEdge(raw: unknown, path: string, nodeIds: Set<string>, seen: S
     return undefined;
   }
   // 失链连线丢弃并记录：端点必须指向本文档中已接受的节点。
-  if (!nodeIds.has(fromNode) || !nodeIds.has(toNode)) {
+  // 视图布局解析不启这一条：投影行节点的 id 不在文档的 nodes 数组里，而在 projectCanvas
+  // 才由行投影产生；这里先丢，连线就永远到不了「按真实行过滤失链」那一步。
+  if (requireKnownEndpoints && (!nodeIds.has(fromNode) || !nodeIds.has(toNode))) {
     issues.push({ path, message: `edge "${id}" references a node that does not exist; dropped` });
     return undefined;
   }
@@ -234,8 +244,15 @@ function normalizeEdge(raw: unknown, path: string, nodeIds: Set<string>, seen: S
   return edge;
 }
 
-/** 解析 JSON Canvas 根值。根不是对象、或 nodes/edges 非数组时拒绝；单条非法则降级丢弃。 */
-export function parseCanvasDocument(input: unknown): CanvasParseResult {
+/** JSON Canvas 文档入参。 */
+export interface CanvasDocumentInput {
+  nodes?: unknown;
+  edges?: unknown;
+  /** 端点必须存在于 nodes；视图布局解析传 false（端点可能是投影行节点）。默认 true。 */
+  requireKnownEndpoints?: boolean;
+}
+
+export function parseCanvasDocument(input: CanvasDocumentInput | unknown): CanvasParseResult {
   if (!isRecord(input)) {
     return { ok: false, issues: [{ path: 'document', message: 'canvas root must be a JSON object' }] };
   }
@@ -245,6 +262,8 @@ export function parseCanvasDocument(input: unknown): CanvasParseResult {
   if (input.edges !== undefined && !Array.isArray(input.edges)) {
     return { ok: false, issues: [{ path: 'edges', message: 'edges must be an array' }] };
   }
+  // 默认要求端点存在于 nodes；视图布局解析显式传 false。
+  const requireKnownEndpoints = input.requireKnownEndpoints !== false;
   const issues: CanvasValidationIssue[] = [];
   const nodes: CanvasNode[] = [];
   const nodeIds = new Set<string>();
@@ -266,7 +285,7 @@ export function parseCanvasDocument(input: unknown): CanvasParseResult {
     issues.push({ path: 'edges', message: `edge count exceeds ${CANVAS_MAX_EDGES}; extra edges dropped` });
   }
   rawEdges.slice(0, CANVAS_MAX_EDGES).forEach((raw, index) => {
-    const edge = normalizeEdge(raw, `edges[${index}]`, nodeIds, edgeIds, issues);
+    const edge = normalizeEdge(raw, `edges[${index}]`, nodeIds, edgeIds, issues, requireKnownEndpoints);
     if (!edge) return;
     edges.push(edge);
     edgeIds.add(edge.id);

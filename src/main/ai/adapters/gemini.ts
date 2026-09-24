@@ -116,7 +116,7 @@ async function completeViaSDK(model: ModelConfig, prompt: string, options?: Call
         },
       }))]
     : prompt;
-  const response = (await withRetry(
+  const response = await withRetry(
     () =>
       ai.models.generateContent({
         model: model.modelName,
@@ -124,7 +124,7 @@ async function completeViaSDK(model: ModelConfig, prompt: string, options?: Call
         config: sdkConfig(model) as never,
       }),
     { retries: options?.retries ?? 2, signal: options?.signal },
-  )) as unknown as GeminiResponse & { text?: string };
+  );
 
   const text = typeof response.text === 'string' ? response.text : geminiText(response);
   return {

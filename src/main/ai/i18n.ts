@@ -9,11 +9,12 @@
 
 /**
  * 主进程侧 i18n：只为网关产生的用户可见文案（适配器错误、流式提示）服务。
- * 语言取自系统 locale（app.getLocale()），字典与渲染端同源于 src/shared/i18n/catalog。
+ * 语言取自系统 locale（app.getLocale()），字典取全量语言，与渲染端同源于 src/shared/i18n。
  */
 import i18next from 'i18next';
 
-import { DEFAULT_LANGUAGE, normalizeLanguage, resources,SUPPORTED_LANGUAGES } from '../../shared/i18n/catalog.js';
+import { DEFAULT_LANGUAGE, normalizeLanguage, SUPPORTED_LANGUAGES } from '../../shared/i18n/catalog.js';
+import { resources } from '../../shared/i18n/resources.js';
 
 /** 主进程独立实例，避免与渲染端全局单例耦合；只加载 errors 命名空间。 */
 const instance = i18next.createInstance();

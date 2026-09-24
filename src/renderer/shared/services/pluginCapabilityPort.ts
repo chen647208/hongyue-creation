@@ -32,6 +32,8 @@ import { PLUGIN_SCRIPT_MAX_OUTPUT_BYTES } from '@shared/constants/pluginExecutio
 import type { AppState, ModelConfig } from '@shared/types';
 
 import { logger } from '../utils/logger';
+import { gatewayComplete } from './ai/gatewayClient';
+import { resolveEffectiveModel } from './localInferenceService';
 
 type ExecuteResult = { ok: true; text: string } | { ok: false; reason: string };
 
@@ -190,10 +192,6 @@ async function aiCapability(args: unknown, activeModel: CapabilityHostBindings['
   if (!prompt) return { ok: false, reason: 'AI 能力缺少 prompt' };
   if (!activeModel) return { ok: false, reason: 'AI 模型读取器未注入，拒绝 AI 能力' };
   try {
-    const [{ gatewayComplete }, { resolveEffectiveModel }] = await Promise.all([
-      import('@/shared/services/ai/gatewayClient'),
-      import('@/shared/services/localInferenceService'),
-    ]);
     const active = activeModel();
     if (!active) return { ok: false, reason: '未配置模型，拒绝 AI 能力' };
     const model = (await resolveEffectiveModel(active)) ?? active;

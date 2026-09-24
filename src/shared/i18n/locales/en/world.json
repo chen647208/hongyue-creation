@@ -38,6 +38,22 @@
         "color": "Color",
         "size": "Size",
         "shape": "Shape"
+      },
+      "valueType": "Value type",
+      "typeAuto": "Infer from values",
+      "types": {
+        "nominal": "Nominal",
+        "ordinal": "Ordinal",
+        "quantitative": "Quantitative",
+        "temporal": "Temporal"
+      },
+      "aggregate": "Aggregation",
+      "aggregates": {
+        "count": "Count",
+        "sum": "Sum",
+        "avg": "Average",
+        "min": "Min",
+        "max": "Max"
       }
     },
     "canvas": {
@@ -144,6 +160,7 @@
       "empty": "No computed columns. Insert a preset for an example.",
       "remove": "Remove computed column",
       "insertFormula": "Insert formula",
+      "keyConflict": "Computed column key \"{{key}}\" duplicates an existing column or another computed column. The configuration was left unchanged.",
       "param": {
         "speechRate": "Speech rate (chars/s)"
       }
@@ -157,6 +174,14 @@
       "value": "Value",
       "valuePlaceholder": "Compare value",
       "addCondition": "Add filter",
+      "addChild": "Add filter to this group",
+      "addGroup": "New group",
+      "removeGroup": "Remove group",
+      "group": {
+        "and": "Match all",
+        "or": "Match any",
+        "not": "Match none"
+      },
       "aggregations": "Aggregates",
       "aggregationKind": "Aggregate",
       "addAggregation": "Add aggregate",

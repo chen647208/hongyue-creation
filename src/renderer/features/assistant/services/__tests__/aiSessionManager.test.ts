@@ -18,6 +18,11 @@ vi.mock('@/shared/services/ai/gatewayClient.js', () => ({
 vi.mock('@/shared/services/repository/index.js', () => ({
   repository: { search: mockSearch },
 }));
+// 向量检索服务在本文件只经工具间接触达；装载期要建实例（读 window.electronAPI），
+// 与「会话编排」这条被测路径无关，桩掉以免把 node 环境的 window 缺失拖进本例。
+vi.mock('@/shared/services/knowledge/vectorIntegrationService.js', () => ({
+  vectorIntegrationService: { semanticSearchKnowledge: vi.fn().mockResolvedValue([]) },
+}));
 
 import type { ModelConfig, Project } from '../../../../../shared/types';
 import { AiSessionManager } from '../aiSessionManager';

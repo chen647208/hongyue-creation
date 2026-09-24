@@ -150,6 +150,87 @@ function str(v: unknown): v is string {
   return typeof v === 'string';
 }
 
+/**
+ * 读侧窄化组：manifest 来自 JSON.parse 的任意值。两条规则：
+ *  - 必填字段与既有校验项：边校验边窄化，问题一次报出；
+ *  - 可选字段（description/keywords/hooks/mcpServers/quotaPerHour/interface）逐字段窄化，
+ *    无效值忽略该字段；settingsSchema 类型本就是 unknown，原样透传。
+ * 通过校验后按字段重建 manifest，不做整体强转（脏值不能靠断言混进结构体）。
+ */
+function readString(value: unknown): string | undefined {
+  return str(value) ? value : undefined;
+}
+
+/** 读字符串数组：任一元素不是字符串即整体判脏；空数组有效。 */
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') return undefined;
+    items.push(entry);
+  }
+  return items;
+}
+
+/** 读有限数；NaN/Infinity 判脏。 */
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/** 把未知值当普通对象读（数组与非对象返回 undefined）。 */
+function readRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+/** 读 MCP 服务贡献：command 必填、args 可选；脏条目忽略。 */
+function readMcpServers(value: unknown): PluginContribution['mcpServers'] | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const servers: NonNullable<PluginContribution['mcpServers']> = {};
+  for (const [name, entry] of Object.entries(data)) {
+    const server = readRecord(entry);
+    if (server === undefined) continue;
+    const command = readString(server.command);
+    if (command === undefined) continue;
+    const args = readStringArray(server.args);
+    servers[name] = args === undefined ? { command } : { command, args };
+  }
+  return servers;
+}
+
+/** 读界面呈现段：五个字段全可选；无效值忽略该字段。 */
+function readInterfaceSection(value: unknown): NonNullable<PluginManifest['interface']> | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const section: NonNullable<PluginManifest['interface']> = {};
+  const displayName = readString(data.displayName);
+  if (displayName !== undefined) section.displayName = displayName;
+  const category = readString(data.category);
+  if (category !== undefined) section.category = category;
+  const capabilities = readStringArray(data.capabilities);
+  if (capabilities !== undefined) section.capabilities = capabilities;
+  const defaultPrompt = readStringArray(data.defaultPrompt);
+  if (defaultPrompt !== undefined) section.defaultPrompt = defaultPrompt;
+  const logo = readString(data.logo);
+  if (logo !== undefined) section.logo = logo;
+  const screenshots = readStringArray(data.screenshots);
+  if (screenshots !== undefined) section.screenshots = screenshots;
+  return section;
+}
+
+/** 读 AI 配额段：quotaPerHour 可选；段非对象时忽略。 */
+function readAiQuota(value: unknown): PluginPermissions['ai'] | undefined {
+  const data = readRecord(value);
+  if (data === undefined) return undefined;
+  const quota = readNumber(data.quotaPerHour);
+  return quota === undefined ? {} : { quotaPerHour: quota };
+}
+
+/** 取必填字段的窄化值：缺失时上面必然已记 issue；走到这里仍缺失说明校验与窄化不一致。 */
+function assertRequired<T>(value: T | undefined, field: string): asserts value is T {
+  if (value === undefined) throw new Error(`manifest 必填字段 ${field} 缺失但未记录问题（校验器不一致）`);
+}
+
 /** 校验 manifest（来自 JSON.parse 的任意值）。全部问题一次报出。 */
 export function validateManifest(raw: unknown): ManifestValidateResult {
   const issues: ManifestIssue[] = [];
@@ -162,72 +243,124 @@ export function validateManifest(raw: unknown): ManifestValidateResult {
   }
   const m = raw as Record<string, unknown>;
 
-  if (!str(m.id)) fail('id', '缺失且必须是字符串');
-  else if (!isReverseDomainId(m.id)) fail('id', `必须是反向域名（如 com.example.golden3），实际「${m.id}」`);
+  // ── 必填字段：校验与窄化一趟完成；失败只记 issue，其余检查继续 ──
+  const id = readString(m.id);
+  if (id === undefined) fail('id', '缺失且必须是字符串');
+  else if (!isReverseDomainId(id)) fail('id', `必须是反向域名（如 com.example.golden3），实际「${id}」`);
 
-  if (!str(m.name) || !m.name) fail('name', '缺失且必须是非空字符串');
-  if (!str(m.version) || !isSemver(m.version)) fail('version', '必须是语义化版本（x.y.z）');
-  if (!str(m.host) || !m.host) fail('host', '缺失：宿主版本区间（如 ^2.0.0）');
-  if (!str(m.license) || !m.license) fail('license', '缺失：插件自身许可证');
+  const name = readString(m.name);
+  if (name === undefined || name === '') fail('name', '缺失且必须是非空字符串');
 
+  const version = readString(m.version);
+  if (version === undefined || !isSemver(version)) fail('version', '必须是语义化版本（x.y.z）');
+
+  const host = readString(m.host);
+  if (host === undefined || host === '') fail('host', '缺失：宿主版本区间（如 ^2.0.0）');
+
+  const license = readString(m.license);
+  if (license === undefined || license === '') fail('license', '缺失：插件自身许可证');
+
+  // ── 可选字段：窄化结果暂存，issues 为空时按字段重建 manifest ──
+  const description = readString(m.description);
+  const keywords = readStringArray(m.keywords);
+
+  let contributes: PluginContribution | undefined;
   if (m.contributes !== undefined) {
-    if (typeof m.contributes !== 'object' || m.contributes === null || Array.isArray(m.contributes)) {
+    const c = readRecord(m.contributes);
+    if (c === undefined) {
       fail('contributes', '必须是对象');
     } else {
-      for (const [key, value] of Object.entries(m.contributes)) {
+      for (const [key, value] of Object.entries(c)) {
         if (value !== null && typeof value !== 'object' && !str(value)) {
           fail(`contributes.${key}`, '必须是路径字符串或对象/数组');
         }
       }
       // 目录/文件清单贡献必须是字符串数组（字符串会被逐字符误读为多个路径）。
-      const c = m.contributes as Record<string, unknown>;
+      const rebuilt: PluginContribution = {};
       for (const key of ['skills', 'types', 'buildProfiles', 'commands', 'ui', 'logic', 'renderers', 'scripts', 'editor', 'formulas'] as const) {
         const value = c[key];
-        if (value !== undefined && (!Array.isArray(value) || value.some((x) => !str(x)))) {
-          fail(`contributes.${key}`, '必须是字符串数组');
-        }
+        if (value === undefined) continue;
+        const list = readStringArray(value);
+        if (list === undefined) fail(`contributes.${key}`, '必须是字符串数组');
+        else rebuilt[key] = list;
       }
+      const hooks = readString(c.hooks);
+      if (hooks !== undefined) rebuilt.hooks = hooks;
+      const mcpServers = readMcpServers(c.mcpServers);
+      if (mcpServers !== undefined) rebuilt.mcpServers = mcpServers;
+      contributes = rebuilt;
     }
   }
 
+  let permissions: PluginPermissions | undefined;
   if (m.permissions !== undefined) {
-    if (typeof m.permissions !== 'object' || m.permissions === null || Array.isArray(m.permissions)) {
+    const p = readRecord(m.permissions);
+    if (p === undefined) {
       fail('permissions', '必须是对象');
     } else {
-      const p = m.permissions as Record<string, unknown>;
+      const rebuilt: PluginPermissions = {};
       for (const key of ['read', 'write'] as const) {
-        if (p[key] !== undefined && (!Array.isArray(p[key]) || (p[key] as unknown[]).some((x) => !str(x)))) {
-          fail(`permissions.${key}`, '必须是字符串数组');
-        }
+        const value = p[key];
+        if (value === undefined) continue;
+        const list = readStringArray(value);
+        if (list === undefined) fail(`permissions.${key}`, '必须是字符串数组');
+        else rebuilt[key] = list;
       }
-      if (p.network !== undefined && typeof p.network !== 'boolean') {
-        fail('permissions.network', '必须是布尔值');
+      if (p.network !== undefined) {
+        if (typeof p.network !== 'boolean') fail('permissions.network', '必须是布尔值');
+        else rebuilt.network = p.network;
       }
+      const ai = readAiQuota(p.ai);
+      if (ai !== undefined) rebuilt.ai = ai;
+      permissions = rebuilt;
     }
   }
 
-  if (m.activation !== undefined && m.activation !== 'onDemand' && m.activation !== 'onStartup') {
-    fail('activation', '必须是 onDemand 或 onStartup');
-  }
+  const activation =
+    m.activation !== undefined && m.activation !== 'onDemand' && m.activation !== 'onStartup'
+      ? (fail('activation', '必须是 onDemand 或 onStartup'), undefined)
+      : m.activation;
 
+  let dependencies: Record<string, string> | undefined;
   if (m.dependencies !== undefined) {
-    if (typeof m.dependencies !== 'object' || m.dependencies === null || Array.isArray(m.dependencies)) {
+    const deps = readRecord(m.dependencies);
+    if (deps === undefined) {
       fail('dependencies', '必须是 { 插件id: 版本区间 } 对象');
     } else {
-      for (const [depId, range] of Object.entries(m.dependencies as Record<string, unknown>)) {
+      const entries: Record<string, string> = {};
+      for (const [depId, range] of Object.entries(deps)) {
         if (!isReverseDomainId(depId)) fail(`dependencies.${depId}`, '依赖 id 必须是反向域名');
-        if (typeof range !== 'string' || !isVersionRange(range)) {
+        if (!str(range) || !isVersionRange(range)) {
           fail(`dependencies.${depId}`, '版本区间必须是 ^x.y.z / ~x.y.z / x.y.z / *');
+          continue;
         }
+        entries[depId] = range;
       }
-      if (str(m.id) && Object.keys(m.dependencies as Record<string, unknown>).includes(m.id)) {
-        fail(`dependencies.${m.id}`, '不能依赖自身');
-      }
+      if (id !== undefined && Object.keys(deps).includes(id)) fail(`dependencies.${id}`, '不能依赖自身');
+      dependencies = entries;
     }
   }
 
+  const interfaceSection = readInterfaceSection(m.interface);
+
   if (issues.length) return { ok: false, issues };
-  return { ok: true, manifest: m as unknown as PluginManifest };
+  assertRequired(id, 'id');
+  assertRequired(name, 'name');
+  assertRequired(version, 'version');
+  assertRequired(host, 'host');
+  assertRequired(license, 'license');
+
+  // 逐字段重建：只收窄化过的值；settingsSchema 类型为 unknown，原样透传。
+  const manifest: PluginManifest = { id, name, version, host, license };
+  if (description !== undefined) manifest.description = description;
+  if (keywords !== undefined) manifest.keywords = keywords;
+  if (dependencies !== undefined) manifest.dependencies = dependencies;
+  if (contributes !== undefined) manifest.contributes = contributes;
+  if (permissions !== undefined) manifest.permissions = permissions;
+  if (activation !== undefined) manifest.activation = activation;
+  if ('settingsSchema' in m) manifest.settingsSchema = m.settingsSchema;
+  if (interfaceSection !== undefined) manifest.interface = interfaceSection;
+  return { ok: true, manifest };
 }
 
 // ── 命名空间（§3）────────────────────────────────────────────────────

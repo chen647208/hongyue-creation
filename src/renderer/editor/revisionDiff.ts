@@ -7,9 +7,9 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import type { RevisionDecision, RevisionReviewState } from '../../shared/types';
+import type { Chapter, RevisionBaselineRef, RevisionDecision, RevisionReviewState } from '../../shared/types';
 
-export type { RevisionDecision };
+export type { RevisionBaselineRef, RevisionDecision };
 
 /**
  * 修订差异（纯函数，docs/design/38 §2.1）：选定版本（基线）与当前正文的字符级差异。
@@ -238,27 +238,146 @@ export function stepChangeIndex(current: number, total: number, delta: number): 
   return Math.max(0, Math.min(total - 1, current + delta));
 }
 
-/** 界面状态 → 可持久化侧车字段：非法决定丢弃，保留标签与基线文本。 */
-export function toRevisionReviewState(
-  label: string,
-  baseline: string,
-  decisions: Readonly<Record<string, RevisionDecision>>,
-): RevisionReviewState {
-  const clean: Record<string, RevisionDecision> = {};
-  for (const [id, decision] of Object.entries(decisions)) {
-    if (decision === 'accept' || decision === 'reject') clean[id] = decision;
-  }
-  return { label, baseline, decisions: clean };
+/**
+ * 写入侧车字段的基线形式（docs/design/38 §2.1 + 48 篇第 8 条）：
+ * 快照/修订 id 引用优先，不夹带正文副本；`inline` 全文兜底只在引用失效回落时写入。
+ */
+export type RevisionBaseline =
+  | { source: 'snapshot'; id: string }
+  | { source: 'revision'; id: string }
+  | { source: 'inline'; text: string };
+
+/** 侧车字段还原出的界面态：基线正文、续存形式与引用失效时的全文兜底。 */
+export interface RestoredRevisionReview {
+  label: string;
+  /** 续存写回用的基线形式。 */
+  baseline: RevisionBaseline;
+  /** 已解析出的基线正文；修订引用的正文在 revisions 表，需调用方异步载入，此处为 null。 */
+  text: string | null;
+  /** 引用失效时回落用的全文兜底（历史数据残留）；无则 null。 */
+  fallbackText: string | null;
+  decisions: Record<string, RevisionDecision>;
 }
 
-/** 侧车字段 → 界面状态；结构不完整（无基线文本）返回 null，调用方按无对比处理。 */
+/** 逐处决定过滤：非法值丢弃（缺省视为拒绝，不写进字段）。 */
+function sanitizeDecisions(raw: Readonly<Record<string, RevisionDecision>> | undefined): Record<string, RevisionDecision> {
+  const clean: Record<string, RevisionDecision> = {};
+  for (const [id, decision] of Object.entries(raw ?? {})) {
+    if (decision === 'accept' || decision === 'reject') clean[id] = decision;
+  }
+  return clean;
+}
+
+/** 校验引用形状；非法（缺 id、来源不认识）视为无引用，按全文兜底处理。 */
+function readBaselineRef(ref: RevisionReviewState['baselineRef']): RevisionBaselineRef | null {
+  if (!ref || typeof ref !== 'object') return null;
+  if (ref.source !== 'snapshot' && ref.source !== 'revision') return null;
+  if (typeof ref.id !== 'string' || ref.id.length === 0) return null;
+  return { source: ref.source, id: ref.id };
+}
+
+/**
+ * 界面状态 → 可持久化侧车字段：非法决定丢弃。
+ * 基线是 id 引用时不写 `baseline` 正文副本，字段体积与章节长度无关；
+ * 只有引用失效回落（`inline`）才写入全文。
+ */
+export function toRevisionReviewState(
+  label: string,
+  baseline: RevisionBaseline,
+  decisions: Readonly<Record<string, RevisionDecision>>,
+): RevisionReviewState {
+  const clean = sanitizeDecisions(decisions);
+  if (baseline.source === 'inline') return { label, baseline: baseline.text, decisions: clean };
+  return { label, baselineRef: { source: baseline.source, id: baseline.id }, decisions: clean };
+}
+
+/**
+ * 侧车字段 → 界面态（修订对比恢复的唯一读取入口）。
+ *
+ * 判定只依据入参（章节快照、revisions 表），同一本书同一时刻打开两次结论一致：
+ *   - 快照引用：传入 chapter 时当场解析正文；快照已删则回落 `baseline` 全文兜底，无兜底返回 null；
+ *   - 修订引用：正文在 revisions 表，返回 text=null 由调用方异步载入，解析不到再回落兜底；
+ *   - 历史数据（只有全文、无引用）：按 inline 返回，升级 id 引用由读时迁移负责
+ *     （`matchSnapshotBaseline` / `matchRevisionBaseline` + `withBaselineRef`）。
+ * 结构不完整（无基线引用也无全文）返回 null，调用方按无对比处理。
+ */
 export function fromRevisionReviewState(
   state: RevisionReviewState | undefined,
-): { label: string; text: string; decisions: Record<string, RevisionDecision> } | null {
-  if (!state || typeof state.baseline !== 'string') return null;
-  const decisions: Record<string, RevisionDecision> = {};
-  for (const [id, decision] of Object.entries(state.decisions ?? {})) {
-    if (decision === 'accept' || decision === 'reject') decisions[id] = decision;
+  chapter?: Pick<Chapter, 'snapshots'>,
+): RestoredRevisionReview | null {
+  if (!state || typeof state !== 'object') return null;
+  const label = typeof state.label === 'string' ? state.label : '';
+  const decisions = sanitizeDecisions(state.decisions);
+  const fallbackText = typeof state.baseline === 'string' ? state.baseline : null;
+  const ref = readBaselineRef(state.baselineRef);
+
+  if (ref) {
+    if (ref.source === 'snapshot') {
+      const snapshot = chapter?.snapshots?.find((item) => item.id === ref.id);
+      if (snapshot) {
+        return {
+          label,
+          baseline: { source: 'snapshot', id: snapshot.id },
+          text: snapshot.content,
+          fallbackText,
+          decisions,
+        };
+      }
+      if (fallbackText !== null) {
+        return {
+          label,
+          baseline: { source: 'inline', text: fallbackText },
+          text: fallbackText,
+          fallbackText,
+          decisions,
+        };
+      }
+      return null;
+    }
+    return { label, baseline: { source: 'revision', id: ref.id }, text: null, fallbackText, decisions };
   }
-  return { label: state.label ?? '', text: state.baseline, decisions };
+
+  if (fallbackText !== null) {
+    return { label, baseline: { source: 'inline', text: fallbackText }, text: fallbackText, fallbackText, decisions };
+  }
+  return null;
+}
+
+/**
+ * 历史全文基线 → 快照 id（读时迁移）：按正文匹配章节快照，取首个命中。
+ * 快照数组顺序稳定，同一章节同一时刻结论唯一。
+ */
+export function matchSnapshotBaseline(
+  chapter: Pick<Chapter, 'snapshots'>,
+  text: string,
+): RevisionBaselineRef | null {
+  const snapshot = chapter.snapshots?.find((item) => item.content === text);
+  return snapshot ? { source: 'snapshot', id: snapshot.id } : null;
+}
+
+/**
+ * 历史全文基线 → 修订 id（读时迁移）：按正文匹配修订记录，取首个命中。
+ * 调用方传入的 rows 需按 seq 升序（`loadRevisions` 的口径），保证结论唯一。
+ */
+export function matchRevisionBaseline(
+  revisions: readonly { id: string; body: string }[],
+  text: string,
+): RevisionBaselineRef | null {
+  const revision = revisions.find((item) => item.body === text);
+  return revision ? { source: 'revision', id: revision.id } : null;
+}
+
+/**
+ * 把迁移出的基线引用并入侧车字段：丢掉全文副本（这是项目文件瘦身的来源），保留逐处决定。
+ * 只在当前字段还没有引用时调用（幂等由调用方保证）。
+ */
+export function withBaselineRef(
+  state: RevisionReviewState,
+  ref: RevisionBaselineRef,
+): RevisionReviewState {
+  return {
+    label: state.label,
+    baselineRef: ref,
+    decisions: sanitizeDecisions(state.decisions),
+  };
 }

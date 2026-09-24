@@ -211,10 +211,11 @@ test('键盘可完成建书→工作台→分区→设置→弹层全链路', as
     await page.keyboard.press('Control+1');
     await page.waitForTimeout(300);
 
-    // 设置：聚焦左侧「设置」并回车
+    // 设置：聚焦左侧「设置」并回车。按可访问名定位（SettingsModal 的 aria-label），
+    // 不用 dialog.first()：后者依赖 portal 插入顺序，全局对话框一旦排队就错位。
     await page.getByRole('button', { name: /^设置$|^Settings$/ }).first().focus();
     await page.keyboard.press('Enter');
-    const settingsDialog = page.getByRole('dialog').first();
+    const settingsDialog = page.getByRole('dialog', { name: /控制台配置|Console Settings/ });
     await expect(settingsDialog).toBeVisible({ timeout: 30_000 });
 
     // 各页签：聚焦 + 回车逐个切换
@@ -229,7 +230,10 @@ test('键盘可完成建书→工作台→分区→设置→弹层全链路', as
 
     // 全局命令面板：Ctrl+K 打开，Esc 关闭后焦点回到设置弹层
     await page.keyboard.press('Control+k');
-    const palette = page.getByRole('dialog').filter({ hasText: /命令面板|Command palette/ });
+    // 用面板独有的命令输入框定位：dialog 的 hasText 会同时命中「设置」弹层
+    // （通用页签的 ShortcutRecorder 里就有「命令面板」这个动作名），导致断言
+    // 无法区分「面板没关」与「面板关了但设置弹层还在」。
+    const palette = page.getByRole('dialog').getByPlaceholder(/输入命令|Type a command/);
     await expect(palette).toBeVisible({ timeout: 10_000 });
     await page.keyboard.press('Escape');
     await expect(palette).toBeHidden({ timeout: 10_000 });

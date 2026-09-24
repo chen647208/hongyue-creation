@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { projectCanvas } from '../canvasView';
 import type { ViewLayout } from '../types';
 import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from '../viewLayout';
 
@@ -39,5 +40,55 @@ describe('viewLayout 公式脚本编解码', () => {
     const layout: ViewLayout = { ...DEFAULT_VIEW_LAYOUT, fieldAliases: { 画面: 'image', 景别: 'framing' } };
     expect(parseViewLayout(serializeViewLayout(layout)).fieldAliases).toEqual({ 画面: 'image', 景别: 'framing' });
     expect(parseViewLayout({ fieldAliases: { 画面: 1, 景别: '' } }).fieldAliases).toBeUndefined();
+  });
+});
+
+describe('viewLayout 计算列键冲突', () => {
+  const flat = { key: 'computed:double', label: '双倍', operator: 'add' as const, operands: ['age', 'age'] };
+
+  it('计算列键与既有列重复时拒绝该计算列，列保持一份', () => {
+    const restored = parseViewLayout({
+      columns: [
+        { key: 'title', label: '名称' },
+        { key: 'computed:double', label: '双倍' },
+      ],
+      computed: [flat, { key: 'computed:ok', label: '可用', operator: 'add', operands: ['age'] }],
+    });
+    expect(restored.computed?.map((column) => column.key)).toEqual(['computed:ok']);
+    expect(restored.columns.map((column) => column.key)).toEqual(['title', 'computed:double']);
+  });
+
+  it('columns 缺席时以内置列为既有列，撞内置键同样拒绝', () => {
+    expect(parseViewLayout({ computed: [{ ...flat, key: 'title' }] }).computed).toBeUndefined();
+    expect(parseViewLayout({ computed: [flat] }).computed).toEqual([flat]);
+  });
+
+  it('计算列键彼此重复时只保留首条', () => {
+    const restored = parseViewLayout({ computed: [flat, { ...flat, label: '另一条' }] });
+    expect(restored.computed).toEqual([flat]);
+  });
+
+  it('不冲突的计算列往返不变', () => {
+    expect(parseViewLayout(serializeViewLayout({ ...DEFAULT_VIEW_LAYOUT, computed: [flat] })).computed).toEqual([flat]);
+  });
+
+  it('连线端点是投影行节点：存档往返后仍保留，失链由 projectCanvas 过滤', () => {
+    // 章节行的 id 由 projectCanvas 从行投影产生，不在文档 nodes 数组里。
+    const layout = {
+      positions: {},
+      nodes: [],
+      edges: [{ id: 'e1', fromNode: 'chapter-1', toNode: 'chapter-2' }],
+    };
+    const parsed = parseViewLayout({ canvas: layout });
+    expect(parsed?.canvas?.edges).toEqual([{ id: 'e1', fromNode: 'chapter-1', toNode: 'chapter-2' }]);
+    // 真实行不存在时 projectCanvas 才会把它当失链滤掉
+    const projected = projectCanvas(parsed?.canvas, []);
+    expect(projected.edges).toEqual([]);
+    // 行存在时投影出来
+    const withRows = projectCanvas(parsed?.canvas, [
+      { id: 'chapter-1', kind: 'chapter', title: '第一章', values: {}, cells: {} },
+      { id: 'chapter-2', kind: 'chapter', title: '第二章', values: {}, cells: {} },
+    ]);
+    expect(withRows.edges).toEqual([{ id: 'e1', fromNode: 'chapter-1', toNode: 'chapter-2' }]);
   });
 });

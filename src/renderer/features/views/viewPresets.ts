@@ -27,7 +27,7 @@ export interface ViewPreset {
   layout: ViewLayout;
 }
 
-/** 分镜表：镜号、景别、画面、台词、音效、时长，末列口播时长由台词字数 ÷ 语速算出。 */
+/** 分镜表：镜号、景别、画面、台词、音效、时长，末两列由计算列 definitions 派生（键不得再写进 columns，否则列出现两份）。 */
 const STORYBOARD_PRESET: ViewPreset = {
   id: 'preset:storyboard',
   nameKey: 'views.preset.storyboard.name',
@@ -41,9 +41,7 @@ const STORYBOARD_PRESET: ViewPreset = {
       { key: 'image', label: 'views.preset.storyboard.col.image', width: 140 },
       { key: 'dialogue', label: 'views.preset.storyboard.col.dialogue', width: 220 },
       { key: 'sound', label: 'views.preset.storyboard.col.sound', width: 140 },
-      { key: 'duration', label: 'views.preset.storyboard.col.duration', width: 96 },
-      { key: 'computed:shotWordCount', label: 'views.preset.storyboard.col.wordCount', width: 96 },
-      { key: 'computed:shotSpeakDuration', label: 'views.preset.storyboard.col.speakDuration', width: 120 },
+      { key: 'duration', label: 'views.preset.storyboard.col.duration', width: 96 }
     ],
     hidden: [],
     sortKey: 'shotNumber',

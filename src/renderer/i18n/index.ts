@@ -16,7 +16,6 @@ export {
   initI18n,
   NAMESPACES,
   normalizeLanguage,
-  resources,
   SUPPORTED_LANGUAGES,
 } from './config';
 // 数据目录型（运行时组合键）取词助手：服务商名称/描述/提示、模板显示名等。

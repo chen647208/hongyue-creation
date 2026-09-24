@@ -60,9 +60,9 @@ interface SyncEntityStore {
 function ipcSyncStore(): SyncEntityStore {
   return {
     read: async (bookId) => {
-      const nodeRows = (await db().all('nodes.selectByBook', [bookId])) as unknown as NodeRow[];
-      const attrRows = (await db().all('attrs.selectByBook', [bookId])) as unknown as AttrRow[];
-      const edgeRows = (await db().all('edges.selectByBook', [bookId])) as unknown as EdgeRow[];
+      const nodeRows = await db().all<NodeRow>('nodes.selectByBook', [bookId]);
+      const attrRows = await db().all<AttrRow>('attrs.selectByBook', [bookId]);
+      const edgeRows = await db().all<EdgeRow>('edges.selectByBook', [bookId]);
       return { nodes: nodeRows.map(toNode), attrs: attrRows.map(toAttr), edges: edgeRows.map(toEdge) };
     },
     upsert: async ({ nodes, attrs, edges }) => {

@@ -509,7 +509,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         if (!open) void handleRequestClose();
       }}
     >
-      <DialogContent hideClose className="flex h-[90vh] w-[94vw] max-w-6xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent hideClose aria-label={i18n.t('settings:title')} className="flex h-[90vh] w-[94vw] max-w-6xl flex-col gap-0 overflow-hidden p-0">
         <SettingsModalHeader
           activeTab={activeTab}
           onChange={setActiveTab}

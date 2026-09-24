@@ -33,7 +33,7 @@ Trail of Bits、Cloudflare coding standards、WordPress 文档风格指南同款
 - `guides/ci-and-release.md`：CI 持续集成与基于标签的自动发布流程
 - `guides/writing-a-plugin.md`：从模板编写插件、贡献点与许可边界
 - `guides/licensing.md`：AGPL-3.0 社区版与商业授权的双重许可说明
-- `guides/acceptance-report.md`：M0–M5 验收报告（各设计篇验收标准逐项状态与证据）
+- `guides/acceptance-report.md`：逐篇设计验收标准的状态与证据（2026-09 时点快照）
 - `guides/v0-readiness.md`：v0 就绪度与验收清单（对外发布口径与手工验收步骤）
 - `CLA.md`：贡献者许可协议正文
 
@@ -54,7 +54,7 @@ Trail of Bits、Cloudflare coding standards、WordPress 文档风格指南同款
 
 ### 3. 目标设计（design/）
 
-- `design/README.md`：v2 设计索引——现状评估、目标架构、数据层、插件系统、AI 层、编辑器、导出、M0–M5 路线图、外部项目基准
+- `design/README.md`：v2 设计索引——起点基线、目标架构、数据层、插件系统、AI 层、编辑器、导出、路线图、外部项目基准
 - 注意：design/ 是**前瞻性设计**，描述目标；功能落地后回写进 features/ 对应文档，现状以 features/ 为准
 
 ## 当前文档范围

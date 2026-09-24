@@ -26,6 +26,9 @@ import { runWasmRequest, type WasmRequest } from './wasmSql';
  * 序列化：主线程驱动保证同一时刻只有一个在途请求（发下一条前必等上一条回执），
  * 且 oo1 执行是同步的，故 worker 内 BEGIN…COMMIT 不会被其它语句插入。
  */
+// worker 全局作用域：tsconfig 只引入 DOM lib，self 被 Window 类型覆盖（其 postMessage 要求
+// targetOrigin 参数，与 DedicatedWorkerGlobalScope.postMessage 不兼容），单段断言两侧都不成立，
+// 只能双段收敛到本文件用到的最小 worker 面（onmessage + postMessage）。
 const ctx = self as unknown as {
   onmessage: ((event: MessageEvent<IncomingMessage>) => void) | null;
   postMessage: (message: unknown) => void;
@@ -39,9 +42,8 @@ let ready: Promise<{ db: Database; capi: CAPI }> | null = null;
 
 async function ensureDb(): Promise<{ db: Database; capi: CAPI }> {
   // 官方 init 的类型标注为 0 参，但运行时接受 emscripten 配置对象（用于静音启动日志）。
-  const initModule = sqlite3InitModule as unknown as (
-    config?: Record<string, unknown>
-  ) => ReturnType<typeof sqlite3InitModule>;
+  // 这里按运行时能力声明参数：少参函数可赋值给多参签名，无需强转，返回类型仍取官方的。
+  const initModule: (config?: Record<string, unknown>) => ReturnType<typeof sqlite3InitModule> = sqlite3InitModule;
   const sqlite3 = await initModule({
     print: () => {},
     printErr: () => {},

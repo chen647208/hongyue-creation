@@ -156,6 +156,9 @@ describe('视图预设', () => {
     expect(columns).toEqual(
       expect.arrayContaining(['shotNumber', 'framing', 'image', 'dialogue', 'sound', 'duration']),
     );
+    // 计算列键不得再写进 columns：否则投影后同名列出现两份。
+    expect(columns).not.toContain('computed:shotWordCount');
+    expect(columns).not.toContain('computed:shotSpeakDuration');
     const speak = preset?.layout.computed?.find((column) => column.key === 'computed:shotSpeakDuration');
     expect(speak?.operands).toEqual(['computed:shotWordCount', '$speechRate']);
     expect(speak?.params?.speechRate).toBeGreaterThan(0);
