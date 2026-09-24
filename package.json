@@ -83,7 +83,7 @@
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/language": "^6.12.4",
     "@codemirror/lint": "^6.9.7",
-    "@codemirror/state": "^6.7.4",
+    "@codemirror/state": "^6.7.5",
     "@codemirror/view": "^6.43.11",
     "@google/genai": "^1.34.0",
     "@jitl/quickjs-wasmfile-release-sync": "^0.32.0",
