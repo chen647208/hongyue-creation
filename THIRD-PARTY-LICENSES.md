@@ -14,7 +14,7 @@
 | @codemirror/language | 6.12.4 | MIT |
 | @codemirror/lint | 6.9.7 | MIT |
 | @codemirror/search | 6.7.2 | MIT |
-| @codemirror/state | 6.7.4 | MIT |
+| @codemirror/state | 6.7.5 | MIT |
 | @codemirror/theme-one-dark | 6.1.3 | MIT |
 | @codemirror/view | 6.43.11 | MIT |
 | @floating-ui/core | 1.8.0 | MIT |
