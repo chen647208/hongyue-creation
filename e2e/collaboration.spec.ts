@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
-import { cleanupUserDataDir, createBook, launchApp } from './helpers';
+import { cleanupUserDataDir, createBook, flushPersistence, launchApp, waitCollaborationReady } from './helpers';
 
 /** 进入工作区（若在书籍库则点开书）、关掉助手侧栏、进写作区并保证有章节、等编辑器就绪。 */
 async function enterWorkspaceWriting(page: Page): Promise<void> {
@@ -41,8 +41,8 @@ test('实时协作：两个窗口同步章节正文', async () => {
   const { app, page } = await launchApp(userDataDir);
   try {
     await createBook(page);
-    // 等差分落盘（防抖 400ms），再开协作并 reload 让启动时读到开关
-    await page.waitForTimeout(2000);
+    // 先把建书差分真实落盘（防抖 400ms 猜不准），再开协作并 reload 让启动时读到开关
+    await flushPersistence(app);
     await page.evaluate(() => window.localStorage.setItem('collab.enabled', '1'));
     await page.reload();
     await enterWorkspaceWriting(page);
@@ -69,8 +69,9 @@ test('实时协作：两个窗口同步章节正文', async () => {
     const editor2 = page2.locator('.ProseMirror').first();
     await expect(editor2).toBeVisible({ timeout: 30_000 });
 
-    // 等播种握手（加入者向对端取状态）完成，再输入
-    await page.waitForTimeout(1500);
+    // 两端会话就绪（面板显示已加入房间）才输入：握手窗口内的本地编辑不会被推送
+    await waitCollaborationReady(page);
+    await waitCollaborationReady(page2);
 
     await editor1.click();
     await page.keyboard.type('协作同步测试内容');

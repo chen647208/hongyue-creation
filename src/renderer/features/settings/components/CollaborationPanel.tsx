@@ -22,14 +22,18 @@ const CollaborationPanel: React.FC = () => {
   const { t } = useTranslation('settings');
   const enabled = useCollaborationStore((state) => state.enabled);
   const peers = useCollaborationStore((state) => state.peers);
+  const sessionState = useCollaborationStore((state) => state.sessionState);
   const serverUrl = useCollaborationStore((state) => state.serverUrl);
   const setServerUrl = useCollaborationStore((state) => state.setServerUrl);
   const setEnabled = useCollaborationStore((state) => state.setEnabled);
   const activeProjectId = useProjectStore((state) => state.activeProjectId);
-  const session = getCollaborationSession();
 
   let status = t('collab.inactive');
-  if (enabled) status = session ? t('collab.active', { room: session.room }) : t('collab.waiting');
+  if (enabled) {
+    if (sessionState === 'ready') status = t('collab.active', { room: getCollaborationSession()?.room ?? '' });
+    else if (sessionState === 'handshaking') status = t('collab.handshaking');
+    else status = t('collab.waiting');
+  }
 
   return (
     <Card>

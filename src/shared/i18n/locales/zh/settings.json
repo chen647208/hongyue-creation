@@ -613,6 +613,7 @@
     "subtitle": "开启后，同一台电脑的多个窗口经 BroadcastChannel 实时同步当前作品的章节。协作副本不写入活动数据库之外的第二份存储；跨设备传输另行接入。",
     "enable": "开启实时协作",
     "active": "已加入房间 {{room}}",
+    "handshaking": "正在建立协作会话，请稍候",
     "waiting": "等待打开作品",
     "inactive": "未开启",
     "online": "在线 {{count}} 人",

@@ -44,6 +44,44 @@ export const cleanupUserDataDir = (dir: string): void => {
   }
 };
 
+/**
+ * 等差分落盘完成：走产品真实的退出刷盘握手（main 发 app:flush-request → 渲染层 flushNow → 回 app:flush-done）。
+ * 通道名与 src/main/channels.ts 的 IPC 常量一致；替代「sleep 2s 赌防抖 400ms 已落盘」的猜测等待。
+ */
+export const flushPersistence = async (app: ElectronApplication): Promise<void> => {
+  await app.evaluate(({ ipcMain, BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const onDone = (): void => {
+        ipcMain.removeListener('app:flush-done', onDone);
+        resolve();
+      };
+      ipcMain.on('app:flush-done', onDone);
+      win.webContents.send('app:flush-request');
+    });
+  });
+};
+
+/**
+ * 等协作会话就绪（播种握手窗口已过，本地编辑开始推送）：经命令面板打开设置弹层（写作分区
+ * 为全屏沉浸、无设置按钮，命令面板全分区可用），切通用页签等协作面板显示「已加入房间」再关闭。
+ * 面板状态由 collaborationService 的 sessionState 驱动，是用户可见的真实信号；
+ * 替代「sleep 1.5s 赌 400ms 握手已过」的猜测等待。
+ */
+export const waitCollaborationReady = async (page: Page): Promise<void> => {
+  await page.keyboard.press('Control+k');
+  const paletteInput = page.getByPlaceholder(/输入命令|Enter a command/).first();
+  await expect(paletteInput).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: /打开设置|Open settings/ }).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible({ timeout: 30_000 });
+  await dialog.getByRole('button', { name: /^(通用|General)$/ }).first().click();
+  await expect(dialog.getByText(/已加入房间|Joined room/)).toBeVisible({ timeout: 30_000 });
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden({ timeout: 10_000 });
+};
+
 /** 建书进工作台灵感分区（首启走向导跳过，非首启走新建模态）。 */
 export const createBook = async (page: Page): Promise<void> => {  const skip = page.getByRole('button', { name: /跳过|Skip/ });
   if (await skip.isVisible({ timeout: 10_000 }).catch(() => false)) {

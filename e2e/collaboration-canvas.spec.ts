@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
-import { cleanupUserDataDir, createBook, enterWritingArea, launchApp } from './helpers';
+import { cleanupUserDataDir, createBook, enterWritingArea, flushPersistence, launchApp, waitCollaborationReady } from './helpers';
 
 /**
  * 画布协作双端 e2e：画布节点位置经同一份 Y.Doc 两端收敛。
@@ -194,11 +194,11 @@ async function openSecondWindow(app: import('@playwright/test').ElectronApplicat
   return opened;
 }
 
-/** 双端画布协作的公共起法：建书 → 开协作 reload → 建两章 → 窗口 1 开画布并保存视图。 */
+/** 双端画布协作的公共起法：建书 → 刷盘 → 开协作 reload → 建两章 → 两端会话就绪 → 窗口 1 开画布并保存视图。 */
 async function setupCanvasPair(app: import('@playwright/test').ElectronApplication, page: Page): Promise<Page> {
   await createBook(page);
-  // 等差分落盘（防抖 400ms），再开协作并 reload 让启动时读到开关
-  await page.waitForTimeout(2000);
+  // 先把建书差分真实落盘（防抖 400ms 猜不准），再开协作并 reload 让启动时读到开关
+  await flushPersistence(app);
   await page.evaluate(() => window.localStorage.setItem('collab.enabled', '1'));
   await page.reload();
   await enterWritingArea(page);
@@ -213,8 +213,9 @@ async function setupCanvasPair(app: import('@playwright/test').ElectronApplicati
   await enterWorkspaceFromBookshelf(peer);
   await openCanvasPanel(peer, false);
   await expectNodeCount(peer, 2);
-  // 等播种握手完成，再开始编辑
-  await page.waitForTimeout(1500);
+  // 两端会话就绪（面板显示已加入房间）才继续：握手窗口内本地画布编辑会被服务丢弃
+  await waitCollaborationReady(page);
+  await waitCollaborationReady(peer);
   return peer;
 }
 
@@ -318,9 +319,10 @@ test('协作画布：断线重连后已删元素保持删除，协同继续可�
     await expect(connectButtons(page).nth(0)).toHaveAttribute('aria-pressed', 'false');
     await expect(removeEdgeButtons(page2)).toHaveCount(1, { timeout: 15_000 });
 
-    // 断线：关闭窗口 2；窗口 1 在无对端状态下删除连线（文档写入墓碑）
+    // 断线：关闭窗口 2（close 返回即渲染进程销毁，BroadcastChannel 对端确已离线）；
+    // 窗口 1 在无对端状态下删除连线（文档写入墓碑）。墓碑协议按同步轮次收敛，
+    // 与对端存活与否无关，无需额外等待。
     await page2.close();
-    await page.waitForTimeout(500);
     await removeEdgeButtons(page).click();
     await expect(removeEdgeButtons(page)).toHaveCount(0, { timeout: 15_000 });
 

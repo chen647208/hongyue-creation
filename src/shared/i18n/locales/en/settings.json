@@ -613,6 +613,7 @@
     "subtitle": "When on, multiple windows on this machine sync the current work's chapters via BroadcastChannel. The collaborative copy adds no second store beyond the live database; cross-device transport is a separate add-on.",
     "enable": "Enable real-time collaboration",
     "active": "Joined room {{room}}",
+    "handshaking": "Establishing the collaboration session, please wait",
     "waiting": "Waiting for a work to open",
     "inactive": "Off",
     "online": "{{count}} online",

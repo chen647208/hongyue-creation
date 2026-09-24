@@ -50,11 +50,15 @@ interface CollaborationSession {
   unsubscribeCanvas: () => void;
 }
 
+/** 协作会话状态：off 未入会；handshaking 已建会话、播种握手窗口未过（此时本地画布编辑不推送）；ready 握手完成，收发就绪。 */
+export type CollaborationSessionState = 'off' | 'handshaking' | 'ready';
+
 interface CollaborationState {
   enabled: boolean;
   peers: CollaborationPeer[];
   serverUrl: string;
   sessionProjectId: string | null;
+  sessionState: CollaborationSessionState;
   setEnabled: (enabled: boolean) => void;
   setServerUrl: (url: string) => void;
 }
@@ -100,6 +104,7 @@ export const useCollaborationStore = create<CollaborationState>()((set) => ({
   peers: [],
   serverUrl: readServerUrl(),
   sessionProjectId: null,
+  sessionState: 'off',
   setEnabled: (enabled) => {
     set({ enabled });
     localStore.setItem(STORAGE_KEYS.collabEnabled, enabled ? '1' : '0');
@@ -247,7 +252,7 @@ export function startCollaboration(projectId: string): void {
 
   const current: CollaborationSession = { projectId, room, doc, awareness, transport, unsubscribe, unsubscribeCanvas };
   session = current;
-  useCollaborationStore.setState({ sessionProjectId: projectId });
+  useCollaborationStore.setState({ sessionProjectId: projectId, sessionState: 'handshaking' });
 
   // 播种握手：等待片刻确认没有对端后再用本地作品初始化，避免两端各自播种产生重复章节。
   setTimeout(() => {
@@ -260,6 +265,7 @@ export function startCollaboration(projectId: string): void {
       queueCanvasPull(doc, projectId);
     }
     canvasReady = true;
+    useCollaborationStore.setState({ sessionState: 'ready' });
   }, SEED_GRACE_MS);
 }
 
@@ -276,7 +282,7 @@ export function stopCollaboration(): void {
   canvasPullQueue = Promise.resolve();
   adoptedCanvasViews.clear();
   canvasSyncedConfigs.clear();
-  useCollaborationStore.setState({ peers: [], sessionProjectId: null });
+  useCollaborationStore.setState({ peers: [], sessionProjectId: null, sessionState: 'off' });
 }
 
 /** 取某章节的协作绑定（片段 + 在线状态），未加入或不是当前作品时返回 null。 */
