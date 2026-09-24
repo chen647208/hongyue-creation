@@ -69,6 +69,9 @@ let applyingRemoteCanvas = false;
 let canvasPullQueue: Promise<void> = Promise.resolve();
 /** 已与文档对齐过的视图 id：首次见到文档有画布状态的视图先拉齐，避免本地陈旧配置反压对端。 */
 const adoptedCanvasViews = new Set<string>();
+/** 每个视图最近一次与文档对齐的 config（JSON）。store 触发的推送只在 config 真正变化时执行，
+ * 否则「收到远程墓碑 → pull 完成前」的任何 store 触发都会用陈旧 config 把已删元素复活。 */
+const canvasSyncedConfigs = new Map<string, string>();
 
 /** 协作光标颜色池。 */
 const PEER_COLORS = ['#e5484d', '#0091ff', '#30a46c', '#f76b15', '#8e4ec6', '#e93d82'];
@@ -113,8 +116,8 @@ export function isCollaborationEnabled(): boolean {
 
 /** 把某视图的画布布局推送进文档；文档已有该视图状态且本地从未对齐过时，先以文档为准拉取。 */
 function pushCanvasView(doc: Y.Doc, projectId: string, viewId: string, config: Record<string, unknown>): void {
-  const layout = parseViewLayout(config).canvas;
-  if (!layout) return;
+  const serialized = JSON.stringify(config);
+  if (canvasSyncedConfigs.get(viewId) === serialized) return;
   if (!adoptedCanvasViews.has(viewId)) {
     adoptedCanvasViews.add(viewId);
     // 首次见到文档已有该视图状态：本地配置可能落后于文档，直接推送会用陈旧数据覆盖对端，改为先拉齐。
@@ -123,7 +126,17 @@ function pushCanvasView(doc: Y.Doc, projectId: string, viewId: string, config: R
       return;
     }
   }
-  applyCanvasLayoutToDoc(doc, viewId, layout);
+  const parsedLayout = parseViewLayout(config);
+  // 视图不是画布形态：与协作画布无关，不推送（快照仍更新，避免切回画布形态时误推陈旧数据）。
+  if (parsedLayout.kind !== 'canvas') {
+    canvasSyncedConfigs.set(viewId, serialized);
+    return;
+  }
+  // 画布内容为空（全部元素被删）也要推送：applyCanvasLayoutToDoc 靠「seed 缺席」给残留元素发墓碑。
+  // 空画布在序列化层被折叠成「canvas 键缺席」，此前这里因 layout 为 undefined 直接 return，
+  // 删除动作永远到不了对端。
+  applyCanvasLayoutToDoc(doc, viewId, parsedLayout.canvas ?? {});
+  canvasSyncedConfigs.set(viewId, serialized);
 }
 
 /** 无对端响应用本地视图播种画布：作为该视图画布元素的首批状态（版本 1）。 */
@@ -134,6 +147,7 @@ function seedCanvasToDoc(doc: Y.Doc, projectId: string): void {
     const layout = parseViewLayout(view.config).canvas;
     if (!layout) continue;
     adoptedCanvasViews.add(view.id);
+    canvasSyncedConfigs.set(view.id, JSON.stringify(view.config));
     applyCanvasLayoutToDoc(doc, view.id, layout, CANVAS_SEED_ORIGIN);
   }
 }
@@ -154,13 +168,22 @@ async function pullCanvasFromDoc(doc: Y.Doc, projectId: string): Promise<void> {
   try {
     for (const view of store.views) {
       const docLayout = docToCanvasLayout(doc, view.id);
-      if (!docLayout) continue;
+      if (!docLayout) {
+        // 文档已无该视图的画布状态（元素被删且墓碑已清）：本地配置是陈旧数据，
+        // 不拉齐的话下一次 store 触发会把旧元素整批复活。
+        if (adoptedCanvasViews.has(view.id) && parseViewLayout(view.config).canvas) {
+          const config = serializeViewLayout({ ...parseViewLayout(view.config), canvas: undefined });
+          canvasSyncedConfigs.set(view.id, JSON.stringify(config));
+          await useGenericModelStore.getState().saveView({ ...view, config });
+        }
+        continue;
+      }
       adoptedCanvasViews.add(view.id);
       const current = parseViewLayout(view.config);
       if (sameCanvasLayout(current.canvas, docLayout)) continue;
-      await useGenericModelStore
-        .getState()
-        .saveView({ ...view, config: serializeViewLayout({ ...current, canvas: docLayout }) });
+      const config = serializeViewLayout({ ...current, canvas: docLayout });
+      canvasSyncedConfigs.set(view.id, JSON.stringify(config));
+      await useGenericModelStore.getState().saveView({ ...view, config });
     }
   } finally {
     applyingRemoteCanvas = false;
@@ -252,6 +275,7 @@ export function stopCollaboration(): void {
   applyingRemoteCanvas = false;
   canvasPullQueue = Promise.resolve();
   adoptedCanvasViews.clear();
+  canvasSyncedConfigs.clear();
   useCollaborationStore.setState({ peers: [], sessionProjectId: null });
 }
 

@@ -76,6 +76,10 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const innerRef = useRef<HTMLDivElement>(null);
+  // onMoveNode 是异步写回（saveView → store reload → projection 更新），期间连续按键
+  // 读到的 node.x/y 还是旧位置，后一次位移会丢。把尚未被 projection 追上的本地编辑
+  // 记在这里：显示与下一次按键都从「projection + pending」取，projection 追上后清掉。
+  const pendingRef = useRef<Record<string, { point: CanvasPoint; from: { x: number; y: number } }>>({});
 
   // 画布尺寸随内容与拖动临时位置增长；平移量只按已提交坐标计算，避免拖动时抖动。
   const bounds = useMemo(() => {
@@ -105,7 +109,13 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const boxes = useMemo(() => {
     const map = new Map<string, Box>();
     for (const node of projection.nodes) {
-      const point = draft[node.id] ?? { x: node.x, y: node.y };
+      const pending = pendingRef.current[node.id];
+      // 乐观坐标只服务「projection 还落后于乐观值」的窗口：projection 追上乐观值即视为
+      // 回流完成，清掉这条 pending。用追上而不是相等：连续编辑时每次按键都重新记乐观值，
+      // 逐次回流的中间值可能正好撞上某条旧起点，等值判断会把未回流的新编辑提前丢掉。
+      const absorbed = pending && node.x >= pending.point.x - 0.5 && node.y >= pending.point.y - 0.5;
+      if (pending && absorbed) delete pendingRef.current[node.id];
+      const point = draft[node.id] ?? (pending && !absorbed ? pending.point : { x: node.x, y: node.y });
       map.set(node.id, { x: point.x + bounds.offsetX, y: point.y + bounds.offsetY, width: node.width, height: node.height });
     }
     return map;
@@ -162,7 +172,12 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!drag || event.pointerId !== drag.pointerId) return;
     const point = draft[drag.id];
-    if (point) onMoveNode(drag.id, point);
+    if (point) {
+      // from 统一记 projection 现值：projection 追到该值说明本次写回已回流
+      const node = projection.nodes.find((item) => item.id === drag.id);
+      if (node) pendingRef.current[drag.id] = { point, from: { x: node.x, y: node.y } };
+      onMoveNode(drag.id, point);
+    }
     setDraft((previous) => {
       const next = { ...previous };
       delete next[drag.id];
@@ -186,7 +201,12 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     else if (event.key === 'ArrowRight') dx = step;
     else return;
     event.preventDefault();
-    onMoveNode(node.id, { x: node.x + dx, y: node.y + dy });
+    const pending = pendingRef.current[node.id];
+    const previous = draft[node.id] ?? pending?.point ?? { x: node.x, y: node.y };
+    const point = { x: previous.x + dx, y: previous.y + dy };
+    // from 记 projection 现值：projection 追到这个位置说明本次写回已回流
+    pendingRef.current[node.id] = { point, from: { x: node.x, y: node.y } };
+    onMoveNode(node.id, point);
   };
 
   const handleConnect = (node: CanvasNode) => {

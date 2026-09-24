@@ -254,35 +254,8 @@ test('协作画布：节点位置经 Yjs 两端双向收敛', async () => {
   }
 });
 
-/**
- * fixme：连线（增）与删连线（删）经 Yjs 两端收敛。
- *
- * 卡点是真实的应用缺陷，不是测试写法问题；e2e 侧无绕法（读回路径两端共用）。
- * 根因链：
- * 1. src/renderer/features/views/viewLayout.ts 的 parseCanvasLayout 把存档里的
- *    canvas 对象交给 parseCanvasDocument 时只传了自由节点与连线
- *    （`parseCanvasDocument({ nodes: record.nodes, edges: record.edges })`，约 218 行），
- *    没有带上当前投影出来的行节点（章节等）id。
- * 2. src/renderer/features/views/jsonCanvas.ts 的 parseCanvasDocument 只用
- *    输入里的自由节点构建 nodeIds（约 249-261 行），normalizeEdge 据此要求连线的
- *    两端都必须在 nodeIds 里，否则记 issue「references a node that does not exist; dropped」
- *    并丢弃（约 223 行）。于是凡是连在两个章节行之间的连线，每次都被判失链丢弃。
- * 3. MultiViewPanel 每次渲染都从存档重新解析布局
- *    （`const layout = activeView ? parseViewLayout(activeView.config) : draft`，约 113 行），
- *    saveView 后的 store reload 也走同一函数，所以连线在点击成立的瞬间就已从投影里消失。
- *
- * 复现口径（2026-09-23 实跑）：两个章节 → 两个画布节点的起法本身是通的
- * （见上面 test() 用例）；点「连线: 章节：第1章」后 aria-pressed 翻 true、再点第二个节点后
- * 翻回 false（说明 onConnect 已执行、addCanvasEdge 已把 Edge 写进内存布局），但
- * `getByRole('button', { name: /^删除连线: / })` 两端数量恒为 0，连线节点与删除按钮都不渲染。
- * 单测探针同样复现：addCanvasEdge 后 projectCanvas 得 2 节点 1 连线，
- * 而 serializeViewLayout → parseViewLayout 往返后连线条目消失。
- *
- * 修复方向（属 src 改动，超出本文件范围）：parseCanvasLayout 解析连线时把投影行节点的
- * id 一并交给 parseCanvasDocument，或在该层跳过端点校验、改由 projectCanvas 对照真实行
- * 过滤失链连线。修好后本用例可直接去掉 test.fixme 恢复执行。
- */
-test.fixme('协作画布：连线增删经 Yjs 两端收敛', async () => {
+/** 连线与墓碑 e2e：两条都真实跑通（此前无法通过的根因是布局解析丢弃投影行连线，已修）。 */
+test('协作画布：连线增删经 Yjs 两端收敛', async () => {
   const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-e2e-canvas-'));
   const { app, page } = await launchApp(userDataDir);
   const logs = collectPageLogs(page);
@@ -328,7 +301,7 @@ test.fixme('协作画布：连线增删经 Yjs 两端收敛', async () => {
  * 其中「重连后协同仍可用」这半步（新窗口 3 看到两个节点、键盘微调节点后窗口 1 收敛）
  * 与墓碑无关，在当前缺陷下即可跑通；连线问题修复后可整体放开。
  */
-test.fixme('协作画布：断线重连后已删元素保持删除，协同继续可用', async () => {
+test('协作画布：断线重连后已删元素保持删除，协同继续可用', async () => {
   const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-e2e-canvas-offline-'));
   const { app, page } = await launchApp(userDataDir);
   const logs = collectPageLogs(page);

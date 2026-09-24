@@ -113,12 +113,16 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   const layout = activeView ? parseViewLayout(activeView.config) : draft;
 
   const setLayout = (patch: Partial<typeof layout>) => {
-    const next = { ...layout, ...patch };
-    if (activeView) {
-      void useGenericModelStore.getState().saveView({ ...activeView, config: serializeViewLayout(next) });
-    } else {
-      setDraft(next);
+    if (!activeView) {
+      setDraft({ ...layout, ...patch });
+      return;
     }
+    // 不读渲染闭包里的 layout：连续编辑（键盘微调、删连线等）时上一次 saveView→reload
+    // 可能还没完成，闭包里的 config 是旧的，后一次保存会把前一次编辑覆盖回去。
+    // 从 store 取该视图的最新配置做合并，两次编辑才能串行叠加。
+    const latest = useGenericModelStore.getState().views.find((view) => view.id === activeView.id) ?? activeView;
+    const next = { ...parseViewLayout(latest.config), ...patch };
+    void useGenericModelStore.getState().saveView({ ...latest, config: serializeViewLayout(next) });
   };
 
   const createView = async () => {
