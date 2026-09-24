@@ -90,7 +90,7 @@ jobs:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
 
       - name: 视觉回归（Linux 基线，见 visual-baselines.yml 生成）
-        run: xvfb-run -a npm run test:e2e:visual
+        run: xvfb-run -a npx playwright test e2e/visual.spec.ts --reporter=list
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
 
