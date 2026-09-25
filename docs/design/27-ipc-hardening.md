@@ -1,6 +1,6 @@
 # 27 IPC 信任边界加固（SQL 语义通道与文件收敛）
 
-本文件是 `docs/design/26-maturity-gaps.md` 中 B4 安全项的设计：渲染层 → 主进程的 IPC
+本文件源于已归档的审计快照（`docs/archive/26-maturity-gaps.md`，B4 安全项）：渲染层 → 主进程的 IPC
 信任边界如何从"透传能力"收敛为"只暴露必要语义"。属于解释性设计（Diátaxis: explanation），
 落地后回写 `docs/features`。
 
@@ -23,7 +23,7 @@ catalog 内的语句。等价能力不减少（现有全部查询都有对应条
 
 ### 2.2 设计
 
-- 新增 `src/shared/sql/catalog.ts`：`const SQL = { '<domain>.<statement>': '<sql>' } as const`，
+- 语句目录单源 `src/shared/sql/catalog.ts`：`const SQL = { '<domain>.<statement>': '<sql>' } as const`，
   导出 `type SqlId = keyof typeof SQL`。schema DDL、迁移脚本、repository 的 CRUD/FTS 查询全部入表。
 - 驱动契约改为按 id 调用：
   - 桌面 `IpcSqlDriver`：把 `{ id, params }` 发给主进程；主进程用 `SQL[id]` 查表执行，id 非法即拒。

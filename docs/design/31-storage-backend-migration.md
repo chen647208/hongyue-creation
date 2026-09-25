@@ -2,7 +2,7 @@
 
 ## 背景与问题
 
-`shared/services/repository/index.ts` 按环境选后端：桌面/IPC → SQLite(opfs) → 无 OPFS 时回退 localStorage。回退只 `logger.warn`，无哨兵、无迁移、无提示：在“上次用 OPFS、这次 OPFS 不可用”时，用户看到的是**空书库**（localStorage 里没有数据），造成“丢书”错觉。审计项见 `docs/design/26-maturity-gaps.md` 第 4 节。
+`shared/services/repository/index.ts` 按环境选后端：桌面/IPC → SQLite(opfs) → 无 OPFS 时回退 localStorage。回退只 `logger.warn`，无哨兵、无迁移、无提示：在“上次用 OPFS、这次 OPFS 不可用”时，用户看到的是**空书库**（localStorage 里没有数据），造成“丢书”错觉。审计项见 `docs/archive/26-maturity-gaps.md` 第 4 节。
 
 ## 目标
 

@@ -18,8 +18,8 @@
    结构用模块路径与职责描述。
 3. **已知边界用现在时**。尚未支持的能力写成「当前边界：……」，这是现状
    的一部分，不是待办清单。
-4. **时点快照单独归档**。验收报告等带证据快照的文档须在标题声明其时点
-   性质；design/（前瞻蓝图）与 features/（现状）分工见下。
+4. **时点快照单独归档**。验收报告等带证据快照的文档移入 `archive/`，
+   只读不再更新；design/（前瞻蓝图）与 features/（现状）分工见下。
 
 （依据业界共识：文档描述当前状态，历史叙事归 changelog/commit——
 Trail of Bits、Cloudflare coding standards、WordPress 文档风格指南同款规则。）
@@ -33,9 +33,9 @@ Trail of Bits、Cloudflare coding standards、WordPress 文档风格指南同款
 - `guides/ci-and-release.md`：CI 持续集成与基于标签的自动发布流程
 - `guides/writing-a-plugin.md`：从模板编写插件、贡献点与许可边界
 - `guides/licensing.md`：AGPL-3.0 社区版与商业授权的双重许可说明
-- `guides/acceptance-report.md`：逐篇设计验收标准的状态与证据（2026-09 时点快照）
 - `guides/v0-readiness.md`：v0 就绪度与验收清单（对外发布口径与手工验收步骤）
 - `CLA.md`：贡献者许可协议正文
+- `archive/`：时点快照（验收报告、审计快照、对账清单），只读归档，不再更新
 
 ### 2. 再看核心功能
 
@@ -49,6 +49,7 @@ Trail of Bits、Cloudflare coding standards、WordPress 文档风格指南同款
 - `features/characters.md`：角色卡编辑、枚举归一化与人物卡导出
 - `features/settings.md`：模型、Embedding、提示词和存储设置
 - `features/plugins-and-sync.md`：插件系统、同步（冲突副本）、逐条目加密、导出构建管线
+- `features/backup-and-crash.md`：自动备份与崩溃转储上报
 - `features/version.md`：版本信息、更新检查与版本历史
 - `features/ui-catalog.md`：UI 组件清单与用法（通用交互的唯一来源，配套 `design/19-ui-system.md`）
 
@@ -69,4 +70,3 @@ Trail of Bits、Cloudflare coding standards、WordPress 文档风格指南同款
 - 文档默认使用中文
 - 文档内容以“真实代码路径 + 职责说明 + 维护建议”为主
 - `features/` 与 `guides/` 不写与当前仓库不符的计划性描述（计划见 design/）
-- 不把整理日志放回 `docs/plans`

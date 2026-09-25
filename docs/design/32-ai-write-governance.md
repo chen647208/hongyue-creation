@@ -2,7 +2,7 @@
 
 ## 背景与问题
 
-- `core/ai/agentLoop.ts` 的提案只带标题，不含将写入内容的 `diff`；内置写工具产出的正文不落库，审批通过后缺少可核对的变更与落库 Revision（审计项 `docs/design/26-maturity-gaps.md` 第 5 节）。
+- `core/ai/agentLoop.ts` 的提案只带标题，不含将写入内容的 `diff`；内置写工具产出的正文不落库，审批通过后缺少可核对的变更与落库 Revision（审计项 `docs/archive/26-maturity-gaps.md` 第 5 节）。
 - `core/plugin/runtime.ts` 已实现权限代理 `assertCan(pluginId, action, domain)`，但生产数据边界未调用，插件 hook 注入无越权拦截（同节）。
 
 ## 目标

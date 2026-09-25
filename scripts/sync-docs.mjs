@@ -10,7 +10,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writ
 import { dirname, join } from 'node:path';
 
 /** 文档目录：整体拷入站点对应路径。 */
-for (const sub of ['design', 'guides', 'features']) {
+for (const sub of ['design', 'guides', 'features', 'archive']) {
   const src = join('docs', sub);
   const dst = join('docs-site', 'src', sub);
   if (!existsSync(src)) continue;

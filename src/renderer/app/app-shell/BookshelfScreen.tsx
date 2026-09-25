@@ -9,7 +9,7 @@
 
 /**
  * 书库屏：在自身内部订阅 projects/activeProjectId，避免工作台编辑时
- * 让整个 App 因 projects 数组变化而重渲染（design/26 第 H 项）。
+ * 让整个 App 因 projects 数组变化而重渲染（性能审计项，归档 docs/archive/26）。
  */
 import React from 'react';
 

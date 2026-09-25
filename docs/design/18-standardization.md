@@ -27,7 +27,7 @@
 
 1. 所有运行期 id 生成统一走 `@core/entities` 的 `uuidv7`，删除 31 处 `Math.random` 与 `substr`；
    保留业务前缀（如 `snap_`/`sess_`）。
-2. 新增 `shared/constants/storageKeys.ts`，收敛全部 localStorage key；裸调改经封装。
+2. `shared/constants/storageKeys.ts` 收敛全部 localStorage key；裸调改经封装。
 
 ### 批次 C：共享工具与类型单源
 

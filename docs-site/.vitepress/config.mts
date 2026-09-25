@@ -116,9 +116,7 @@ export default defineConfig({
           text: '平台与生态',
           items: [
             { text: '25 数据安全', link: '/design/25-data-safety' },
-            { text: '26 成熟度缺口清单', link: '/design/26-maturity-gaps' },
             { text: '27 IPC 信任边界加固', link: '/design/27-ipc-hardening' },
-            { text: '28 文档已写、代码未落地清单', link: '/design/28-doc-impl-gaps' },
             { text: '29 通用创作平台', link: '/design/29-general-creation-platform' },
             { text: '30 按需载入正文', link: '/design/30-lazy-node-loading' },
             { text: '31 存储后端切换与哨兵', link: '/design/31-storage-backend-migration' },
@@ -148,6 +146,25 @@ export default defineConfig({
             { text: '50 键位自定义与缩放接管', link: '/design/50-keybindings-and-zoom' },
           ],
         },
+        {
+          text: '归档（时点快照）',
+          collapsed: true,
+          items: [
+            { text: '归档索引', link: '/archive/README' },
+            { text: '26 成熟度缺口清单', link: '/archive/26-maturity-gaps' },
+            { text: '28 文档-实现对账清单', link: '/archive/28-doc-impl-gaps' },
+          ],
+        },
+      ],
+      '/archive/': [
+        {
+          text: '归档（时点快照）',
+          items: [
+            { text: '归档索引', link: '/archive/README' },
+            { text: '26 成熟度缺口清单', link: '/archive/26-maturity-gaps' },
+            { text: '28 文档-实现对账清单', link: '/archive/28-doc-impl-gaps' },
+          ],
+        },
       ],
       '/guides/': [
         {
@@ -158,7 +175,6 @@ export default defineConfig({
             { text: 'CI 与发布流程', link: '/guides/ci-and-release' },
             { text: '编写插件', link: '/guides/writing-a-plugin' },
             { text: '许可说明', link: '/guides/licensing' },
-            { text: '验收报告', link: '/guides/acceptance-report' },
             { text: 'v0 就绪度与验收清单', link: '/guides/v0-readiness' },
           ],
         },

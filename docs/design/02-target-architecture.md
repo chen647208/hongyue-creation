@@ -42,7 +42,7 @@ app-shell/* ─┘         ✗ Electron/React/DOM  （core 的禁区）
 任何层 ──✗──> fs/网络/SQL 直连（必须经 StoreProvider / AiGateway / IndexProvider）
 ```
 
-新增 ESLint `no-restricted-imports` 规则组：
+边界由三组 ESLint 规则强制：
 1. `src/core/**` 禁止 import `electron`、`react`、`@renderer/*`。（已落地为 error）
 2. `src/renderer/features/**` 禁止 import `repository` 内部实现，只准 import `@core/*` 与注入的 API 对象。（已落地为 error；存量 5 文件冻结在 `eslint.config.js` 的 ignores，清一件删一件）
 3. 跨 feature 引用只准走 `core` 契约或事件总线，禁止 import 对方实现。规则 `local/no-cross-feature`（`eslint-rules/no-cross-feature.js`）把相对路径与 `@/features` 别名都解析为绝对路径后判断，已落地为 error；存量边按「源->目标」冻结在 `eslint.config.js` 的 `CROSS_FEATURE_DEBT`（19 条），只拦新增边，清一条删一条。无依赖的共享模块已迁 `src/renderer/shared`（`aiService`、`mcpClient`、`displayLabels`、`characterKinds`）。
@@ -51,7 +51,7 @@ app-shell/* ─┘         ✗ Electron/React/DOM  （core 的禁区）
 
 ```
 src/
-├── core/                        # ★ 新增：平台无关领域核心
+├── core/                        # ★ 平台无关领域核心
 │   ├── entities/                #   六实体类型 + 校验（03 篇）
 │   ├── types-registry/          #   类型模板注册表 + 内置模板定义（03 篇）
 │   ├── dsl/                     #   开放文本格式：解析/序列化/frontmatter（03 篇）
@@ -93,7 +93,7 @@ src/
 | FTS5 trigram 中文检索 | 保留，并入索引器输出 |
 | 5 个 AI 适配器 + sse/retry/json | 代码平移进 AiGatewayProvider |
 | i18next / themeService / DialogHost / ToastHost | 原样保留 |
-| CI（lint/typecheck/test/build）+ verify + 许可证头 | 原样保留，新增 core 边界 lint 规则 |
+| CI（lint/typecheck/test/build）+ verify + 许可证头 | 原样保留，叠加 core 边界 lint 规则 |
 | vectra + 7 个向量服务 | 合并为 EmbeddingProvider + VectorIndex（M0 减脂） |
 | shared/types.ts 双轨 | M0 完成拆分收编（types/ 目录转正，types.ts 退役） |
 | chapterSnapshotService | 升级为 Revision 实体的前端（03 篇） |

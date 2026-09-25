@@ -4,7 +4,7 @@
 
 ## 数据模型
 
-`src/shared/types/world.ts` 一系（`types.ts` 仅剩再导出）中的 `Foreshadow`，挂在 `Project.foreshadows` 上：
+`src/shared/types.ts` 中的 `Foreshadow`，挂在 `Project.foreshadows` 上：
 
 - `title` / `detail`：伏笔简述与具体内容
 - `status`：`planted`（未回收）/ `paid-off`（已回收）/ `abandoned`（已废弃）
@@ -15,7 +15,7 @@
 
 ## 服务
 
-`src/renderer/features/foreshadowing/services/foreshadowService.ts`（纯函数 + AI 检测）：
+`src/renderer/shared/services/foreshadowService.ts`（纯函数 + AI 检测）：
 
 - 增删改：`createForeshadow` / `addForeshadow` / `updateForeshadow` / `removeForeshadow` / `setStatus` / `payOffForeshadow`
 - 查询：`openForeshadows`（按重要度与埋设顺序排序）、`overdueForeshadows`（跨度超阈值仍未回收）、`foreshadowCounts`
@@ -32,4 +32,4 @@
 
 ## 测试
 
-`foreshadowService` 的纯函数（排序、超期、计数、提示注入等）在 `services/__tests__/foreshadowService.test.ts` 覆盖。
+`foreshadowService` 的纯函数（排序、超期、计数、提示注入等）在 `src/renderer/shared/services/__tests__/foreshadowService.test.ts` 覆盖。

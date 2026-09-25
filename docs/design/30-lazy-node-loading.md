@@ -2,7 +2,7 @@
 
 ## 背景与问题
 
-当前桌面启动时 `nodes.selectAll`（`SELECT *`）把全部书的全部正文一次性载入内存，书多/字多时冷启动变慢、常驻内存与每书索引重建成本线性增长。审计项见 `docs/design/26-maturity-gaps.md` 第 1 节。
+当前桌面启动时 `nodes.selectAll`（`SELECT *`）把全部书的全部正文一次性载入内存，书多/字多时冷启动变慢、常驻内存与每书索引重建成本线性增长。源于性能审计项（`docs/archive/26-maturity-gaps.md` 第 1 节）。
 
 ## 目标
 

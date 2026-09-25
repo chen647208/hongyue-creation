@@ -1,8 +1,8 @@
 # 插件系统、同步与逐条目加密
 
 > 本文覆盖插件系统、同步与逐条目加密的用户可见能力。设计蓝图见
-> `design/04-plugin-system.md` 与 `design/03-data-layer.md`；验收证据见
-> `guides/acceptance-report.md`。
+> `design/04-plugin-system.md` 与 `design/03-data-layer.md`；验收证据归档于
+> `docs/archive/acceptance-report.md`。
 
 ## 插件系统
 
