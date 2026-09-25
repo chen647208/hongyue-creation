@@ -256,8 +256,11 @@ test('键盘可完成建书→工作台→分区→设置→弹层全链路', as
     }
     await switchToWriting(page);
 
+    // 写作分区为沉浸模式（无导航/设置按钮）：切回结构分区再进设置。
     // 设置：聚焦左侧「设置」并回车。按可访问名定位（SettingsModal 的 aria-label），
     // 不用 dialog.first()：后者依赖 portal 插入顺序，全局对话框一旦排队就错位。
+    await page.keyboard.press('Control+4');
+    await page.getByRole('button', { name: /大纲\/细纲|Structure/ }).first().waitFor({ state: 'visible', timeout: 15_000 });
     await page.getByRole('button', { name: /^设置$|^Settings$/ }).first().focus();
     await page.keyboard.press('Enter');
     const settingsDialog = page.getByRole('dialog', { name: /控制台配置|Console Settings/ });
