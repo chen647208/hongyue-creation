@@ -407,7 +407,6 @@
     "addConfig": "Add Embedding Model Config",
     "testSuccess": "Connection test succeeded!\nModel: {{model}}\nDimensions: {{dimensions}}\nLatency: {{latency}}ms",
     "testFailed": "Connection test failed: {{error}}",
-    "emptyVector": "Returned embedding vector is empty",
     "connTestFailed": "Connection test failed",
     "unsupportedProvider": "Unsupported provider type: {{provider}}",
     "ollamaEmbedFailed": "Ollama Embedding request failed: {{status}} {{detail}}",

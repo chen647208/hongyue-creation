@@ -98,15 +98,6 @@ export class EmbeddingModelService {
     try {
       const embeddings = await this.fetchEmbeddings(config, [testText]);
       const latency = Date.now() - startTime;
-      
-      if (!embeddings || embeddings.length === 0) {
-        return {
-          success: false,
-          dimensions: 0,
-          latency,
-          error: i18n.t('settings:embedding.emptyVector')
-        };
-      }
 
       const actualDimensions = embeddings[0]?.length ?? 0;
       
@@ -349,7 +340,13 @@ export class EmbeddingModelService {
 
     if (!response.ok) {
       logger.error('API错误响应:', response.text);
-      const errorData = asRecord(response.text ? JSON.parse(response.text) as unknown : {});
+      // 错误响应体可能是 HTML/纯文本（网关错误页），非 JSON 时保留原文走兜底文案
+      let errorData: Record<string, unknown>;
+      try {
+        errorData = asRecord(JSON.parse(response.text) as unknown);
+      } catch {
+        errorData = {};
+      }
       const errorMessage = asStr(asRecord(errorData.error).message) || asStr(errorData.message) || i18n.t('settings:embedding.apiRequestFailed', { status: response.status, detail: response.text });
       throw new Error(errorMessage);
     }

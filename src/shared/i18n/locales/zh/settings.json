@@ -407,7 +407,6 @@
     "addConfig": "新增 Embedding 模型配置",
     "testSuccess": "连接测试成功！\n模型: {{model}}\n维度: {{dimensions}}\n延迟: {{latency}}ms",
     "testFailed": "连接测试失败: {{error}}",
-    "emptyVector": "返回的嵌入向量为空",
     "connTestFailed": "连接测试失败",
     "unsupportedProvider": "不支持的提供商类型: {{provider}}",
     "ollamaEmbedFailed": "Ollama Embedding 请求失败: {{status}} {{detail}}",

@@ -209,6 +209,18 @@ describe('fetchEmbeddings 错误分支', () => {
     );
   });
 
+  it('API 错误响应体非 JSON（网关 HTML/纯文本错误页）时走兜底文案，不抛解析异常', async () => {
+    httpMock.mockResolvedValueOnce({ ok: false, status: 502, statusText: 'Bad Gateway', text: '<html>502 Service Unavailable</html>' });
+    await expect(embeddingModelService.getEmbedding(cfg(), 'x')).rejects.toThrow(
+      i18n.t('settings:embedding.apiRequestFailed', { status: 502, detail: '<html>502 Service Unavailable</html>' })
+    );
+
+    httpMock.mockResolvedValueOnce({ ok: false, status: 503, statusText: '', text: 'upstream timeout' });
+    await expect(embeddingModelService.getEmbedding(cfg(), 'x')).rejects.toThrow(
+      i18n.t('settings:embedding.apiRequestFailed', { status: 503, detail: 'upstream timeout' })
+    );
+  });
+
   it('ollama 嵌入逐条发送 prompt；非 2xx 抛错；embedding 缺失抛格式错误', async () => {
     httpMock.mockResolvedValueOnce(httpOk({ embedding: [1, 2] }));
     expect(await embeddingModelService.getEmbedding(cfg({ provider: 'ollama', endpoint: 'http://127.0.0.1:11434' }), '你好'))
@@ -241,7 +253,7 @@ describe('fetchEmbeddings 错误分支', () => {
 });
 
 describe('testConnection', () => {
-  it('成功返回维度与模型名；空向量判失败；异常返回错误消息', async () => {
+  it('成功返回维度与模型名；空向量在服务层即抛错判失败；异常返回错误消息', async () => {
     httpMock.mockResolvedValueOnce(httpOk({ data: [{ index: 0, embedding: [1, 2, 3, 4] }] }));
     const okResult = await embeddingModelService.testConnection(cfg());
     expect(okResult.success).toBe(true);
