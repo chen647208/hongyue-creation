@@ -8,11 +8,11 @@
  */
 
 import type { RevisionEntity } from '@core/entities';
-import { Bot, Camera, Check, ChevronDown, ChevronLeft, ChevronUp, Copy, History, Redo2, RotateCcw, Trash2, X } from 'lucide-react';
+import { Bot, Camera, Check, ChevronDown, ChevronLeft, ChevronUp, History, Redo2, Trash2, X } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { appendSnapshot, createSnapshot, listSnapshots, removeSnapshot } from '@/shared/services/chapterSnapshotService';
+import { appendSnapshot, createSnapshot, listSnapshots } from '@/shared/services/chapterSnapshotService';
 import { dialogService } from '@/shared/services/dialogService';
 import { repository } from '@/shared/services/repository';
 import { Button } from '@/shared/ui/Button';
@@ -37,9 +37,10 @@ import {
   uniformDecisions,
   withBaselineRef,
 } from '../../../editor/revisionDiff';
-import { diffLines } from '../services/historyDiff';
 import { computeChapterStats } from '../services/writingStatsService';
-import { formatHistoryTimestamp, getGenerationType, getProviderIcon } from '../utils';
+import AiHistoryTab from './history/AiHistoryTab';
+import RevisionsHistoryTab from './history/RevisionsHistoryTab';
+import SnapshotHistoryTab from './history/SnapshotHistoryTab';
 
 interface ReviewBaseline {
   label: string;
@@ -58,10 +59,6 @@ interface ChapterHistoryModalProps {
   onUpdateChapter?: (chapter: Chapter) => void;
 }
 
-const DEFAULT_SOURCE_CLS = 'bg-muted text-muted-foreground';
-const MANUAL_SOURCE_CLS = 'bg-chart-2/10 text-chart-2';
-const BEFORE_CLEAR_SOURCE_CLS = 'bg-destructive/10 text-destructive';
-
 const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
   isOpen,
   chapter,
@@ -73,8 +70,6 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
   const { t } = useTranslation('writing');
   const [tab, setTab] = useState<'ai' | 'snapshot' | 'revisions'>('ai');
   const [revisions, setRevisions] = useState<RevisionEntity[]>([]);
-  // diff 对比目标记录 id（与当前正文逐行比对，只读展示）
-  const [diffRecordId, setDiffRecordId] = useState<string | null>(null);
   // 修订对比：选定版本为基线，逐处接受/拒绝后写回正文（docs/design/38 §2.1）
   const [review, setReview] = useState<ReviewBaseline | null>(null);
   const [decisions, setDecisions] = useState<Record<string, RevisionDecision>>({});
@@ -282,13 +277,6 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
 
   const sortedHistory = [...(chapter.history || [])].sort((a, b) => b.timestamp - a.timestamp);
   const snapshots = listSnapshots(chapter);
-  const sourceLabels: Record<string, { text: string; cls: string }> = {
-    auto: { text: t('chapterHistory.sourceAuto'), cls: DEFAULT_SOURCE_CLS },
-    manual: { text: t('chapterHistory.sourceManual'), cls: MANUAL_SOURCE_CLS },
-    'before-clear': { text: t('chapterHistory.sourceBeforeClear'), cls: BEFORE_CLEAR_SOURCE_CLS },
-    'before-rollback': { text: t('chapterHistory.sourceBeforeRollback'), cls: BEFORE_CLEAR_SOURCE_CLS },
-  };
-  const fallbackSourceLabel = { text: t('chapterHistory.sourceAuto'), cls: DEFAULT_SOURCE_CLS };
 
   const applyContentWithSnapshot = (content: string) => {
     if (onUpdateChapter) {
@@ -302,6 +290,16 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
   };
 
   const handleRestoreSnapshot = (content: string) => {
+    applyContentWithSnapshot(content);
+    onClose();
+  };
+
+  const handleApplyRevision = (body: string) => {
+    applyContentWithSnapshot(body);
+    onClose();
+  };
+
+  const handleApplyRecord = (content: string) => {
     applyContentWithSnapshot(content);
     onClose();
   };
@@ -491,226 +489,17 @@ const ChapterHistoryModal: React.FC<ChapterHistoryModalProps> = ({
           {review ? (
             reviewView
           ) : tab === 'snapshot' ? (
-            snapshots.length > 0 ? (
-              snapshots.map((snap) => {
-                const label = sourceLabels[snap.source] ?? fallbackSourceLabel;
-                return (
-                  <div key={snap.id} className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-xs font-medium', label.cls)}>{label.text}</span>
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-foreground">{formatHistoryTimestamp(snap.timestamp)}</div>
-                        <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {t('chapterHistory.charCountInfo', { count: snap.charCount, preview: snap.content.slice(0, 40).replace(/\n/g, ' ') || t('chapterHistory.emptyPreview') })}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => startReview(formatHistoryTimestamp(snap.timestamp), snap.content, { source: 'snapshot', id: snap.id })}
-                        title={t('chapterHistory.compareAsBaselineTitle')}
-                      >
-                        <History className="size-3.5" /> {t('chapterHistory.compareAsBaseline')}
-                      </Button>
-                      <Button variant="secondary" size="sm" onClick={() => handleRestoreSnapshot(snap.content)} title={t('chapterHistory.restoreTitle')}>
-                        <RotateCcw className="size-3.5" /> {t('chapterHistory.restore')}
-                      </Button>
-                      {onUpdateChapter && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => onUpdateChapter(removeSnapshot(chapter, snap.id))}
-                          title={t('chapterHistory.deleteSnapshotTitle')}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <EmptyState icon={Camera} title={t('chapterHistory.noSnapshots')} description={t('chapterHistory.noSnapshotsHint')} />
-            )
+            <SnapshotHistoryTab
+              chapter={chapter}
+              snapshots={snapshots}
+              onStartReview={startReview}
+              onRestore={handleRestoreSnapshot}
+              onUpdateChapter={onUpdateChapter}
+            />
           ) : tab === 'revisions' ? (
-            revisions.length > 0 ? (
-              <div className="space-y-3">
-                {revisions.map((rev) => (
-                  <div key={rev.id} className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs tabular-nums">#{rev.seq}</span>
-                        <span>{formatHistoryTimestamp(rev.createdAt)}</span>
-                      </div>
-                      <div className="mt-1 truncate text-xs text-muted-foreground">
-                        {t('chapterHistory.revisionAuthor')}: {rev.author}
-                        {rev.cause ? ` · ${t('chapterHistory.revisionCause')}: ${rev.cause}` : ''}
-                        {` · ${rev.body.slice(0, 60).replace(/\n/g, ' ') || t('chapterHistory.emptyPreview')}`}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => startReview(`#${rev.seq}`, rev.body, { source: 'revision', id: rev.id })}
-                        title={t('chapterHistory.compareAsBaselineTitle')}
-                      >
-                        <History className="size-3.5" /> {t('chapterHistory.compareAsBaseline')}
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="shrink-0"
-                        onClick={() => {
-                          applyContentWithSnapshot(rev.body);
-                          onClose();
-                        }}
-                        title={t('chapterHistory.revisionApplyTitle')}
-                      >
-                        <Redo2 className="size-3.5" /> {t('chapterHistory.revisionApply')}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState icon={History} title={t('chapterHistory.noRevisions')} description={t('chapterHistory.noRevisionsHint')} />
-            )
-          ) : sortedHistory.length > 0 ? (
-            <div className="space-y-4">
-              {sortedHistory.map((record) => (
-                <div key={record.id} className="overflow-hidden rounded-lg border border-border bg-card">
-                  <div className="flex items-center justify-between border-b border-border bg-muted/30 p-4">
-                    <div className="flex items-center gap-3">
-                      {(() => { const { icon: PIcon, cls } = getProviderIcon(record.modelConfig.provider); return <PIcon className={cn('size-5', cls)} />; })()}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">{record.modelConfig.modelName}</span>
-                          <span className="rounded border border-border bg-background px-1.5 py-0.5 text-xs text-muted-foreground">
-                            {getGenerationType(record)}
-                          </span>
-                        </div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          {record.metadata?.templateName || t('chapterHistory.customGeneration')}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-xs font-medium text-foreground">{formatHistoryTimestamp(record.timestamp)}</div>
-                      <div className="mt-0.5 text-2xs tabular-nums text-muted-foreground">
-                        {record.tokens ? `${record.tokens.total} tokens` : 'N/A tokens'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 p-5">
-                    <div>
-                      <div className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('chapterHistory.promptLabel')}</div>
-                      <div className=" max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-3 text-sm text-foreground/80">
-                        {record.prompt}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('chapterHistory.contentLabel')}</div>
-                      <div className=" max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg border border-primary/20 bg-primary/5 p-3 font-serif text-sm leading-relaxed text-foreground">
-                        {record.generatedContent}
-                      </div>
-                      <div className="mt-1.5 text-right text-xs tabular-nums text-muted-foreground">
-                        {t('chapterHistory.lengthInfo', { count: record.generatedContent.length })}
-                      </div>
-                    </div>
-
-                    {diffRecordId === record.id && (
-                      <div>
-                        <div className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('chapterHistory.diffLabel')}</div>
-                        <div className=" max-h-64 space-y-0.5 overflow-y-auto rounded-lg border border-border bg-muted/30 p-3 font-mono text-xs leading-relaxed">
-                          {diffLines(record.generatedContent, chapter.content || '').map((line, i) => (
-                            <div
-                              key={i}
-                              className={cn(
-                                'whitespace-pre-wrap rounded px-1.5 py-0.5',
-                                line.type === 'add' && 'bg-success/10 text-success',
-                                line.type === 'del' && 'bg-destructive/10 text-destructive',
-                                line.type === 'same' && 'text-muted-foreground'
-                              )}
-                            >
-                              {line.type === 'add' ? '+ ' : line.type === 'del' ? '- ' : '  '}{line.text || ' '}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg border border-border bg-muted/30 p-3">
-                        <div className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('chapterHistory.modelConfigLabel')}</div>
-                        <div className="space-y-1">
-                          <div className="text-sm text-foreground/80">
-                            <span className="font-medium">{t('chapterHistory.providerLabel')}</span> {record.modelConfig.provider}
-                          </div>
-                          {record.modelConfig.temperature !== undefined && (
-                            <div className="text-sm text-foreground/80">
-                              <span className="font-medium">{t('chapterHistory.temperatureLabel')}</span> {record.modelConfig.temperature}
-                            </div>
-                          )}
-                          {record.modelConfig.maxTokens !== undefined && (
-                            <div className="text-sm text-foreground/80">
-                              <span className="font-medium">{t('chapterHistory.maxTokensLabel')}</span> {record.modelConfig.maxTokens}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-border bg-muted/30 p-3">
-                        <div className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('record.tokenUsage')}</div>
-                        <div className="space-y-1">
-                          <div className="text-sm tabular-nums text-foreground/80"><span className="font-medium">{t('chapterHistory.inputLabel')}</span> {record.tokens?.prompt || 'N/A'}</div>
-                          <div className="text-sm tabular-nums text-foreground/80"><span className="font-medium">{t('chapterHistory.outputLabel')}</span> {record.tokens?.completion || 'N/A'}</div>
-                          <div className="text-sm tabular-nums text-foreground/80"><span className="font-medium">{t('chapterHistory.totalLabel')}</span> {record.tokens?.total || 'N/A'}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2 border-t border-border pt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setDiffRecordId((v) => (v === record.id ? null : record.id))}
-                      >
-                        {t('chapterHistory.compare')}
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          void navigator.clipboard.writeText(record.generatedContent);
-                          dialogService.alert(t('record.copied'));
-                        }}
-                      >
-                        <Copy className="size-3.5" /> {t('record.copyContent')}
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => {
-                          applyContentWithSnapshot(record.generatedContent);
-                          onClose();
-                        }}
-                      >
-                        <Redo2 className="size-3.5" /> {t('chapterHistory.reapply')}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <RevisionsHistoryTab revisions={revisions} onStartReview={startReview} onApplyRevision={handleApplyRevision} />
           ) : (
-            <EmptyState icon={History} title={t('chapterHistory.noHistory')} description={t('chapterHistory.noHistoryHint')} />
+            <AiHistoryTab chapter={chapter} history={sortedHistory} onApply={handleApplyRecord} />
           )}
         </div>
 

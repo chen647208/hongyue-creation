@@ -85,7 +85,9 @@ export const waitCollaborationReady = async (page: Page): Promise<void> => {
 /** 建书进工作台灵感分区（首启走向导跳过，非首启走新建模态）。 */
 export const createBook = async (page: Page): Promise<void> => {  const skip = page.getByRole('button', { name: /跳过|Skip/ });
   if (await skip.isVisible({ timeout: 10_000 }).catch(() => false)) {
-    await skip.click();
+    // 跳过必须走键盘确认：部分环境下鼠标 click 会被 dialog 动画吞掉（onboarding 不关闭）
+    await skip.focus();
+    await page.keyboard.press('Enter');
   } else {
     await page.getByRole('button', { name: /新建书籍|New Book/ }).first().click();
     await page.getByPlaceholder(/例如|e\.g\./).fill('E2E测试书');

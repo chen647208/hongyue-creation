@@ -36,7 +36,7 @@ import { useModelSelection } from './hooks/useModelSelection';
 import { buildContextContent } from './services/assistantContextContent';
 import { parseSingleCharacterFromText } from './services/characterParsing';
 import { collectChatAttachments } from './services/chatAttachments';
-import { loadInjectionPreference, saveInjectionPreference } from './services/injectionPreferenceService';
+import { loadInjectionPreference, saveInjectionPreference, subscribeInjectionPreference } from './services/injectionPreferenceService';
 import { type AssistantCategory, type AssistantEditCategory, type EditingData,type GlobalAssistantProps, type SyncStatus } from './types';
 
 
@@ -50,28 +50,25 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
   // 卡片落库（AI 归因 + 未知命令提示）见 useAssistantCards
   const { commitAICard, addCardToProject } = useAssistantCards({ project, updateActiveProject, t });
 
-  // 自动上下文注入（design/37）：整体开关 + 单条取消按书持久化（重启保留），最近一次结果见 lastInjection
+  // 自动上下文注入（design/37）：整体开关 + 单条取消按书持久化（重启保留），最近一次结果见 lastInjection。
+  // 偏好单源在 injectionPreferenceService（10 篇自协调）：这里订阅重读，不持镜像副本。
   const [injectionPanelOpen, setInjectionPanelOpen] = useState(false);
-  const [injectionEnabled, setInjectionEnabled] = useState(() => loadInjectionPreference(project?.id).enabled);
-  const [disabledInjectionIds, setDisabledInjectionIds] = useState<string[]>(() => loadInjectionPreference(project?.id).disabledIds);
+  const [injectionPreference, setInjectionPreference] = useState(() => loadInjectionPreference(project?.id));
 
   useEffect(() => {
-    const preference = loadInjectionPreference(project?.id);
-    setInjectionEnabled(preference.enabled);
-    setDisabledInjectionIds(preference.disabledIds);
+    setInjectionPreference(loadInjectionPreference(project?.id));
+    return subscribeInjectionPreference(setInjectionPreference);
   }, [project?.id]);
 
   const handleInjectionEnabledChange = (enabled: boolean): void => {
-    setInjectionEnabled(enabled);
-    saveInjectionPreference(project?.id, { enabled, disabledIds: disabledInjectionIds });
+    saveInjectionPreference(project?.id, { enabled, disabledIds: injectionPreference.disabledIds });
   };
 
   const toggleInjectionEntry = (id: string) => {
-    setDisabledInjectionIds((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-      saveInjectionPreference(project?.id, { enabled: injectionEnabled, disabledIds: next });
-      return next;
-    });
+    const disabledIds = injectionPreference.disabledIds.includes(id)
+      ? injectionPreference.disabledIds.filter((x) => x !== id)
+      : [...injectionPreference.disabledIds, id];
+    saveInjectionPreference(project?.id, { enabled: injectionPreference.enabled, disabledIds });
   };
 
   // 聊天编排（消息/发送/停止/会话记忆/卡片模板）见 useAssistantChat
@@ -83,8 +80,8 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
     addCardToProject,
     t,
     language: i18n.language,
-    injectionEnabled,
-    disabledInjectionIds,
+    injectionEnabled: injectionPreference.enabled,
+    disabledInjectionIds: injectionPreference.disabledIds,
   });
   const {
     messages, setMessages, input, setInput, isLoading, planMode, setPlanMode,
@@ -655,9 +652,9 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
           {injectionPanelOpen && (
             <AssistantInjectionPanel
               injection={lastInjection}
-              enabled={injectionEnabled}
+              enabled={injectionPreference.enabled}
               onEnabledChange={handleInjectionEnabledChange}
-              disabledIds={disabledInjectionIds}
+              disabledIds={injectionPreference.disabledIds}
               onToggleEntry={toggleInjectionEntry}
               onClose={() => setInjectionPanelOpen(false)}
             />

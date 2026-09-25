@@ -50,9 +50,8 @@ export function checkImportVersion(imported: { schemaVersion?: unknown } | null 
  * 从 App 的“导入全部数据”内联逻辑中抽取而来，使其成为可独立测试的纯函数。
  * 逐字段做类型守卫并回退到默认值；同时保证 activeProjectId 指向一个真实存在的项目。
  *
- * 修复：旧的内联实现只搬运了 7 个字段，导入时会静默丢弃 cardPrompts /
- * consistencyPrompts / consistencyCheckConfig，与“覆盖所有数据”的意图相悖。
- * 这里一并透传这三项（缺失时回退到初始默认值）。
+ * 导入覆盖 cardPrompts / consistencyPrompts / consistencyCheckConfig 三项
+ * （缺失时回退到初始默认值），与「覆盖所有数据」的意图一致。
  */
 export const normalizeImportedState = (imported: Partial<AppState> | null | undefined): AppState => {
   const src = imported ?? {};

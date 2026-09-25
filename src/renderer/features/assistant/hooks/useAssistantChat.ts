@@ -238,7 +238,7 @@ export function useAssistantChat({
       return;
     }
 
-    // 用户消息进历史流（Agent 分支此前漏推，聊天区只见答复不见问）
+    // 用户消息进历史流：Agent 分支同样入流，聊天区问答都可见
     // 图片名取 state（调用时刻即最新；重试路径图片已清空，不会误标）
     setMessages(prev => [...prev, {
       id: Date.now().toString(),

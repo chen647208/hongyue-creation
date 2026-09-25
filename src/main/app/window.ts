@@ -90,10 +90,12 @@ export function applyWindowSecurity(win: BrowserWindow): void {
     return { action: 'deny' };
   });
 
-  // 阻止偏离预期来源的导航（防止被诱导跳转到外部站点）
+  // 阻止偏离预期来源的导航（防止被诱导跳转到外部站点）。打包版限定应用自身入口文件，
+  // 不放行任意 file: URL（51 篇）。
+  const packagedEntry = path.join(__dirname, '../../../renderer/index.html');
   win.webContents.on('will-navigate', (event, url) => {
     const allowed = app.isPackaged
-      ? url.startsWith('file:')
+      ? url === `file://${packagedEntry.replace(/\\/g, '/')}` || url.startsWith(`file://${packagedEntry.replace(/\\/g, '/')}/`)
       : /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(url);
     if (!allowed) {
       event.preventDefault();

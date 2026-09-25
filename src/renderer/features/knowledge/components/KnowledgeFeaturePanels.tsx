@@ -58,6 +58,7 @@ function PanelToggle({ icon: Icon, title, hint, active, hasData, expandable = tr
   return (
     <button
       onClick={onClick}
+      aria-expanded={expandable ? active : undefined}
       className={cn(
         'motion-hover rounded-lg border p-4 text-left',
         active ? 'border-primary/40 bg-primary/5' : 'border-border bg-card hover:border-primary/30 hover:bg-accent/40'

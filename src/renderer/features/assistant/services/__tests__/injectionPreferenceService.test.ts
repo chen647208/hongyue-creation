@@ -13,7 +13,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   clearInjectionPreferences,
-  defaultInjectionPreference,
   loadInjectionPreference,
   saveInjectionPreference,
 } from '../injectionPreferenceService';
@@ -24,7 +23,7 @@ afterEach(() => {
 
 describe('injectionPreferenceService', () => {
   it('未登记时回落默认（开启、无关闭条目）', () => {
-    expect(loadInjectionPreference('b1')).toEqual(defaultInjectionPreference());
+    expect(loadInjectionPreference('b1')).toEqual({ enabled: true, disabledIds: [] });
   });
 
   it('按书保存并读回开关与单条关闭', () => {
@@ -43,8 +42,8 @@ describe('injectionPreferenceService', () => {
     saveInjectionPreference(undefined, { enabled: false, disabledIds: [] });
     expect(loadInjectionPreference(undefined).enabled).toBe(false);
     window.localStorage.setItem('ai.injectionPrefs', '{broken');
-    expect(loadInjectionPreference('b1')).toEqual(defaultInjectionPreference());
+    expect(loadInjectionPreference('b1')).toEqual({ enabled: true, disabledIds: [] });
     clearInjectionPreferences();
-    expect(loadInjectionPreference(undefined)).toEqual(defaultInjectionPreference());
+    expect(loadInjectionPreference(undefined)).toEqual({ enabled: true, disabledIds: [] });
   });
 });

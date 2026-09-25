@@ -10,6 +10,7 @@
 /** 多视图面板：同一份作品数据可在表格/卡片/图之间切换，布局存入 ViewDefinition。 */
 import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
+import { VIEW_PANEL_DEFAULT_HEIGHT, VIEW_PANEL_MAX_HEIGHT, VIEW_PANEL_MIN_HEIGHT } from '@shared/constants/views';
 import type { Project } from '@shared/types';
 import { BarChart3, BookmarkPlus, BookOpen, FileDown, LayoutDashboard, LayoutGrid, ListOrdered, Network, Plus, Table2, Trash2, Upload } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -26,18 +27,17 @@ import { Button } from '@/shared/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/shared/ui/DropdownMenu';
 import { Input } from '@/shared/ui/Input';
-import { Select } from '@/shared/ui/Select';
 import { ViewModeToggle } from '@/shared/ui/ViewModeToggle';
 import { cn } from '@/shared/utils/cn';
 
 import { buildEntityView,ENTITY_VIEW_COLUMNS } from './buildEntityView';
 import { addCanvasEdge, mergeCanvasDocument, moveCanvasNode, projectCanvas, removeCanvasEdge } from './canvasView';
+import { ViewChartSection, ViewConditionSection } from './components/ViewPanelSections';
 import { parseCanvasText, serializeCanvas } from './jsonCanvas';
-import type { AggregationKind, CanvasPoint, ChartAggregate, ChartChannel, ChartMark, ChartValueType, ConditionOperator, ViewColumn, ViewRow } from './types';
+import type { AggregationKind, CanvasPoint, QueryCondition, ViewAggregation,ViewColumn, ViewRow } from './types';
 import ViewCards from './ViewCards';
-import { DEFAULT_CHART_SPEC, projectChart } from './viewChart';
-import ViewConditionEditor from './ViewConditionEditor';
-import { type ConditionGroupType, insertConditionAt, makeConditionLeaf, removeConditionAt } from './viewConditions';
+import { projectChart } from './viewChart';
+import { insertConditionAt, removeConditionAt } from './viewConditions';
 import { serializeViewTable, type TableFormat } from './viewExport';
 import { buildTemplateFieldLabels } from './viewFieldLabels';
 import ViewGraph from './ViewGraph';
@@ -54,11 +54,6 @@ const LazyViewChart = React.lazy(() => import('./ChartView'));
 /** 画布渲染器按需加载：不进默认视图包。 */
 const LazyCanvasView = React.lazy(() => import('./ViewCanvas'));
 
-const CHART_MARKS: readonly ChartMark[] = ['bar', 'point', 'line', 'area'];
-const CHART_CHANNELS: readonly ChartChannel[] = ['x', 'y', 'color', 'size', 'shape'];
-const CHART_VALUE_TYPES: readonly ChartValueType[] = ['nominal', 'ordinal', 'quantitative', 'temporal'];
-const CHART_AGGREGATES: readonly ChartAggregate[] = ['count', 'sum', 'avg', 'min', 'max'];
-
 interface MultiViewPanelProps {
   project: Project;
   onSelectItem?: (type: string, id: string) => void;
@@ -72,11 +67,6 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   const [dragViewId, setDragViewId] = useState<string | null>(null);
   const [resize, setResize] = useState<{ startY: number; base: number } | null>(null);
   const [liveHeight, setLiveHeight] = useState<number | null>(null);
-  const [condField, setCondField] = useState('title');
-  const [condOperator, setCondOperator] = useState<ConditionOperator>('contains');
-  const [condValue, setCondValue] = useState('');
-  const [aggField, setAggField] = useState('title');
-  const [aggKind, setAggKind] = useState<AggregationKind>('count');
 
   const data = useMemo(() => buildEntityView(project), [project]);
 
@@ -118,7 +108,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
       return;
     }
     // 不读渲染闭包里的 layout：连续编辑（键盘微调、删连线等）时上一次 saveView→reload
-    // 可能还没完成，闭包里的 config 是旧的，后一次保存会把前一次编辑覆盖回去。
+    // 可能还没完成，闭包里的 config 已过期，后一次保存会把前一次编辑覆盖回去。
     // 从 store 取该视图的最新配置做合并，两次编辑才能串行叠加。
     const latest = useGenericModelStore.getState().views.find((view) => view.id === activeView.id) ?? activeView;
     const next = { ...parseViewLayout(latest.config), ...patch };
@@ -252,19 +242,6 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     longest: t('views.query.agg.longest'),
     latest: t('views.query.agg.latest'),
   };
-  const chartValueTypeLabels: Record<ChartValueType, string> = {
-    nominal: t('views.chart.types.nominal'),
-    ordinal: t('views.chart.types.ordinal'),
-    quantitative: t('views.chart.types.quantitative'),
-    temporal: t('views.chart.types.temporal'),
-  };
-  const chartAggregateLabels: Record<ChartAggregate, string> = {
-    count: t('views.chart.aggregates.count'),
-    sum: t('views.chart.aggregates.sum'),
-    avg: t('views.chart.aggregates.avg'),
-    min: t('views.chart.aggregates.min'),
-    max: t('views.chart.aggregates.max'),
-  };
   const projection = useMemo(
     () =>
       applyViewQuery(data, {
@@ -278,43 +255,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   const displayColumns = projection.columns.map((column) => ({ ...column, label: columnLabel(column) }));
 
   // 图表：轴与图例由「字段→通道」声明派生，投影为纯函数。
-  const chartSpec = layout.chart ?? DEFAULT_CHART_SPEC;
   const chartProjection = useMemo(() => projectChart(projection, layout.chart), [projection, layout.chart]);
-  const chartBinding = (channel: ChartChannel) => chartSpec.bindings.find((binding) => binding.channel === channel);
-  const chartBindingField = (channel: ChartChannel): string => chartBinding(channel)?.field ?? '';
-  const setChartMark = (mark: ChartMark) => setLayout({ chart: { mark, bindings: chartSpec.bindings } });
-  const setChartBinding = (channel: ChartChannel, field: string) => {
-    const previous = chartBinding(channel);
-    const bindings = chartSpec.bindings.filter((binding) => binding.channel !== channel);
-    if (field) bindings.push(previous ? { ...previous, field } : { field, channel });
-    setLayout({ chart: { mark: chartSpec.mark, bindings } });
-  };
-  /** 改通道声明的取值类型：字段不变；选「按取值推断」则从声明中移除 type，回到引擎推断。 */
-  const setChartValueType = (channel: ChartChannel, type: ChartValueType | '') => {
-    const bindings = chartSpec.bindings.map((binding) => {
-      if (binding.channel !== channel) return binding;
-      if (type === '') {
-        const rest = { ...binding };
-        delete rest.type;
-        return rest;
-      }
-      return { ...binding, type };
-    });
-    setLayout({ chart: { mark: chartSpec.mark, bindings } });
-  };
-  /** 改通道声明的聚合方式：字段不变；聚合只对量化通道（y）生效，缺省即按 x 计数。 */
-  const setChartAggregate = (channel: ChartChannel, aggregate: ChartAggregate | '') => {
-    const bindings = chartSpec.bindings.map((binding) => {
-      if (binding.channel !== channel) return binding;
-      if (aggregate === '') {
-        const rest = { ...binding };
-        delete rest.aggregate;
-        return rest;
-      }
-      return { ...binding, aggregate };
-    });
-    setLayout({ chart: { mark: chartSpec.mark, bindings } });
-  };
 
   const availableFields = useMemo(() => {
     const keys = new Set<string>();
@@ -345,21 +286,16 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
   };
 
   // 条件树编辑：增删按「根起第几层第几个」的路径定位，未被命中的分支原样保留。
-  const addCondition = (path: readonly number[]) => {
-    const leaf = makeConditionLeaf(condField, condOperator, condValue);
-    setLayout({ conditions: insertConditionAt(layout.conditions, path, leaf) });
-  };
-
-  const addConditionGroup = (path: readonly number[], type: ConditionGroupType) => {
-    setLayout({ conditions: insertConditionAt(layout.conditions, path, { type, children: [] }) });
+  const insertCondition = (path: readonly number[], node: QueryCondition) => {
+    setLayout({ conditions: insertConditionAt(layout.conditions, path, node) });
   };
 
   const removeCondition = (path: readonly number[]) => {
     setLayout({ conditions: removeConditionAt(layout.conditions, path) });
   };
 
-  const addAggregation = () => {
-    setLayout({ aggregations: [...(layout.aggregations ?? []), { field: aggField, kind: aggKind }] });
+  const addAggregation = (aggregation: ViewAggregation) => {
+    setLayout({ aggregations: [...(layout.aggregations ?? []), aggregation] });
   };
 
   const removeAggregation = (index: number) => {
@@ -483,7 +419,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
     if (skipped > 0) dialogService.alert(t('views.canvas.importSkipped', { count: skipped }));
   };
 
-  const bodyHeight = liveHeight ?? layout.height ?? 440;
+  const bodyHeight = liveHeight ?? layout.height ?? VIEW_PANEL_DEFAULT_HEIGHT;
 
   const handleSelectRow = (row: ViewRow) => {
     onSelectItem?.(row.kind === 'event' ? 'timeline' : row.kind, row.id);
@@ -683,37 +619,15 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
             </div>
           </div>
           <div className="mt-3 space-y-2 border-t border-border pt-3">
-            <ViewConditionEditor
-              condition={layout.conditions}
+            <ViewConditionSection
+              conditions={layout.conditions}
               availableFields={availableFields}
               fieldLabel={fieldLabel}
-              field={condField}
-              operator={condOperator}
-              value={condValue}
-              onFieldChange={setCondField}
-              onOperatorChange={setCondOperator}
-              onValueChange={setCondValue}
-              onAddLeaf={addCondition}
-              onAddGroup={addConditionGroup}
-              onRemove={removeCondition}
+              aggregationKindLabels={aggregationKindLabels}
+              onInsertAt={insertCondition}
+              onRemoveAt={removeCondition}
+              onAddAggregation={addAggregation}
             />
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="text-muted-foreground">{t('views.query.aggregations')}</span>
-              <Select value={aggField} onChange={(event) => setAggField(event.target.value)} className="h-7 w-auto text-2xs" aria-label={t('views.query.field')}>
-                {availableFields.map((field) => (
-                  <option key={field} value={field}>{fieldLabel(field)}</option>
-                ))}
-              </Select>
-              <Select value={aggKind} onChange={(event) => setAggKind(event.target.value as AggregationKind)} className="h-7 w-auto text-2xs" aria-label={t('views.query.aggregationKind')}>
-                {(Object.keys(aggregationKindLabels) as AggregationKind[]).map((kind) => (
-                  <option key={kind} value={kind}>{aggregationKindLabels[kind]}</option>
-                ))}
-              </Select>
-              <Button size="sm" variant="outline" className="h-7" onClick={addAggregation}>
-                <Plus className="size-3" />
-                {t('views.query.addAggregation')}
-              </Button>
-            </div>
             <div className="flex flex-wrap items-center gap-1 border-t border-border pt-2">
               <span className="text-muted-foreground">{t('views.computed.title')}</span>
               {computedColumns.length === 0 && <span className="text-foreground/70">{t('views.computed.empty')}</span>}
@@ -762,55 +676,12 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
                 </DropdownMenu>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
-              <span className="text-muted-foreground">{t('views.chart.title')}</span>
-              <Select value={chartSpec.mark} onChange={(event) => setChartMark(event.target.value as ChartMark)} className="h-7 w-auto text-2xs" aria-label={t('views.chart.mark')}>
-                {CHART_MARKS.map((mark) => (
-                  <option key={mark} value={mark}>{t(`views.chart.marks.${mark}`)}</option>
-                ))}
-              </Select>
-              {CHART_CHANNELS.map((channel) => (
-                <label key={channel} className="flex flex-wrap items-center gap-1">
-                  <span className="text-muted-foreground">{t(`views.chart.channels.${channel}`)}</span>
-                  <Select
-                    value={chartBindingField(channel)}
-                    onChange={(event) => setChartBinding(channel, event.target.value)}
-                    className="h-7 w-auto text-2xs"
-                    aria-label={t(`views.chart.channels.${channel}`)}
-                  >
-                    <option value="">{t('views.chart.unbound')}</option>
-                    {availableFields.map((field) => (
-                      <option key={field} value={field}>{fieldLabel(field)}</option>
-                    ))}
-                  </Select>
-                  {channel === 'x' && chartBindingField('x') !== '' && (
-                    <Select
-                      value={chartBinding('x')?.type ?? ''}
-                      onChange={(event) => setChartValueType('x', event.target.value as ChartValueType | '')}
-                      className="h-7 w-auto text-2xs"
-                      aria-label={t('views.chart.valueType')}
-                    >
-                      <option value="">{t('views.chart.typeAuto')}</option>
-                      {CHART_VALUE_TYPES.map((type) => (
-                        <option key={type} value={type}>{chartValueTypeLabels[type]}</option>
-                      ))}
-                    </Select>
-                  )}
-                  {channel === 'y' && chartBindingField('y') !== '' && (
-                    <Select
-                      value={chartBinding('y')?.aggregate ?? 'count'}
-                      onChange={(event) => setChartAggregate('y', event.target.value as ChartAggregate)}
-                      className="h-7 w-auto text-2xs"
-                      aria-label={t('views.chart.aggregate')}
-                    >
-                      {CHART_AGGREGATES.map((aggregate) => (
-                        <option key={aggregate} value={aggregate}>{chartAggregateLabels[aggregate]}</option>
-                      ))}
-                    </Select>
-                  )}
-                </label>
-              ))}
-            </div>
+            <ViewChartSection
+              chart={layout.chart}
+              availableFields={availableFields}
+              fieldLabel={fieldLabel}
+              onChange={(chart) => setLayout({ chart })}
+            />
           </div>
         </details>
         {aggregations.length > 0 && (
@@ -895,7 +766,7 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
           }}
           onPointerMove={(event) => {
             if (!resize) return;
-            setLiveHeight(Math.max(160, Math.min(900, resize.base + (event.clientY - resize.startY))));
+            setLiveHeight(Math.max(VIEW_PANEL_MIN_HEIGHT, Math.min(VIEW_PANEL_MAX_HEIGHT, resize.base + (event.clientY - resize.startY))));
           }}
           onPointerUp={() => {
             if (resize && liveHeight !== null) setLayout({ height: liveHeight });

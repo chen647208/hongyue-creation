@@ -61,6 +61,9 @@ const SETTINGS_TABS: Array<{ zh: string; en: string }> = [
 /** 分区快捷键顺序（App.tsx SECTION_ORDER）。 */
 const SECTION_KEYS = ['Control+1', 'Control+2', 'Control+3', 'Control+4', 'Control+5'] as const;
 
+// 各分区在导航里的可访问名（nav.json；含手机档侧栏图标按钮的 aria-label）
+const SECTION_NAV = [/世界构建中心|World/, /角色与势力|Characters/, /大纲\/细纲|Structure/, /写作编辑器|Writing/] as const;
+
 const PANEL_DEBT: Record<string, PanelDebt> = {
   bookshelf: {},
   workspace: {},
@@ -82,6 +85,33 @@ async function expectNoNewDebt(page: Page, label: string): Promise<void> {
   expect(summary(label, regressions), `${label} 出现新的 axe serious/critical 问题`).toEqual([]);
 }
 
+/**
+ * 分区切换的确定性信号（替代盲等）：
+ * - 导航分区（灵感/世界/角色/结构）：导航按钮 aria-current 变为 page；
+ * - 写作分区为全屏沉浸（无导航栏），以编辑器挂载为信号。
+ */
+async function switchSection(page: Page, key: string, navLabel: RegExp): Promise<void> {
+  await page.keyboard.press(key);
+  await expect(page.getByRole('button', { name: navLabel }).first()).toHaveAttribute('aria-current', 'page', { timeout: 15_000 });
+}
+
+/**
+ * 切到写作分区（沉浸模式无导航）：未配置模型时先点「先手写看看」解除拦截；
+ * 空书再点「新建第一章」；以编辑器挂载为就绪信号。
+ * 两个按钮都先等出现再点：isVisible 是无等待快照，渲染竞态下会漏点。
+ */
+async function switchToWriting(page: Page): Promise<void> {
+  await page.keyboard.press('Control+5');
+  const handwrite = page.getByRole('button', { name: /先手写看看|Write by hand/ }).first();
+  if (await handwrite.isVisible().catch(() => false)) {
+    await handwrite.click();
+  }
+  const createFirst = page.getByRole('button', { name: /新建第一章|Create first chapter/ }).first();
+  await createFirst.waitFor({ state: 'visible', timeout: 15_000 });
+  await createFirst.click();
+  await expect(page.locator('.ProseMirror').first()).toBeAttached({ timeout: 15_000 });
+}
+
 test('书架/工作台各分区通过 axe 棘轮审计', async () => {
   const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-a11y-'));
   const { app, page } = await launchApp(userDataDir);
@@ -91,35 +121,40 @@ test('书架/工作台各分区通过 axe 棘轮审计', async () => {
     await createBook(page);
     await expectNoNewDebt(page, 'workspace');
 
+    // 未配置模型时各分区被 EmptyState 拦截：先手写豁免
+    const handwrite = page.getByRole('button', { name: /先手写看看|Write by hand/ }).first();
+    if (await handwrite.isVisible().catch(() => false)) {
+      await handwrite.click();
+    }
+
     // Ctrl+2 世界
-    await page.keyboard.press('Control+2');
-    await page.waitForTimeout(500);
+    await switchSection(page, 'Control+2', /世界构建中心|World/);
     await expectNoNewDebt(page, 'world');
 
     // 世界子面板：数据视图与双轴时间线
-    await page.getByRole('button', { name: /数据视图|Data Views/ }).first().click();
-    await page.waitForTimeout(500);
+    const dataViewBtn = page.getByRole('button', { name: /数据视图|Data Views/ }).first();
+    await dataViewBtn.click();
+    await expect(dataViewBtn).toHaveAttribute('aria-expanded', 'true', { timeout: 15_000 });
     await expectNoNewDebt(page, 'world.views');
-    await page.getByRole('button', { name: /双轴时间线|Dual-Axis Timeline/ }).first().click();
-    await page.waitForTimeout(500);
+    const timelineBtn = page.getByRole('button', { name: /双轴时间线|Dual-Axis Timeline/ }).first();
+    await timelineBtn.click();
+    await expect(timelineBtn).toHaveAttribute('aria-expanded', 'true', { timeout: 15_000 });
     await expectNoNewDebt(page, 'world.timeline');
 
     // Ctrl+3 角色
-    await page.keyboard.press('Control+3');
-    await page.waitForTimeout(500);
+    await switchSection(page, 'Control+3', /角色与势力|Characters/);
     await expectNoNewDebt(page, 'characters');
 
     // Ctrl+4 结构：大纲子页 + 细纲子页
-    await page.keyboard.press('Control+4');
-    await page.waitForTimeout(500);
+    await switchSection(page, 'Control+4', /大纲\/细纲|Structure/);
     await expectNoNewDebt(page, 'structure.outline');
-    await page.getByRole('button', { name: /^细纲$|^Chapters$/ }).first().click();
-    await page.waitForTimeout(500);
+    const chaptersTab = page.getByRole('button', { name: /^细纲$|^Chapters$/ }).first();
+    await chaptersTab.click();
+    await expect(chaptersTab).toHaveAttribute('aria-pressed', 'true', { timeout: 15_000 });
     await expectNoNewDebt(page, 'structure.chapters');
 
-    // Ctrl+5 写作
-    await page.keyboard.press('Control+5');
-    await page.waitForTimeout(500);
+    // Ctrl+5 写作（沉浸模式，无导航）
+    await switchToWriting(page);
     await expectNoNewDebt(page, 'writing');
   } finally {
     await app.close();
@@ -138,8 +173,19 @@ test('设置各页签通过 axe 棘轮审计', async () => {
     await expect(dialog).toBeVisible({ timeout: 30_000 });
 
     for (const tab of SETTINGS_TABS) {
-      await dialog.getByRole('button', { name: new RegExp(`^(${tab.zh}|${tab.en})$`) }).first().click();
-      await page.waitForTimeout(400);
+      const tabBtn = dialog.getByRole('button', { name: new RegExp(`^(${tab.zh}|${tab.en})$`) }).first();
+      await tabBtn.click();
+      await expect(tabBtn).toHaveAttribute('aria-pressed', 'true', { timeout: 15_000 });
+      // color transition（120ms）进行中 axe 会采样到中间色（对比度不达标）：
+      // 等颜色两帧稳定（transition 结束）再审计。
+      await expect
+        .poll(async () => {
+          const c1 = await tabBtn.evaluate((el) => getComputedStyle(el).color);
+          await page.waitForTimeout(50);
+          const c2 = await tabBtn.evaluate((el) => getComputedStyle(el).color);
+          return c1 === c2 ? c1 : '';
+        }, { timeout: 5_000 })
+        .not.toBe('');
       await expectNoNewDebt(page, `settings.${tab.zh}`);
     }
   } finally {
@@ -203,13 +249,12 @@ test('键盘可完成建书→工作台→分区→设置→弹层全链路', as
     }
     await expect(page.getByPlaceholder(/输入你的初始灵感|Enter your initial inspiration/)).toBeVisible({ timeout: 30_000 });
 
-    // 分区：Ctrl+2..5 切到其余分区，再回 Ctrl+1（设置入口需非写作分区）
-    for (const key of SECTION_KEYS.slice(1)) {
-      await page.keyboard.press(key);
-      await page.waitForTimeout(300);
+    // 分区：Ctrl+2..4 逐个切换（世界/角色/结构），每次等导航 aria-current 落到目标项；
+    // Ctrl+5 写作为沉浸模式（无导航），单独走 switchToWriting
+    for (let i = 0; i < SECTION_KEYS.length - 2; i++) {
+      await switchSection(page, SECTION_KEYS[i + 1]!, SECTION_NAV[i]!);
     }
-    await page.keyboard.press('Control+1');
-    await page.waitForTimeout(300);
+    await switchToWriting(page);
 
     // 设置：聚焦左侧「设置」并回车。按可访问名定位（SettingsModal 的 aria-label），
     // 不用 dialog.first()：后者依赖 portal 插入顺序，全局对话框一旦排队就错位。
@@ -225,7 +270,9 @@ test('键盘可完成建书→工作台→分区→设置→弹层全链路', as
         .first()
         .focus();
       await page.keyboard.press('Enter');
-      await page.waitForTimeout(200);
+      await expect(
+        settingsDialog.getByRole('button', { name: new RegExp(`^(${tab.zh}|${tab.en})$`) }).first(),
+      ).toHaveAttribute('aria-pressed', 'true', { timeout: 15_000 });
     }
 
     // 全局命令面板：Ctrl+K 打开，Esc 关闭后焦点回到设置弹层

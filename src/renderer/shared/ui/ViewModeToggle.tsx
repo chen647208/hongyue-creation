@@ -61,6 +61,7 @@ export function SegmentedControl<T extends string>({ value, onChange, options, c
           key={opt.value}
           onClick={() => onChange(opt.value)}
           disabled={opt.disabled}
+          aria-pressed={value === opt.value}
           className={cn(
             'touch-target rounded-md px-3 py-1.5 font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
             size === 'sm' ? 'text-xs' : 'text-sm',

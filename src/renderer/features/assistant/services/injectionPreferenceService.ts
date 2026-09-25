@@ -10,6 +10,9 @@
 /**
  * 自动注入偏好（按书持久化）：整体开关与单条关闭按书 id 存 localStorage，
  * 重启保留；未登记时回落默认（开启、无关闭条目）。
+ *
+ * 单一真源（10 篇自协调）：本模块持内存态并对外订阅，组件不维护镜像副本，
+ * 书间切换经 subscribe 通知消费者重读。
  */
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 
@@ -22,6 +25,10 @@ export interface InjectionPreference {
 
 /** 无活动书时的占位键（新建书前也能记录偏好）。 */
 const NO_BOOK_KEY = '__none__';
+
+/** 内存中的当前偏好：启动时从 localStorage 读一次，此后写入即更新。 */
+let current: InjectionPreference | null = null;
+const listeners = new Set<(preference: InjectionPreference) => void>();
 
 function keyOf(bookId: string | undefined): string {
   return bookId?.trim() || NO_BOOK_KEY;
@@ -44,14 +51,8 @@ function writeMap(map: Record<string, unknown>): void {
   localStore.setItem(STORAGE_KEYS.aiInjectionPrefs, JSON.stringify(map));
 }
 
-export function defaultInjectionPreference(): InjectionPreference {
-  return { enabled: true, disabledIds: [] };
-}
-
-/** 读取某书的注入偏好；缺失或损坏时回落默认。 */
-export function loadInjectionPreference(bookId: string | undefined): InjectionPreference {
-  const entry = readMap()[keyOf(bookId)];
-  if (typeof entry !== 'object' || entry === null) return defaultInjectionPreference();
+function normalize(entry: unknown): InjectionPreference {
+  if (typeof entry !== 'object' || entry === null) return { enabled: true, disabledIds: [] };
   const value = entry as { enabled?: unknown; disabledIds?: unknown };
   return {
     enabled: value.enabled !== false,
@@ -61,7 +62,25 @@ export function loadInjectionPreference(bookId: string | undefined): InjectionPr
   };
 }
 
-/** 写入某书的注入偏好（覆盖该书的登记）。 */
+/** 订阅偏好变化（含书切换触发的重读）；返回解绑函数。 */
+export function subscribeInjectionPreference(listener: (preference: InjectionPreference) => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function notify(): void {
+  if (!current) return;
+  const snapshot = { ...current };
+  for (const listener of listeners) listener(snapshot);
+}
+
+/** 读取某书的注入偏好；缺失或损坏时回落默认。 */
+export function loadInjectionPreference(bookId: string | undefined): InjectionPreference {
+  current = normalize(readMap()[keyOf(bookId)]);
+  return current;
+}
+
+/** 写入某书的注入偏好（覆盖该书的登记），并通知订阅者。 */
 export function saveInjectionPreference(bookId: string | undefined, preference: InjectionPreference): void {
   const map = readMap();
   map[keyOf(bookId)] = {
@@ -69,6 +88,8 @@ export function saveInjectionPreference(bookId: string | undefined, preference: 
     disabledIds: preference.disabledIds.filter((id): id is string => typeof id === 'string'),
   };
   writeMap(map);
+  current = normalize(map[keyOf(bookId)]);
+  notify();
 }
 
 export function clearInjectionPreferences(): void {

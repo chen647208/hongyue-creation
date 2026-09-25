@@ -156,7 +156,7 @@ async function streamViaSDK(
       onChunk({ content: accumulated, error: aiT('streamCancelled'), isComplete: true, isStreaming: false });
       return;
     }
-    // SDK 流与 REST 流对齐：逐块透出 finishReason 与用量（此前全程缺失）
+    // SDK 流与 REST 流对齐：逐块透出 finishReason 与用量
     const candidate = raw.candidates?.[0];
     if (candidate?.finishReason) finishReason = candidate.finishReason;
     const usage = extractGeminiTokenUsage(raw);

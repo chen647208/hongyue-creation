@@ -143,7 +143,7 @@ export const openAICompatibleAdapter: ProviderAdapter = {
           return; // 忽略无法解析的事件
         }
         if (parsed.model) modelName = parsed.model;
-        // 流内错误块：记录并停止累积成功内容（此前直接忽略，失败会被当成功收尾）
+        // 流内错误块：记录并停止累积成功内容，避免错误块之后的内容被当成功收尾
         if (parsed.error?.message) {
           streamError = parsed.error.message;
           return;

@@ -17,6 +17,7 @@ import type { SandboxRunRequest } from '../../shared/sandbox.js';
 import { initMainI18n, tMain } from '../ai/i18n.js';
 import { registerLocalInferenceIpc, shutdownLocalRuntime } from '../ai/localRuntime.js';
 import { IPC } from '../channels.js';
+import { logger } from '../logger.js';
 import { closeMcpClients,registerMcpClientIpc } from '../mcp/clientIpc.js';
 import { registerPluginNetIpc } from '../net/pluginNet.js';
 import { registerProxyIpc } from '../net/proxyIpc.js';
@@ -164,7 +165,9 @@ export const fileProvider: Provider = {
       try {
         const entries = await fs.readdir(dirPath, { withFileTypes: true });
         return entries.map((e) => ({ name: e.name, type: e.isDirectory() ? ('directory' as const) : ('file' as const) }));
-      } catch {
+      } catch (error) {
+        // 空目录与权限/磁盘错误对调用方语义不同：留日志供排查
+        logger.warn('providers', `listDirectory 失败：${dirPath}`, error);
         return [];
       }
     });

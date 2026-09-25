@@ -8,7 +8,6 @@
  */
 
 import { isEncryptedEnvelope } from '@core/crypto';
-import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import React, { useCallback,useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -22,7 +21,6 @@ import { dialogService } from '@/shared/services/dialogService';
 import { resetEditorContext, setEditorContext } from '@/shared/services/editorContextService';
 import { onEditorOps } from '@/shared/services/editorOps';
 import { openForeshadows, overdueForeshadows } from '@/shared/services/foreshadowService';
-import { localStore } from '@/shared/services/localStore';
 import { emitPluginEvent } from '@/shared/services/pluginEventBus';
 import { Button } from '@/shared/ui/Button';
 import { EmptyState } from '@/shared/ui/EmptyState';
@@ -53,13 +51,13 @@ import { useChapterSnapshots } from './hooks/useChapterSnapshots';
 import { useFindReplace } from './hooks/useFindReplace';
 import { useGenerationSelections } from './hooks/useGenerationSelections';
 import { useSelectionMenu } from './hooks/useSelectionMenu';
+import { useWritingViewMode } from './hooks/useWritingViewMode';
 import { extractChapterSummary } from './services/summaryExtractionService';
 import { computeBookStats, computeChapterStats } from './services/writingStatsService';
-import { applyProofreadFixes, autoFormatContent, isScreenplayFormatEnabled, type ProofreadIssue,readPaperStyle, setScreenplayFormatEnabled, writePaperStyle } from './services/writingToolsService';
+import { applyProofreadFixes, autoFormatContent, type ProofreadIssue } from './services/writingToolsService';
 import type {
   GenerationModalState,
   NovelEditorHandle,
-  PaperStyle,
   WritingEditorProps,
 } from './types';
 import {
@@ -91,23 +89,9 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => !isMobile);
   const [lastSaved, setLastSaved] = useState<number>(Date.now());
   const [saveDirty, setSaveDirty] = useState(false);
-  const [typewriter, setTypewriter] = useState<boolean>(() => {
-    try {
-      return localStore.getItem(STORAGE_KEYS.editorTypewriter) === '1';
-    } catch {
-      return false;
-    }
-  });
-  const toggleTypewriter = () => {
-    setTypewriter((v) => {
-      try {
-        localStore.setItem(STORAGE_KEYS.editorTypewriter, v ? '0' : '1');
-      } catch {
-        // 忽略
-      }
-      return !v;
-    });
-  };
+  // 编辑器视觉态：专注模式 / 打字机 / 纸张 / 剧本格式，统一见 useWritingViewMode
+  const viewMode = useWritingViewMode();
+  const { typewriter, isFocusMode, paper, screenplayFormat } = viewMode;
   const [outputMode, setOutputMode] = useState(DEFAULT_OUTPUT_MODE);
   
 
@@ -120,11 +104,25 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
   const [selectedEditPromptId, setSelectedEditPromptId] = useState<string>('');
   const [customEditPrompt, setCustomEditPrompt] = useState<string>(''); // 自定义提示词
 
-  const [isHistoryViewerOpen, setIsHistoryViewerOpen] = useState(false);
-  const [isGlobalHistorySidebarOpen, setIsGlobalHistorySidebarOpen] = useState(false);
+  // 历史查看器与全局历史侧栏的开关：单一对象 state
+  const [historyPanels, setHistoryPanels] = useState<{ viewerOpen: boolean; sidebarOpen: boolean }>({
+    viewerOpen: false,
+    sidebarOpen: false,
+  });
+  const isHistoryViewerOpen = historyPanels.viewerOpen;
+  const isGlobalHistorySidebarOpen = historyPanels.sidebarOpen;
+  const setHistoryViewerOpen = (open: boolean) => setHistoryPanels((panels) => ({ ...panels, viewerOpen: open }));
+  const setGlobalHistorySidebarOpen = (open: boolean) => setHistoryPanels((panels) => ({ ...panels, sidebarOpen: open }));
 
-  const [isExtractingSummary, setIsExtractingSummary] = useState(false);
-  const [selectedSummaryPromptId, setSelectedSummaryPromptId] = useState<string>('');
+  // 摘要提取进行中标志与所选提示词：单一对象 state
+  const [summaryState, setSummaryState] = useState<{ extracting: boolean; promptId: string }>({
+    extracting: false,
+    promptId: '',
+  });
+  const isExtractingSummary = summaryState.extracting;
+  const selectedSummaryPromptId = summaryState.promptId;
+  const setExtractingSummary = (extracting: boolean) => setSummaryState((state) => ({ ...state, extracting }));
+  const setSummaryPromptId = (promptId: string) => setSummaryState((state) => ({ ...state, promptId }));
 
   const [useOutline, setUseOutline] = useState<boolean>(true);
   const [editableSummary, setEditableSummary] = useState<string>("");
@@ -235,7 +233,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
     setIsSidebarOpen(true);
   }, []);
 
-  // 换章后旧的定位高亮失效
+  // 换章后定位高亮失效
   useEffect(() => {
     setActiveAnnotationId(null);
   }, [activeChapterId]);
@@ -310,11 +308,8 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
     onUpdate: (updates) => onUpdateRef.current(updates),
   });
 
-  const [isFocusMode, setIsFocusMode] = useState(false);
   const [isForeshadowOpen, setIsForeshadowOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
-  const [screenplayFormat, setScreenplayFormat] = useState(() => isScreenplayFormatEnabled());
-  const [paper, setPaper] = useState(() => readPaperStyle());
 
   // 章节字段写回统一见 useChapterMutations
   const { handleUpdateChapter, updateChapterContent, updateChapterSummary, updateChapterContentSummary, updateActiveChapterTitle } = useChapterMutations({
@@ -347,16 +342,6 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
     shortcutBlocked: genModal.isOpen || editModalOpen || exporter.open || isHistoryViewerOpen || isForeshadowOpen,
   });
 
-  // 专注模式下 Esc 退出
-  useEffect(() => {
-    if (!isFocusMode) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsFocusMode(false);
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isFocusMode]);
-
   useEffect(() => {
     if (genModal.isOpen && genModal.chapter) {
       setEditableSummary(genModal.chapter.summary || "");
@@ -379,7 +364,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
     activeChapterId,
     setActiveChapterId,
     editorRef,
-    onHistoryCleared: () => setIsHistoryViewerOpen(false),
+    onHistoryCleared: () => setHistoryViewerOpen(false),
   });
 
   const {
@@ -489,7 +474,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
       dialogService.alert(t('steps:common.noModel'));
       return;
     }
-    setIsExtractingSummary(true);
+    setExtractingSummary(true);
     try {
       await extractChapterSummary({
         activeChapter,
@@ -504,7 +489,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
       logger.error(err);
       dialogService.alert(t('editor.extractSummaryFailed'));
     } finally {
-      setIsExtractingSummary(false);
+      setExtractingSummary(false);
     }
   };
   const modalContextInfo = genModal.chapter ? getChapterContext(project.chapters, genModal.chapter) : { prevChapter: null, prevContextText: "", nextChapter: null, nextSummary: "" };
@@ -522,7 +507,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
       onClose={() => setIsSidebarOpen(false)}
       onChapterSummaryChange={updateChapterSummary}
       onContentSummaryChange={updateChapterContentSummary}
-      onSummaryPromptChange={setSelectedSummaryPromptId}
+      onSummaryPromptChange={setSummaryPromptId}
       onExtractSummary={handleExtractSummary}
       onChapterClick={handleChapterClick}
       onNavigateToCharacters={onNavigateToCharacters}
@@ -631,11 +616,11 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
         onClearSelection={clearSelectionMenu}
         isHistoryViewerOpen={isHistoryViewerOpen}
         activeChapter={activeChapter}
-        onCloseHistoryViewer={() => setIsHistoryViewerOpen(false)}
+        onCloseHistoryViewer={() => setHistoryViewerOpen(false)}
         onApplyHistoryContent={updateChapterContent}
         onClearChapterHistory={handleClearChapterHistory}
         isGlobalHistorySidebarOpen={isGlobalHistorySidebarOpen}
-        onCloseGlobalHistorySidebar={() => setIsGlobalHistorySidebarOpen(false)}
+        onCloseGlobalHistorySidebar={() => setGlobalHistorySidebarOpen(false)}
         onUpdate={onUpdate}
         onUpdateChapter={handleUpdateChapter}
         onOpenSettings={onOpenSettings}
@@ -700,11 +685,11 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
           onOpenExport={exporter.openModal}
           onOpenForeshadow={() => setIsForeshadowOpen(true)}
           onClearContent={handleClearContent}
-          onToggleGlobalHistory={() => setIsGlobalHistorySidebarOpen(!isGlobalHistorySidebarOpen)}
-          onOpenChapterHistory={() => setIsHistoryViewerOpen(true)}
+          onToggleGlobalHistory={() => setGlobalHistorySidebarOpen(!isGlobalHistorySidebarOpen)}
+          onOpenChapterHistory={() => setHistoryViewerOpen(true)}
           onOpenSidebar={() => setIsSidebarOpen(true)}
-          onToggleFocusMode={() => setIsFocusMode((v) => !v)}
-          onToggleTypewriter={toggleTypewriter}
+          onToggleFocusMode={() => viewMode.setFocusMode((v) => !v)}
+          onToggleTypewriter={viewMode.toggleTypewriter}
           onUndo={() => editorRef.current?.undo()}
           onRedo={() => editorRef.current?.redo()}
           onManualSnapshot={handleManualSnapshot}
@@ -805,15 +790,9 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
           editorRef.current?.insertText(text);
         }}
         screenplayFormat={screenplayFormat}
-        onToggleScreenplayFormat={(value: boolean) => {
-          setScreenplayFormatEnabled(value);
-          setScreenplayFormat(value);
-        }}
+        onToggleScreenplayFormat={viewMode.setScreenplayFormat}
         paper={paper}
-        onPaperChange={(value: PaperStyle) => {
-          writePaperStyle(value);
-          setPaper(value);
-        }}
+        onPaperChange={viewMode.setPaper}
         onClose={() => setIsToolsOpen(false)}
       />
     </div>

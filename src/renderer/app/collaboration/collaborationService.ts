@@ -138,7 +138,7 @@ function pushCanvasView(doc: Y.Doc, projectId: string, viewId: string, config: R
     return;
   }
   // 画布内容为空（全部元素被删）也要推送：applyCanvasLayoutToDoc 靠「seed 缺席」给残留元素发墓碑。
-  // 空画布在序列化层被折叠成「canvas 键缺席」，此前这里因 layout 为 undefined 直接 return，
+  // 空画布在序列化层被折叠成「canvas 键缺席」，若此处跳过空布局，
   // 删除动作永远到不了对端。
   applyCanvasLayoutToDoc(doc, viewId, parsedLayout.canvas ?? {});
   canvasSyncedConfigs.set(viewId, serialized);

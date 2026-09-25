@@ -35,3 +35,10 @@ export const CANVAS_PADDING = 40;
 /** 画布导入解析上限：超出部分丢弃并在 issues 中记录。 */
 export const CANVAS_MAX_NODES = 2000;
 export const CANVAS_MAX_EDGES = 4000;
+
+/** 视图面板正文区高度（像素）：未配置或未拖拽时的缺省高度。 */
+export const VIEW_PANEL_DEFAULT_HEIGHT = 440;
+/** 视图面板正文区拖拽的最小高度（像素）。 */
+export const VIEW_PANEL_MIN_HEIGHT = 160;
+/** 视图面板正文区拖拽的最大高度（像素）。 */
+export const VIEW_PANEL_MAX_HEIGHT = 900;

@@ -24,7 +24,7 @@ interface MarkdownViewProps {
  * 令牌化 Markdown 渲染组件。
  *
  * AI 生成的大纲、灵感、助手回复等长文本普遍带 Markdown 结构（标题/加粗/列表/分隔线），
- * 此前以裸 textarea/pre-wrap 展示导致符号原样暴露。这里用 react-markdown 直接渲染为
+ * Markdown 符号若以裸 textarea/pre-wrap 展示会原样暴露。这里用 react-markdown 直接渲染为
  * React 元素（无 innerHTML 注入），样式全部走设计令牌，标题用衬线呼应文学排版。
  */
 const markdownComponents: Components = {
