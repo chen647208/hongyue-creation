@@ -17,6 +17,8 @@ import { EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view';
 import CodeMirror from '@uiw/react-codemirror';
 import { useMemo, useRef } from 'react';
 
+import { dt } from '@/i18n';
+
 import { novelDslExtensions } from './novelDsl';
 import { tagValidation } from './tagValidation';
 
@@ -75,7 +77,7 @@ function makeTagCompletion(getTags: () => string[]) {
         label: tag,
         type: isWiki ? 'class' : 'text',
         apply: isWiki ? `[[${tag}]]` : tag,
-        detail: isWiki ? '链接' : '标签',
+        detail: isWiki ? dt('steps:detail.wiki') : dt('steps:detail.tag'),
       }));
     if (options.length === 0) return null;
     return { from: word.from, options };
@@ -100,7 +102,7 @@ export function DslEditor({
   const tagsRef = useRef<string[]>([]);
   tagsRef.current = validTags ? Array.from(validTags) : [];
 
-  const editableLabel = ariaLabel ?? placeholder ?? '编辑器';
+  const editableLabel = ariaLabel ?? placeholder ?? dt('steps:detail.editor');
 
   const extensions = useMemo(() => {
     const ext = [...novelDslExtensions(), EditorView.lineWrapping, ...accessibleEditor(editableLabel)];

@@ -145,7 +145,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
      // 空上下文不发送（该分区暂无内容时保持静默，由空态引导用户先填）
      if (!content.trim()) return;
      const promptTemplate = prompts.find(p => p.id === analysisPromptId);
-     const instruction = promptTemplate ? promptTemplate.content : "请分析以下内容";
+     const instruction = promptTemplate ? promptTemplate.content : t('generation.defaultInstruction');
      
      // 附件归类跟随当前分析分区（知识库无独立归类，回落 writing；原硬编码全标 writing）
      const attachmentCategory = activeCategory === 'inspiration' ? 'inspiration'
@@ -169,7 +169,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
           .replace('{inspiration}', project.inspiration)
           .replace('{title}', project.title)
           .replace('{intro}', project.intro)
-          .replace('{content}', "（见附件资料）"); // 提示 AI 查看附件
+          .replace('{content}', t('generation.seeAttachment')); // 提示 AI 查看附件
      }
 
      setContextPanelOpen(false);
@@ -307,29 +307,11 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
         return;
       }
       
-      const prompt = `基于以下小说信息生成一个角色设定：
-书名：${project.title}
-简介：${project.intro}
-用户要求：${characterGenerationPrompt}
-
-请生成包含以下字段的完整角色设定：
-- 姓名、性别（male/female/other/unknown）、年龄
-- 角色定位（protagonist/antagonist/supporting/other）
-- 性格特点
-- 背景故事
-- 外貌特征
-- 独特特征
-- 职业/身份
-- 动机目标
-- 优点缺点
-- 角色成长弧线
-
-重要要求：
-1. 请只返回JSON格式，不要包含任何其他解释性文字
-2. JSON必须严格符合格式，使用双引号包裹所有键和字符串值
-3. 所有字段都必须提供，即使为空字符串
-
-请以JSON格式返回，包含以下字段：name, gender, age, role, personality, background, appearance, distinctiveFeatures, occupation, motivation, strengths, weaknesses, characterArc`;
+      const prompt = t('generation.characterPrompt', {
+        title: project.title,
+        intro: project.intro,
+        request: characterGenerationPrompt,
+      });
       
       const response = await AIService.call(activeModel, prompt);
       
@@ -398,7 +380,7 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
           characterData = {
             name: nameMatch[1]?.trim() ?? '',
             gender: genderMatch ? genderMatch[1]?.trim() ?? '' : 'unknown',
-            age: ageMatch ? ageMatch[1]?.trim() ?? '' : '未知',
+            age: ageMatch ? ageMatch[1]?.trim() ?? '' : t('fallback.unknown'),
             role: 'supporting',
             personality: '',
             background: '',
@@ -416,20 +398,20 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
       if (characterData) {
         const newCharacter: Character = {
           id: Date.now().toString(),
-          name: asStr(characterData.name, '未命名角色'),
+          name: asStr(characterData.name, t('fallback.unnamedCharacter')),
           gender: normalizeGenderId(asStr(characterData.gender)),
-          age: asStr(characterData.age, '未知'),
+          age: asStr(characterData.age, t('fallback.unknown')),
           role: normalizeRoleId(asStr(characterData.role), 'supporting'),
-          personality: asStr(characterData.personality, '暂无描述'),
-          background: asStr(characterData.background, '暂无背景'),
+          personality: asStr(characterData.personality, t('fallback.noDescription')),
+          background: asStr(characterData.background, t('fallback.noBackground')),
           relationships: asStr(characterData.relationships),
-          appearance: asStr(characterData.appearance, '暂无描述'),
-          distinctiveFeatures: asStr(characterData.distinctiveFeatures, '暂无特征'),
-          occupation: asStr(characterData.occupation, '暂无'),
-          motivation: asStr(characterData.motivation, '暂无'),
-          strengths: asStr(characterData.strengths, '暂无'),
-          weaknesses: asStr(characterData.weaknesses, '暂无'),
-          characterArc: asStr(characterData.characterArc, '暂无')
+          appearance: asStr(characterData.appearance, t('fallback.noDescription')),
+          distinctiveFeatures: asStr(characterData.distinctiveFeatures, t('fallback.noFeatures')),
+          occupation: asStr(characterData.occupation, t('fallback.none')),
+          motivation: asStr(characterData.motivation, t('fallback.none')),
+          strengths: asStr(characterData.strengths, t('fallback.none')),
+          weaknesses: asStr(characterData.weaknesses, t('fallback.none')),
+          characterArc: asStr(characterData.characterArc, t('fallback.none'))
         };
         
         const updatedCharacters = [...(project.characters || []), newCharacter];

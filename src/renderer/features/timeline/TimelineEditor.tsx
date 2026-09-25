@@ -218,7 +218,7 @@ export const TimelineEditor: React.FC<TimelineEditorProps> = ({
       world: 'bg-chart-4/10 text-chart-4',
       faction: 'bg-chart-2/10 text-chart-2',
       battle: 'bg-destructive/10 text-destructive',
-      discovery: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+      discovery: 'bg-chart-8/10 text-chart-8',
       other: 'bg-muted text-foreground/80'
     };
     return colors[type] || 'bg-muted text-foreground/80';

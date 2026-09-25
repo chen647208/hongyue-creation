@@ -339,5 +339,18 @@
     "cancel": "Cancel",
     "pickStep": "Pick a rollback step",
     "step": "Step {{n}}: {{label}}"
+  },
+  "generation": {
+    "defaultInstruction": "Please analyze the following content",
+    "seeAttachment": "(see attached material)",
+    "characterPrompt": "Generate a character profile from the following novel information:\nBook title: {{title}}\nSynopsis: {{intro}}\nUser request: {{request}}\n\nProduce a complete character profile covering these fields:\n- Name, gender (male/female/other/unknown), age\n- Role (protagonist/antagonist/supporting/other)\n- Personality traits\n- Background story\n- Appearance\n- Distinctive features\n- Occupation/identity\n- Motivation and goals\n- Strengths and weaknesses\n- Character arc\n\nImportant requirements:\n1. Return JSON only, with no other explanatory text\n2. The JSON must be strictly well-formed, with all keys and string values double-quoted\n3. Every field must be present, even if an empty string\n\nReturn JSON with these fields: name, gender, age, role, personality, background, appearance, distinctiveFeatures, occupation, motivation, strengths, weaknesses, characterArc"
+  },
+  "fallback": {
+    "unnamedCharacter": "Unnamed character",
+    "unknown": "Unknown",
+    "none": "N/A",
+    "noDescription": "No description",
+    "noBackground": "No background",
+    "noFeatures": "No distinctive features"
   }
 }

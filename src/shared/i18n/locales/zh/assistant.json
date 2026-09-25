@@ -339,5 +339,18 @@
     "cancel": "取消",
     "pickStep": "选择回滚步",
     "step": "第 {{n}} 步：{{label}}"
+  },
+  "generation": {
+    "defaultInstruction": "请分析以下内容",
+    "seeAttachment": "（见附件资料）",
+    "characterPrompt": "基于以下小说信息生成一个角色设定：\n书名：{{title}}\n简介：{{intro}}\n用户要求：{{request}}\n\n请生成包含以下字段的完整角色设定：\n- 姓名、性别（male/female/other/unknown）、年龄\n- 角色定位（protagonist/antagonist/supporting/other）\n- 性格特点\n- 背景故事\n- 外貌特征\n- 独特特征\n- 职业/身份\n- 动机目标\n- 优点缺点\n- 角色成长弧线\n\n重要要求：\n1. 请只返回JSON格式，不要包含任何其他解释性文字\n2. JSON必须严格符合格式，使用双引号包裹所有键和字符串值\n3. 所有字段都必须提供，即使为空字符串\n\n请以JSON格式返回，包含以下字段：name, gender, age, role, personality, background, appearance, distinctiveFeatures, occupation, motivation, strengths, weaknesses, characterArc"
+  },
+  "fallback": {
+    "unnamedCharacter": "未命名角色",
+    "unknown": "未知",
+    "none": "暂无",
+    "noDescription": "暂无描述",
+    "noBackground": "暂无背景",
+    "noFeatures": "暂无特征"
   }
 }

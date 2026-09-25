@@ -198,5 +198,20 @@
     "extractBatchProgress": "已提取 {{done}}/{{total}} 批",
     "extractContinue": "续提剩余批次",
     "extractPartial": "已完成 {{done}}/{{total}} 批，剩余可在预览中续提。失败：{{error}}"
+  },
+  "prompt": {
+    "charDetail": "【{{name}}】({{role}})\n- 性格：{{personality}}\n- 背景：{{background}}\n- 关系：{{relationships}}",
+    "knowledgeHeader": "\n\n### 必须参考的世界观/设定资料 (Knowledge Base)\n请参考以下资料确保大纲符合设定：\n{{content}}",
+    "knowledgeRef": "【参考资料：{{name}}】\n{{content}}",
+    "worldHeader": "\n\n### 必须参考的世界观/设定资料 (Knowledge Base)\n请务必参考以下设定资料来构建角色（如种族、职业、阵营等）：\n{{content}}"
+  },
+  "fallback": {
+    "unknownAge": "未知",
+    "untitled": "未命名故事"
+  },
+  "detail": {
+    "wiki": "链接",
+    "tag": "标签",
+    "editor": "编辑器"
   }
 }

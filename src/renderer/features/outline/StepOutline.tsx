@@ -179,9 +179,9 @@ const StepOutline: React.FC<StepOutlineProps> = ({ project }) => {
     
     // Build a richer character context
     const charDetails = project.characters.map(c =>
-      `【${c.name}】(${roleLabel(c.role)})\n- 性格：${c.personality}\n- 背景：${c.background}\n- 关系：${c.relationships}`
+      t('steps:prompt.charDetail', { name: c.name, role: roleLabel(c.role), personality: c.personality, background: c.background, relationships: c.relationships })
     ).join('\n\n');
-    
+
     let finalPrompt = template
       .replace('{title}', project.title)
       .replace('{intro}', project.intro)
@@ -191,9 +191,9 @@ const StepOutline: React.FC<StepOutlineProps> = ({ project }) => {
     if (selectedKnowledgeIds.size > 0) {
        const kContent = project.knowledge
          .filter(k => selectedKnowledgeIds.has(k.id))
-         .map(k => `【参考资料：${k.name}】\n${k.content.substring(0, KNOWLEDGE_SNIPPET_TRUNCATE)}`)
+         .map(k => t('steps:prompt.knowledgeRef', { name: k.name, content: k.content.substring(0, KNOWLEDGE_SNIPPET_TRUNCATE) }))
          .join('\n\n');
-       if (kContent) finalPrompt += `\n\n### 必须参考的世界观/设定资料 (Knowledge Base)\n请参考以下资料确保大纲符合设定：\n${kContent}`;
+       if (kContent) finalPrompt += t('steps:prompt.knowledgeHeader', { content: kContent });
     }
 
     // 根据用户选择的输出模式决定调用方式

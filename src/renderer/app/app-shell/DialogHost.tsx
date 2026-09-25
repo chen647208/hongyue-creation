@@ -73,7 +73,7 @@ const DialogHost: React.FC = () => {
 
   return createPortal(
     <div
-      className="pointer-events-auto fixed inset-0 z-alert flex animate-fade-in items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      className="pointer-events-auto fixed inset-0 z-alert flex animate-fade-in items-center justify-center bg-overlay p-4 backdrop-blur-sm"
       role="presentation"
       onKeyDown={onKeyDown}
     >

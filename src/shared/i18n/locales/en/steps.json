@@ -198,5 +198,20 @@
     "extractBatchProgress": "Extracted {{done}}/{{total}} batches",
     "extractContinue": "Continue remaining batches",
     "extractPartial": "Completed {{done}}/{{total}} batches; continue the rest from the preview. Error: {{error}}"
+  },
+  "prompt": {
+    "charDetail": "[{{name}}] ({{role}})\n- Personality: {{personality}}\n- Background: {{background}}\n- Relationships: {{relationships}}",
+    "knowledgeHeader": "\n\n### Required world-setting reference (Knowledge Base)\nUse the following material to keep the outline consistent with the setting:\n{{content}}",
+    "knowledgeRef": "[Reference: {{name}}]\n{{content}}",
+    "worldHeader": "\n\n### Required world-setting reference (Knowledge Base)\nGround the character in the following material (race, occupation, faction, etc.):\n{{content}}"
+  },
+  "fallback": {
+    "unknownAge": "Unknown",
+    "untitled": "Untitled story"
+  },
+  "detail": {
+    "wiki": "Link",
+    "tag": "Tag",
+    "editor": "Editor"
   }
 }

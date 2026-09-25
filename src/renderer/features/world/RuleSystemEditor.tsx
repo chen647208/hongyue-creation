@@ -86,9 +86,9 @@ export const RuleSystemEditor: React.FC<RuleSystemEditorProps> = ({
   // 获取规则类型颜色（语义色，双主题安全）
   const getRuleTypeColor = (type: RuleSystemType): string => {
     const colors: Record<RuleSystemType, string> = {
-      cultivation: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+      cultivation: 'bg-destructive/10 text-destructive',
       magic: 'bg-chart-4/10 text-chart-4',
-      tech: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+      tech: 'bg-chart-8/10 text-chart-8',
       currency: 'bg-chart-2/10 text-chart-2',
       organization: 'bg-chart-1/10 text-chart-1',
       profession: 'bg-chart-5/10 text-chart-5',

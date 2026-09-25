@@ -104,26 +104,6 @@ export class AICardCommandService {
     };
     return i18n.t(displayKeys[command]);
   }
-
-  /**
-   * 获取命令的颜色主题
-   * @param command 命令类型
-   * @returns 颜色配置
-   */
-  static getCommandTheme(command: AICardCommand): { bg: string; text: string; border: string } {
-    const themes: Record<AICardCommand, { bg: string; text: string; border: string }> = {
-      character: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },
-      location: { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' },
-      faction: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' },
-      timeline: { bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-200' },
-      rule: { bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-200' },
-      event: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200' },
-      magic: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200' },
-      tech: { bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-200' },
-      history: { bg: 'bg-stone-100', text: 'text-stone-700', border: 'border-stone-200' },
-    };
-    return themes[command];
-  }
 }
 
 

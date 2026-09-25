@@ -514,7 +514,7 @@ const ExportChapterModal: React.FC<ExportChapterModalProps> = ({
             </div>
             <div className=" min-h-0 flex-1 overflow-auto bg-background p-4">
               {format === 'html' ? (
-                <iframe title="preview" srcDoc={previewText} className="h-80 w-full rounded-md border border-border bg-white" />
+                <iframe title="preview" srcDoc={previewText} className="h-80 w-full rounded-md border border-border bg-doc-preview" />
               ) : format === 'md' ? (
                 <MarkdownView content={previewText} />
               ) : (

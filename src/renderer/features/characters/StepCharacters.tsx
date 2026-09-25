@@ -99,11 +99,11 @@ const StepCharacters: React.FC<StepCharactersProps> = ({
       const titleMatch = sec.match(/(?:书名|标题|##)[:：]?\s*([^\n,，:：]+)/) || 
                          sec.match(/【([^】]+)】/) || 
                          [null, fallbackTitle];
-      const title = ((titleMatch[1] ?? '') || '未命名故事').replace(/[#*【】]/g, '').trim();
+      const title = ((titleMatch[1] ?? '') || t('steps:fallback.untitled')).replace(/[#*【】]/g, '').trim();
       const summary = sec.replace(titleMatch[0] ?? '', '').replace(/^[，,]\s*/, '').trim();
       return { title, summary };
     });
-  }, [project.intro, project.title]);
+  }, [project.intro, project.title, t]);
 
   const activeInspiration = inspirationOptions[selectedIndex] || { title: project.title, summary: project.intro };
 
@@ -125,9 +125,9 @@ const StepCharacters: React.FC<StepCharactersProps> = ({
     if (selectedKnowledgeIds.size > 0 && project.knowledge) {
        const kContent = project.knowledge
          .filter(k => selectedKnowledgeIds.has(k.id))
-         .map(k => `【参考资料：${k.name}】\n${k.content.substring(0, KNOWLEDGE_SNIPPET_TRUNCATE)}`)
+         .map(k => t('steps:prompt.knowledgeRef', { name: k.name, content: k.content.substring(0, KNOWLEDGE_SNIPPET_TRUNCATE) }))
          .join('\n\n');
-       if (kContent) finalPrompt += `\n\n### 必须参考的世界观/设定资料 (Knowledge Base)\n请务必参考以下设定资料来构建角色（如种族、职业、阵营等）：\n${kContent}`;
+       if (kContent) finalPrompt += t('steps:prompt.worldHeader', { content: kContent });
     }
 
     try {
@@ -408,7 +408,7 @@ const StepCharacters: React.FC<StepCharactersProps> = ({
                     id: Date.now().toString(),
                     name: t('archive.defaultName'),
                     gender: 'unknown' as const,
-                    age: '未知',
+                    age: t('steps:fallback.unknownAge'),
                     role: 'protagonist' as const,
                     personality: '',
                     background: '',
