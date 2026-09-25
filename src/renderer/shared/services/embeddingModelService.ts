@@ -188,6 +188,7 @@ export class EmbeddingModelService {
         url,
         headers: { 'Content-Type': 'application/json' },
         apiKeyRef: config.apiKey,
+        apiKeyHost: new URL(url).host,
       });
 
       if (!response.ok) {
@@ -340,6 +341,7 @@ export class EmbeddingModelService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
       apiKeyRef: config.apiKey,
+      apiKeyHost: new URL(url).host,
       timeoutMs: config.timeout,
     });
 

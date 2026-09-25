@@ -7,12 +7,14 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 
 import type { SandboxRunRequest } from '../../shared/sandbox.js';
+import { initMainI18n, tMain } from '../ai/i18n.js';
 import { registerLocalInferenceIpc, shutdownLocalRuntime } from '../ai/localRuntime.js';
 import { IPC } from '../channels.js';
 import { closeMcpClients,registerMcpClientIpc } from '../mcp/clientIpc.js';
@@ -47,6 +49,24 @@ function assertString(value: unknown, label: string): asserts value is string {
   }
 }
 
+/**
+ * 按已持久化的存储配置授权自定义数据目录（51 篇）。
+ * 目录授权只来自用户在原生对话框的真实点选；对话框授权不跨重启，
+ * 重启后主进程自行读取 storage-config.json 恢复授权，不经渲染层转达。
+ */
+async function allowPersistedStorageRoot(): Promise<void> {
+  try {
+    const configPath = path.join(app.getPath('userData'), 'storage-config.json');
+    const raw = await fs.readFile(configPath, 'utf-8');
+    const config = JSON.parse(raw) as { useCustomPath?: unknown; dataPath?: unknown };
+    if (config.useCustomPath !== true || typeof config.dataPath !== 'string' || config.dataPath.length === 0) return;
+    const stat = await fs.stat(config.dataPath).catch(() => null);
+    if (stat?.isDirectory()) allowRoot(config.dataPath);
+  } catch {
+    // 配置不存在或不可读：走默认 userData，无需授权
+  }
+}
+
 /** 窗口 Provider：创建主窗口。置于最后 boot（IPC 先就绪），最先 shutdown 无操作。 */
 export const windowProvider: Provider = {
   name: 'window',
@@ -69,16 +89,11 @@ export const windowProvider: Provider = {
 export const fileProvider: Provider = {
   name: 'file',
   boot(ctx: ProviderContext) {
-    // 默认只允许 userData；其余根经 fs:allow-path 注册或对话框返回时自动授权
+    void initMainI18n(app.getLocale());
+    // 默认只允许 userData；其余根只经对话框（用户真实点选）授权，见 allowPath 的调用点。
     allowRoot(app.getPath('userData'));
+    void allowPersistedStorageRoot();
     ipcMain.handle(IPC.getAppDataPath, () => app.getPath('userData'));
-    ipcMain.handle(IPC.allowPath, async (_event, dirPath: string) => {
-      assertString(dirPath, 'dirPath');
-      const stat = await fs.stat(dirPath).catch(() => null);
-      if (!stat?.isDirectory()) throw new Error(`路径不是目录：${dirPath}`);
-      allowRoot(dirPath);
-      return true;
-    });
 
     ipcMain.handle(IPC.readFile, async (_event, filePath: string) => {
       assertString(filePath, 'filePath');
@@ -190,12 +205,46 @@ export const fileProvider: Provider = {
         return verifyEd25519(Buffer.from(contentBase64, 'base64'), signatureBase64, publicKeyPem);
       },
     );
-    ipcMain.handle(IPC.pluginTrustedKeysSync, (_event, keys: unknown) => {
-      if (!Array.isArray(keys)) throw new TypeError('Invalid keys');
-      setTrustedPluginKeys(keys.filter((key): key is string => typeof key === 'string'));
-      return { ok: true };
-    });
     ipcMain.handle(IPC.pluginTrustedKeysList, () => listTrustedPluginKeys());
+    // 信任锚写路径经用户确认（51 篇）：渲染层每次只能增删一把公钥，主进程弹原生确认框；
+    // 无整体替换通道，渲染层被接管也无法静默更换信任锚。
+    ipcMain.handle(IPC.pluginTrustedKeyAdd, async (_event, publicKeyPem: string) => {
+      assertString(publicKeyPem, 'publicKeyPem');
+      if (!publicKeyPem.includes('BEGIN PUBLIC KEY')) throw new Error('不是 PEM 公钥');
+      if (isTrustedPluginKey(publicKeyPem)) return { ok: true as const, confirmed: true };
+      const win = ctx.getMainWindow();
+      const fingerprint = createHash('sha256').update(publicKeyPem).digest('hex').slice(0, 16);
+      const { response } = win
+        ? await dialog.showMessageBox(win, {
+            type: 'question',
+            buttons: [tMain('dialog.trustKey.confirm'), tMain('dialog.trustKey.cancel')],
+            defaultId: 1,
+            cancelId: 1,
+            message: tMain('dialog.trustKey.message', { fingerprint }),
+            detail: tMain('dialog.trustKey.detail'),
+          })
+        : { response: 1 };
+      if (response !== 0) return { ok: false as const, confirmed: false };
+      setTrustedPluginKeys([...listTrustedPluginKeys(), publicKeyPem]);
+      return { ok: true as const, confirmed: true };
+    });
+    ipcMain.handle(IPC.pluginTrustedKeyRemove, async (_event, publicKeyPem: string) => {
+      assertString(publicKeyPem, 'publicKeyPem');
+      if (!isTrustedPluginKey(publicKeyPem)) return { ok: true as const, confirmed: true };
+      const win = ctx.getMainWindow();
+      const { response } = win
+        ? await dialog.showMessageBox(win, {
+            type: 'question',
+            buttons: [tMain('dialog.trustKey.remove'), tMain('dialog.trustKey.cancel')],
+            defaultId: 1,
+            cancelId: 1,
+            message: tMain('dialog.trustKey.removeMessage'),
+          })
+        : { response: 1 };
+      if (response !== 0) return { ok: false as const, confirmed: false };
+      setTrustedPluginKeys(listTrustedPluginKeys().filter((key) => key !== publicKeyPem));
+      return { ok: true as const, confirmed: true };
+    });
     ipcMain.handle(IPC.pluginDigestMatches, (_event, contentBase64: string, digestBase64: string) =>
       sha256Matches(Buffer.from(contentBase64, 'base64'), digestBase64),
     );

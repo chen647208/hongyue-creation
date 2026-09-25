@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { utilityProcess } from 'electron';
 
 import {
-  DEFAULT_SANDBOX_LIMITS,
+  clampSandboxLimits,
   type SandboxRunRequest,
   type SandboxRunResult,
 } from '../../../shared/sandbox.js';
@@ -60,7 +60,8 @@ export class SandboxHost {
   ) {}
 
   async run(request: SandboxRunRequest): Promise<SandboxRunResult> {
-    const limits = { ...DEFAULT_SANDBOX_LIMITS, ...request.limits };
+    // IPC 入口统一钳制（51 篇）：渲染层带来的限额只能下调不能上调默认值
+    const limits = clampSandboxLimits(request.limits);
     const id = `sbx_${randomUUID()}`;
     let child: SandboxChildHandle;
     try {

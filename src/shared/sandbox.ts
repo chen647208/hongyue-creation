@@ -33,6 +33,22 @@ export const DEFAULT_SANDBOX_LIMITS: SandboxLimits = {
   maxOutputBytes: PLUGIN_SCRIPT_MAX_OUTPUT_BYTES,
 };
 
+/**
+ * 把请求方带来的限额钳制到安全上限（51 篇）：入参只能下调不能上调。
+ * 上限即默认值——请求 `timeoutMs: 1e9` 或超大内存都不会让子进程常驻或耗尽主进程内存。
+ */
+export function clampSandboxLimits(requested?: Partial<SandboxLimits>): SandboxLimits {
+  const clamp = (value: number | undefined, ceiling: number): number => {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return ceiling;
+    return Math.min(Math.floor(value), ceiling);
+  };
+  return {
+    memoryBytes: clamp(requested?.memoryBytes, PLUGIN_SCRIPT_MEMORY_BYTES),
+    timeoutMs: clamp(requested?.timeoutMs, PLUGIN_SCRIPT_TIMEOUT_MS),
+    maxOutputBytes: clamp(requested?.maxOutputBytes, PLUGIN_SCRIPT_MAX_OUTPUT_BYTES),
+  };
+}
+
 export type SandboxErrorKind = 'timeout' | 'memory' | 'runtime' | 'limit' | 'capability' | 'permission';
 
 /** WASM 宿主函数种类（受控实现，见 wasmRunner）。 */

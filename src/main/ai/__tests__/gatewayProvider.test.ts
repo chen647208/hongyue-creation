@@ -244,12 +244,12 @@ describe('aiGatewayProvider（IPC 网关）', () => {
       text: 'body',
     });
 
-    await performAiHttp({ url: 'https://x', apiKeyRef: 'vault:m' });
+    await performAiHttp({ url: 'https://x', apiKeyRef: 'vault:m', apiKeyHost: 'x' });
     const headers = (fetchMock.mock.calls[1]?.[1]?.headers ?? {}) as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer sk-vault');
 
     state.resolveVaultApiKey.mockResolvedValue(undefined);
-    await expect(performAiHttp({ url: 'https://x', apiKeyRef: 'vault:missing' })).rejects.toThrow(
+    await expect(performAiHttp({ url: 'https://x', apiKeyRef: 'vault:missing', apiKeyHost: 'x' })).rejects.toThrow(
       state.VAULT_UNAVAILABLE,
     );
 

@@ -74,11 +74,12 @@ export class ModelListService {
     }
     
     const url = `${endpoint}/models`;
-    
+
     const response = await gatewayHttp({
       url,
       headers: { 'Content-Type': 'application/json' },
       apiKeyRef: model.apiKey,
+      apiKeyHost: new URL(url).host,
     });
     
     if (!response.ok) {
@@ -105,6 +106,7 @@ export class ModelListService {
       apiKeyRef: model.apiKey,
       apiKeyHeader: 'x-api-key',
       apiKeyScheme: 'raw',
+      apiKeyHost: new URL(url).host,
     });
     
     if (!response.ok) {
@@ -142,7 +144,10 @@ export class ModelListService {
       url,
       headers: { 'Content-Type': 'application/json' },
       apiKeyRef: model.apiKey,
-      apiKeyQueryParam: 'key',
+      // Gemini 支持 x-goog-api-key 头：Key 走头不经 query（51 篇，query 会进访问日志）
+      apiKeyHeader: 'x-goog-api-key',
+      apiKeyScheme: 'raw',
+      apiKeyHost: new URL(url).host,
     });
 
     if (!response.ok) {

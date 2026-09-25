@@ -248,5 +248,22 @@
     "encryptConfirmTitle": "加密章节？",
     "encryptConfirmMessage": "《{{title}}》的正文将被加密为信封。没有口令将无法还原，请牢记口令。",
     "noChapters": "本书暂无章节"
+  },
+  "dialog": {
+    "trustKey": {
+      "confirm": "信任此公钥",
+      "cancel": "取消",
+      "message": "要把这把公钥加入插件签名信任清单吗？\n\n指纹（SHA-256 前 16 位）：{{fingerprint}}",
+      "detail": "信任后，用这把私钥签名的插件可以安装并进入沙箱运行。只信任你亲自核对过来源的公钥。",
+      "remove": "移除此公钥",
+      "removeMessage": "移除后，用它签名的插件将无法通过来源校验，可能无法更新或重新安装。确定移除吗？"
+    },
+    "netPolicy": {
+      "confirm": "保存白名单",
+      "cancel": "取消",
+      "message": "更新插件联网白名单？",
+      "detail": "白名单内的主机只对申请了联网能力的插件放行，其余一律拒绝。当前清单：{{hosts}}",
+      "emptyHosts": "（空，全部拒绝）"
+    }
   }
 }

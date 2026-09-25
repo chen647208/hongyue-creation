@@ -516,9 +516,16 @@
     },
     "trust": {
       "title": "Trusted signing keys",
-      "hint": "Paste plugin signing public keys (PEM, separate multiple with a blank line). Plugins shipping plugin.sig must be signed by a listed key or they are rejected; an empty list rejects all signed plugins.",
-      "save": "Save trusted keys",
-      "saved": "Saved"
+      "hint": "Paste one plugin signing public key (PEM) at a time. A native confirmation dialog asks before each key takes effect. Executable plugins with plugin.sig must be signed by a listed key, otherwise they are rejected. An empty list rejects all signed plugins.",
+      "pasteLabel": "Add a key",
+      "pasteHint": "Paste the full PEM (including BEGIN/END lines), one key per save.",
+      "add": "Request trust",
+      "added": "Added to the trust list",
+      "rejected": "Cancelled or failed",
+      "invalid": "Not a valid PEM public key",
+      "current": "Current trusted keys",
+      "none": "List is empty",
+      "remove": "Remove"
     },
     "sources": {
       "title": "Plugin source allowlist",

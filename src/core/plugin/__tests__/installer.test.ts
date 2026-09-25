@@ -34,6 +34,7 @@ class FakePort implements PluginInstallPort {
   removed: string[] = [];
   cleared: string[] = [];
   verifyResult = true;
+  verifySigCalls = 0;
   digestResult = true;
   commitError?: Error;
   installed = new Map<string, string>();
@@ -41,7 +42,10 @@ class FakePort implements PluginInstallPort {
   constructor(private readonly pkg: PluginPackage) {}
 
   readPackage = async (): Promise<PluginPackage> => this.pkg;
-  verifySignature = async (): Promise<boolean> => this.verifyResult;
+  verifySignature = async (): Promise<boolean> => {
+    this.verifySigCalls += 1;
+    return this.verifyResult;
+  };
   digestMatches = async (): Promise<boolean> => this.digestResult;
   readInstalledVersion = async (id: string): Promise<string | undefined> => this.installed.get(id);
   commit = async (pkg: PluginPackage): Promise<void> => {
@@ -76,6 +80,21 @@ describe('installer（安装/更新/卸载与签名拒绝）', () => {
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('签名');
     expect(port.committed).toHaveLength(0);
+  });
+
+  it('sha256 信封不满足 requireSignature：拒装（自算摘要不能冒充来源认证，51 篇）', async () => {
+    const port = new FakePort(makePackage({ contributes: { logic: ['./logic/'] } }, { algorithm: 'sha256', digest: 'abc' }));
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('来源认证');
+    expect(port.verifySigCalls).toBe(0);
+  });
+
+  it('非可执行插件带 sha256 信封：只做完整性校验，可安装', async () => {
+    const port = new FakePort(makePackage({}, { algorithm: 'sha256', digest: 'abc' }));
+    const result = await installPackage(port, '/src/com.example.p', { hostVersion: HOST, allowAnySource: true });
+    expect(result).toMatchObject({ ok: true, action: 'install' });
+    expect(port.verifySigCalls).toBe(0);
   });
 
   it('摘要不匹配（篡改）：拒装', async () => {

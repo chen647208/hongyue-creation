@@ -1461,7 +1461,6 @@ export interface LocalRuntimeStatus {
 export interface ElectronAPI {
   // 文件系统操作
   getAppDataPath: () => Promise<string>;
-  allowPath: (dirPath: string) => Promise<boolean>;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, data: string) => Promise<boolean>;
   appendFile: (filePath: string, data: string) => Promise<boolean>;
@@ -1495,7 +1494,10 @@ export interface ElectronAPI {
   pluginFetch: (url: string) => Promise<{ ok: boolean; status?: number; text?: string; error?: string }>;
   /** 校验插件包签名（Ed25519，主进程持私钥无关的公开校验）。 */
   pluginVerifySignature: (contentBase64: string, signatureBase64: string, publicKeyPem: string) => Promise<boolean>;
-  pluginTrustedKeysSync?: (keys: string[]) => Promise<{ ok: boolean }>;
+  /** 请求主进程把一把公钥加入信任清单（弹原生确认框，用户确认才生效）。 */
+  pluginTrustedKeyAdd?: (publicKeyPem: string) => Promise<{ ok: boolean; confirmed: boolean }>;
+  /** 请求主进程移除一把受信公钥（弹原生确认框）。 */
+  pluginTrustedKeyRemove?: (publicKeyPem: string) => Promise<{ ok: boolean; confirmed: boolean }>;
   pluginTrustedKeysList?: () => Promise<string[]>;
   /** 校验 sha256 摘要信封（完整性，不认证来源）。 */
   pluginDigestMatches: (contentBase64: string, digestBase64: string) => Promise<boolean>;
@@ -1605,7 +1607,8 @@ export interface ElectronAPI {
       apiKeyRef?: string;
       apiKeyHeader?: string;
       apiKeyScheme?: 'bearer' | 'raw';
-      apiKeyQueryParam?: string;
+      /** 保险库 Key 的允许目标域（与请求 URL 的 host 比对）；不传则拒绝注入 Key。 */
+      apiKeyHost?: string;
       timeoutMs?: number;
     }) => Promise<{ ok: boolean; status: number; statusText: string; text: string }>;
   };

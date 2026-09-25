@@ -18,7 +18,7 @@
  * 两者合起来保证无残留。
  */
 import type { PluginSignatureEnvelope } from '../../shared/pluginSignature.js';
-import { compareSemver } from './catalog.js';
+import { compareSemver, isIndexSignatureAlgorithm } from './catalog.js';
 import { type ManifestIssue, satisfiesRange, validateManifest } from './manifest.js';
 
 /** 一个已读取的插件包（manifest 原文 + 解析值 + 资源）。 */
@@ -121,8 +121,15 @@ export async function installPackage(
   const requireSignature = options.requireSignature === true || executable;
 
   if (pkg.signature) {
-    const verified = await port.verifySignature(pkg.manifestText, pkg.signature);
-    if (!verified) return failure('插件签名校验失败（包被篡改或公钥不受信任）');
+    // 签名两级语义（51 篇）：ed25519/cosign 才能认证来源；sha256 信封只校验完整性，
+    // 攻击者可对任意 manifest 自算摘要，不得满足 requireSignature。
+    if (requireSignature && !isIndexSignatureAlgorithm(pkg.signature.algorithm)) {
+      return failure('来源认证不足：sha256 摘要仅校验完整性，可执行插件必须提供 ed25519 或 cosign 签名');
+    }
+    if (isIndexSignatureAlgorithm(pkg.signature.algorithm)) {
+      const verified = await port.verifySignature(pkg.manifestText, pkg.signature);
+      if (!verified) return failure('插件签名校验失败（包被篡改或公钥不受信任）');
+    }
   } else if (requireSignature) {
     return failure('缺少签名：可执行贡献或强制签名要求的插件必须带 plugin.sig');
   }

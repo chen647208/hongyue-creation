@@ -95,7 +95,7 @@ describe('performAiHttp（受控 HTTP 网关）', () => {
   it('明文 Key 注入 Authorization: Bearer，并透传响应', async () => {
     const fetchMock = fakeFetch();
     vi.stubGlobal('fetch', fetchMock);
-    const response = await performAiHttp({ url: 'https://api.x/models', apiKeyRef: 'sk-plain' });
+    const response = await performAiHttp({ url: 'https://api.x/models', apiKeyRef: 'sk-plain', apiKeyHost: 'api.x' });
     expect(response).toEqual({ ok: true, status: 200, statusText: 'OK', text: '{"ok":1}' });
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-plain');
@@ -105,19 +105,35 @@ describe('performAiHttp（受控 HTTP 网关）', () => {
   it('自定义头名与 raw 方案（Anthropic x-api-key）', async () => {
     const fetchMock = fakeFetch();
     vi.stubGlobal('fetch', fetchMock);
-    await performAiHttp({ url: 'https://api.anthropic.com/v1/models', apiKeyRef: 'sk-ant', apiKeyHeader: 'x-api-key', apiKeyScheme: 'raw' });
+    await performAiHttp({ url: 'https://api.anthropic.com/v1/models', apiKeyRef: 'sk-ant', apiKeyHeader: 'x-api-key', apiKeyScheme: 'raw', apiKeyHost: 'api.anthropic.com' });
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
     expect((init.headers as Record<string, string>)['x-api-key']).toBe('sk-ant');
     vi.unstubAllGlobals();
   });
 
-  it('查询参数注入（Gemini key）不改动请求头', async () => {
+  it('Gemini Key 走 x-goog-api-key 头（不再经 query）', async () => {
     const fetchMock = fakeFetch();
     vi.stubGlobal('fetch', fetchMock);
-    await performAiHttp({ url: 'https://generativelanguage.googleapis.com/v1beta/models', apiKeyRef: 'AIza', apiKeyQueryParam: 'key' });
-    const url = fetchMock.mock.calls[0]![0] as URL;
-    expect(url.searchParams.get('key')).toBe('AIza');
+    await performAiHttp({
+      url: 'https://generativelanguage.googleapis.com/v1beta/models',
+      apiKeyRef: 'AIza',
+      apiKeyHeader: 'x-goog-api-key',
+      apiKeyScheme: 'raw',
+      apiKeyHost: 'generativelanguage.googleapis.com',
+    });
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('AIza');
     vi.unstubAllGlobals();
+  });
+
+  it('目标域与 apiKeyHost 不一致：拒绝注入 Key', async () => {
+    await expect(
+      performAiHttp({ url: 'https://evil.example/v1', apiKeyRef: 'sk-x', apiKeyHost: 'api.x' }),
+    ).rejects.toThrow('拒绝注入');
+  });
+
+  it('带 apiKeyRef 但缺 apiKeyHost：拒绝注入', async () => {
+    await expect(performAiHttp({ url: 'https://api.x/models', apiKeyRef: 'sk-x' })).rejects.toThrow('拒绝注入');
   });
 
   it('拒绝非 http/https 协议', async () => {

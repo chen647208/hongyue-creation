@@ -16,7 +16,7 @@
 
 import { getQuickJS } from '../../../shared/quickjs.js';
 import {
-  DEFAULT_SANDBOX_LIMITS,
+  clampSandboxLimits,
   type SandboxError,
   type SandboxRunRequest,
   type SandboxRunResult,
@@ -41,7 +41,8 @@ export async function runQuickJS(
   request: SandboxRunRequest,
   onLog?: (level: string, message: string) => void,
 ): Promise<SandboxRunResult> {
-  const limits = { ...DEFAULT_SANDBOX_LIMITS, ...request.limits };
+  // 进程内执行也钳制（51 篇纵深防御）：IPC 入口已钳，这里再保一次
+  const limits = clampSandboxLimits(request.limits);
   const deadline = Date.now() + limits.timeoutMs;
   let timedOut = false;
 

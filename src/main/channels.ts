@@ -13,7 +13,6 @@
  */
 export const IPC = {
   getAppDataPath: 'get-app-data-path',
-  allowPath: 'fs:allow-path',
   readFile: 'read-file',
   writeFile: 'write-file',
   appendFile: 'append-file',
@@ -34,7 +33,8 @@ export const IPC = {
   pluginSandboxRun: 'plugin-sandbox-run',
   pluginFetch: 'plugin-fetch',
   pluginVerifySignature: 'plugin-verify-signature',
-  pluginTrustedKeysSync: 'plugin-trusted-keys-sync',
+  pluginTrustedKeyAdd: 'plugin-trusted-key-add',
+  pluginTrustedKeyRemove: 'plugin-trusted-key-remove',
   pluginTrustedKeysList: 'plugin-trusted-keys-list',
   pluginDigestMatches: 'plugin-digest-matches',
   pluginCosignVerify: 'plugin-cosign-verify',

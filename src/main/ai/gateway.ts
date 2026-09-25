@@ -88,8 +88,8 @@ export interface GatewayHttpRequest {
   apiKeyHeader?: string;
   /** 头值方案：bearer → `Bearer <key>`；raw → 原样。默认 bearer。 */
   apiKeyScheme?: 'bearer' | 'raw';
-  /** 非空时以查询参数注入 Key（如 Gemini 的 key）。 */
-  apiKeyQueryParam?: string;
+  /** Key 的允许目标域（51 篇）：与请求 URL 的 host 不一致即拒绝注入，防 Key 转投任意域。 */
+  apiKeyHost?: string;
   timeoutMs?: number;
 }
 
@@ -109,13 +109,14 @@ export async function performAiHttp(request: GatewayHttpRequest): Promise<Gatewa
   }
   const headers: Record<string, string> = { ...(request.headers ?? {}) };
   if (request.apiKeyRef) {
+    // Key 域绑定（51 篇）：只注入到声明匹配的 host，渲染层被接管也无法把 Key 转投任意域。
+    if (!request.apiKeyHost || request.apiKeyHost !== url.host) {
+      throw new Error(`拒绝注入 API Key：目标域 ${url.host} 与声明的允许域不一致`);
+    }
+    // Key 只进请求头：query 参数会进代理与访问日志，不提供。
     const key = await resolveVaultApiKey(request.apiKeyRef);
     if (!key) throw new Error(VAULT_UNAVAILABLE);
-    if (request.apiKeyQueryParam) {
-      url.searchParams.set(request.apiKeyQueryParam, key);
-    } else {
-      headers[request.apiKeyHeader ?? 'Authorization'] = request.apiKeyScheme === 'raw' ? key : `Bearer ${key}`;
-    }
+    headers[request.apiKeyHeader ?? 'Authorization'] = request.apiKeyScheme === 'raw' ? key : `Bearer ${key}`;
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), request.timeoutMs ?? 30_000);

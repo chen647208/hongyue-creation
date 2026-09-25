@@ -22,7 +22,7 @@ interface HttpRequest {
   apiKeyRef?: string;
   apiKeyHeader?: string;
   apiKeyScheme?: string;
-  apiKeyQueryParam?: string;
+  apiKeyHost?: string;
 }
 
 function ok(body: unknown, status = 200): { ok: boolean; status: number; statusText: string; text: string } {
@@ -82,7 +82,9 @@ describe('ModelListService 各协议列表端点', () => {
     const result = await ModelListService.fetchModels(model({ provider: 'gemini', endpoint: '', apiKey: 'AIza-xyz' }));
     const request = httpMock.mock.calls[0]![0] as HttpRequest;
     expect(request.url).toContain('generativelanguage.googleapis.com/v1beta/models');
-    expect(request.apiKeyQueryParam).toBe('key');
+    expect(request.apiKeyHeader).toBe('x-goog-api-key');
+    expect(request.apiKeyScheme).toBe('raw');
+    expect(request.apiKeyHost).toBe('generativelanguage.googleapis.com');
     expect(request.apiKeyRef).toBe('AIza-xyz');
     expect(result).toEqual(['gemini-3.7-flash', 'gemini-3.5-flash']);
   });

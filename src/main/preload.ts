@@ -19,7 +19,6 @@ import { IPC } from './channels.js';
 contextBridge.exposeInMainWorld('electronAPI', {
   // 文件系统操作
   getAppDataPath: () => ipcRenderer.invoke(IPC.getAppDataPath),
-  allowPath: (dirPath: string) => ipcRenderer.invoke(IPC.allowPath, dirPath),
   readFile: (filePath: string) => ipcRenderer.invoke(IPC.readFile, filePath),
   writeFile: (filePath: string, data: string) => ipcRenderer.invoke(IPC.writeFile, filePath, data),
   appendFile: (filePath: string, data: string) => ipcRenderer.invoke(IPC.appendFile, filePath, data),
@@ -46,7 +45,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pluginFetch: (url: string) => ipcRenderer.invoke(IPC.pluginFetch, url),
   pluginVerifySignature: (contentBase64: string, signatureBase64: string, publicKeyPem: string) =>
     ipcRenderer.invoke(IPC.pluginVerifySignature, contentBase64, signatureBase64, publicKeyPem),
-  pluginTrustedKeysSync: (keys: string[]) => ipcRenderer.invoke(IPC.pluginTrustedKeysSync, keys),
+  pluginTrustedKeyAdd: (publicKeyPem: string) => ipcRenderer.invoke(IPC.pluginTrustedKeyAdd, publicKeyPem),
+  pluginTrustedKeyRemove: (publicKeyPem: string) => ipcRenderer.invoke(IPC.pluginTrustedKeyRemove, publicKeyPem),
   pluginTrustedKeysList: () => ipcRenderer.invoke(IPC.pluginTrustedKeysList),
   pluginDigestMatches: (contentBase64: string, digestBase64: string) =>
     ipcRenderer.invoke(IPC.pluginDigestMatches, contentBase64, digestBase64),

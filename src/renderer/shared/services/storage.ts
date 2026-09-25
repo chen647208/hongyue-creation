@@ -79,8 +79,7 @@ const getStoragePath = async (): Promise<string> => {
     try {
       const config = await getStorageConfig();
       if (config.useCustomPath && config.dataPath) {
-        // 自定义数据目录经路径门注册后才能读写
-        await window.electronAPI.allowPath?.(config.dataPath).catch(() => undefined);
+        // 自定义数据目录由主进程按持久化配置自行授权（51 篇），渲染层无授权通道
         return `${config.dataPath}/${STORAGE_FILE_NAME}`;
       } else {
         // 使用默认应用数据路径

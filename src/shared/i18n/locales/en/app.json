@@ -248,5 +248,22 @@
     "encryptConfirmTitle": "Encrypt chapter?",
     "encryptConfirmMessage": "\"{{title}}\" will be encrypted into an envelope. Without the passphrase it cannot be recovered.",
     "noChapters": "No chapters in this book yet"
+  },
+  "dialog": {
+    "trustKey": {
+      "confirm": "Trust this key",
+      "cancel": "Cancel",
+      "message": "Add this public key to the plugin signature trust list?\n\nFingerprint (first 16 hex of SHA-256): {{fingerprint}}",
+      "detail": "Once trusted, plugins signed with the matching private key can be installed and run in the sandbox. Only trust keys whose origin you have verified yourself.",
+      "remove": "Remove key",
+      "removeMessage": "After removal, plugins signed with this key fail source verification and may stop installing or updating. Remove it?"
+    },
+    "netPolicy": {
+      "confirm": "Save allowlist",
+      "cancel": "Cancel",
+      "message": "Update the plugin network allowlist?",
+      "detail": "Only hosts on the list are reachable for plugins granted network capability; everything else is denied. Current list: {{hosts}}",
+      "emptyHosts": "(empty, deny all)"
+    }
   }
 }

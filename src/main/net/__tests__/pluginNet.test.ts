@@ -26,6 +26,9 @@ vi.mock('electron', () => ({
       state.handlers.set(channel, fn);
     },
   },
+  // netSetPolicy 的确认框依赖：模拟有窗口且用户点「确认」（response 0）
+  BrowserWindow: { getAllWindows: () => [{ id: 1 }] as never[] },
+  dialog: { showMessageBox: async () => ({ response: 0 }) },
 }));
 
 vi.mock('../../logger.js', () => ({
@@ -151,10 +154,10 @@ describe('registerPluginNetIpc（策略持久化与 IPC）', () => {
   it('set-policy 校验入参、写盘并内存生效', async () => {
     await register();
     const set = state.handlers.get(IPC.plugin.netSetPolicy)!;
-    expect(() => set(null, null)).toThrow(TypeError);
-    expect(() => set(null, { allowedHosts: 'nope' })).toThrow(TypeError);
+    await expect(set(null, null)).rejects.toThrow(TypeError);
+    await expect(set(null, { allowedHosts: 'nope' })).rejects.toThrow(TypeError);
 
-    expect(set(null, { allowedHosts: ['a.com'] })).toEqual({ ok: true });
+    await expect(set(null, { allowedHosts: ['a.com'] })).resolves.toEqual({ ok: true });
 
     const get = state.handlers.get(IPC.plugin.netGetPolicy)!;
     expect(get(null)).toEqual(
@@ -173,7 +176,7 @@ describe('registerPluginNetIpc（策略持久化与 IPC）', () => {
     writeFileSync(target, 'x', 'utf-8');
     state.userData = target;
     const set = state.handlers.get(IPC.plugin.netSetPolicy)!;
-    expect(set(null, { allowedHosts: ['a.com'] })).toEqual({ ok: true });
+    await expect(set(null, { allowedHosts: ['a.com'] })).resolves.toEqual({ ok: true });
     expect(state.warn).toHaveBeenCalled();
   });
 
@@ -192,7 +195,7 @@ describe('registerPluginNetIpc（策略持久化与 IPC）', () => {
       error: expect.any(String),
     });
 
-    state.handlers.get(IPC.plugin.netSetPolicy)!(null, { allowedHosts: ['a.com'] });
+    await state.handlers.get(IPC.plugin.netSetPolicy)!(null, { allowedHosts: ['a.com'] });
     await expect(fetchHandler(null, { url: 'https://a.com' })).resolves.toEqual({ ok: true, status: 200, text: 'ok' });
   });
 });

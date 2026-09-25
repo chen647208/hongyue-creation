@@ -116,11 +116,31 @@ function readTrustedPluginKeys(): string[] | undefined {
   return readStringArraySetting(STORAGE_KEYS.trustedPluginKeys);
 }
 
-/** 保存信任公钥并立即生效（设置面板调用）。 */
-export function saveTrustedPluginKeys(keys: readonly string[]): void {
+/**
+ * 请求把一把公钥加入信任清单（设置面板调用）。
+ * 主进程弹原生确认框，用户确认后落盘并即时生效；拒绝或不可用返回 false。
+ */
+export async function requestAddTrustedPluginKey(publicKeyPem: string): Promise<boolean> {
+  const api = typeof window === 'undefined' ? undefined : window.electronAPI;
+  if (!api?.pluginTrustedKeyAdd) return false;
+  const result = await api.pluginTrustedKeyAdd(publicKeyPem);
+  if (!result.ok || !result.confirmed) return false;
+  const keys = await (api.pluginTrustedKeysList?.() ?? Promise.resolve([]));
   localStore.setItem(STORAGE_KEYS.trustedPluginKeys, JSON.stringify(keys));
   setTrustedPluginKeys(keys);
-  void window.electronAPI?.pluginTrustedKeysSync?.([...keys]);
+  return true;
+}
+
+/** 请求移除一把受信公钥（主进程确认框），成功后刷新本地缓存。 */
+export async function requestRemoveTrustedPluginKey(publicKeyPem: string): Promise<boolean> {
+  const api = typeof window === 'undefined' ? undefined : window.electronAPI;
+  if (!api?.pluginTrustedKeyRemove) return false;
+  const result = await api.pluginTrustedKeyRemove(publicKeyPem);
+  if (!result.ok || !result.confirmed) return false;
+  const keys = await (api.pluginTrustedKeysList?.() ?? Promise.resolve([]));
+  localStore.setItem(STORAGE_KEYS.trustedPluginKeys, JSON.stringify(keys));
+  setTrustedPluginKeys(keys);
+  return true;
 }
 
 /** 配置允许的插件来源白名单；空清单表示不限制来源。 */
@@ -478,18 +498,15 @@ export async function bootstrapPlugins(
   // 构建管线消费插件渲染器：把宿主门控后的同步执行装配为 core/build 端口（缺省即无）。
   setBuildRendererHost(host);
   try {
-    const storedKeys = readTrustedPluginKeys();
-    if (storedKeys) setTrustedPluginKeys(storedKeys);
-    // 信任清单同步到主进程：签名校验以主进程清单为准。
+    // 信任清单以主进程为唯一真源（51 篇）：启动时拉取并缓存，localStorage 只是只读镜像。
     const trustApi = typeof window === 'undefined' ? undefined : window.electronAPI;
     if (trustApi?.pluginTrustedKeysList) {
       const mainKeys = await trustApi.pluginTrustedKeysList();
-      if (mainKeys.length > 0) {
-        setTrustedPluginKeys(mainKeys);
-        localStore.setItem(STORAGE_KEYS.trustedPluginKeys, JSON.stringify(mainKeys));
-      } else if (storedKeys && trustApi.pluginTrustedKeysSync) {
-        await trustApi.pluginTrustedKeysSync([...storedKeys]);
-      }
+      setTrustedPluginKeys(mainKeys);
+      localStore.setItem(STORAGE_KEYS.trustedPluginKeys, JSON.stringify(mainKeys));
+    } else {
+      const storedKeys = readTrustedPluginKeys();
+      if (storedKeys) setTrustedPluginKeys(storedKeys);
     }
     const storedSources = readAllowedPluginSources();
     if (storedSources) setAllowedPluginSources(storedSources);

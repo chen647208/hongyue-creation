@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { app, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 
 import {
   DEFAULT_NETWORK_POLICY,
@@ -25,6 +25,7 @@ import {
   evaluateNetworkRequest,
   type NetworkGatePolicy,
 } from '../../core/plugin/netGate.js';
+import { tMain } from '../ai/i18n.js';
 import { IPC } from '../channels.js';
 import { logger } from '../logger.js';
 
@@ -111,11 +112,26 @@ export async function performPluginNetFetch(
 
 export function registerPluginNetIpc(): void {
   ipcMain.handle(IPC.plugin.netGetPolicy, () => loadPolicy());
-  ipcMain.handle(IPC.plugin.netSetPolicy, (_event, policy: NetworkGatePolicy) => {
+  ipcMain.handle(IPC.plugin.netSetPolicy, async (_event, policy: NetworkGatePolicy) => {
     if (typeof policy !== 'object' || policy === null || !Array.isArray(policy.allowedHosts)) {
       throw new TypeError('Invalid plugin net policy');
     }
-    saveNetworkPolicy(policy);
+    // 白名单变更经用户确认（51 篇）：渲染层被接管时无法静默放行任意主机。
+    const hosts = policy.allowedHosts.filter((host): host is string => typeof host === 'string' && host.length > 0);
+    const windows = BrowserWindow.getAllWindows();
+    const parent = windows[0] ?? null;
+    const { response } = parent
+      ? await dialog.showMessageBox(parent, {
+          type: 'question',
+          buttons: [tMain('dialog.netPolicy.confirm'), tMain('dialog.netPolicy.cancel')],
+          defaultId: 1,
+          cancelId: 1,
+          message: tMain('dialog.netPolicy.message'),
+          detail: tMain('dialog.netPolicy.detail', { hosts: hosts.length > 0 ? hosts.join(', ') : tMain('dialog.netPolicy.emptyHosts') }),
+        })
+      : { response: 1 };
+    if (response !== 0) return { ok: false as const };
+    saveNetworkPolicy({ allowedHosts: hosts });
     return { ok: true as const };
   });
   ipcMain.handle(IPC.plugin.netFetch, (_event, request: PluginNetFetchRequest) => {
