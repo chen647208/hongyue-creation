@@ -28,7 +28,7 @@ const untracked = execSync('git ls-files --others --exclude-standard', { encodin
   .split('\n').map((s) => s.trim()).filter(Boolean);
 for (const f of untracked) {
   if (f === 'package-lock.json') continue;
-  let content = '';
+  let content;
   try {
     content = readFileSync(f, 'utf-8');
   } catch {

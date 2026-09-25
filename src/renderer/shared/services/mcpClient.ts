@@ -15,6 +15,8 @@
 import type { ToolPermission, ToolRegistry } from '@core/ai';
 import type { McpServerConfig } from '@shared/types';
 
+import { i18n } from '@/i18n';
+
 export interface McpRemoteTool {
   serverId: string;
   toolId: string;
@@ -60,7 +62,7 @@ function remoteParameters(inputSchema: unknown): Record<string, unknown> {
 
 function api() {
   const gateway = window.electronAPI?.mcpClient;
-  if (!gateway) throw new Error('MCP 客户端需要 Electron 环境');
+  if (!gateway) throw new Error(i18n.t('errors:mcp.desktopRequired'));
   return gateway;
 }
 

@@ -28,12 +28,14 @@ import {
 } from '@core/sync';
 import type { FileDialogOptions, SaveDialogOptions, SyncTransportConfig } from '@shared/types';
 
+import { i18n } from '@/i18n';
+
 import { saveTextFile } from './fileSave';
 import { repository } from './repository';
 import { getSyncObject, putSyncObject, type RetryOptions } from './syncTransportService';
 
 function db(): NonNullable<Window['electronAPI']>['db'] {
-  if (!window.electronAPI) throw new Error('同步需要桌面环境（文件系统/SQLite）');
+  if (!window.electronAPI) throw new Error(i18n.t('errors:sync.desktopRequired'));
   return window.electronAPI.db;
 }
 
@@ -85,11 +87,11 @@ function ipcSyncStore(): SyncEntityStore {
 function repositorySyncStore(): SyncEntityStore {
   return {
     read: async (bookId) => {
-      if (!repository.readSyncEntities) throw new Error('当前存储后端不支持同步合并');
+      if (!repository.readSyncEntities) throw new Error(i18n.t('errors:sync.backendUnsupportedMerge'));
       return repository.readSyncEntities(bookId);
     },
     upsert: async (input) => {
-      if (!repository.applySyncEntities) throw new Error('当前存储后端不支持同步合并');
+      if (!repository.applySyncEntities) throw new Error(i18n.t('errors:sync.backendUnsupportedMerge'));
       await repository.applySyncEntities(input);
     },
   };
@@ -136,7 +138,7 @@ export async function exportSyncBundle(bookId: string, bookTitle: string): Promi
       filters: [{ name: 'AI Novel Sync', extensions: ['json'] }],
     };
     const save = await api.saveFileDialog(saveOptions);
-    if (save.canceled || !save.filePath) throw new Error('已取消导出');
+    if (save.canceled || !save.filePath) throw new Error(i18n.t('errors:sync.exportCancelled'));
     await api.writeFile(save.filePath, JSON.stringify(bundle, null, 2));
     return { path: save.filePath, changeCount };
   }
@@ -288,7 +290,7 @@ export async function prepareDownloadBundle(
   options: RetryOptions = {},
 ): Promise<SyncMergePlan> {
   const raw = await getSyncObject(config, key, options);
-  if (raw === null || raw === undefined) throw new Error(`远端不存在同步包：${key}`);
+  if (raw === null || raw === undefined) throw new Error(i18n.t('errors:sync.remoteBundleMissing', { key }));
   return prepareSync(JSON.parse(raw) as SyncBundle);
 }
 

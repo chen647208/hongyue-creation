@@ -164,7 +164,7 @@ export class EmbeddingModelService {
       });
 
       if (!response.ok) {
-        throw new Error(`Ollama请求失败: ${response.status} ${response.statusText}`);
+        throw new Error(i18n.t('errors:embedding.ollamaRequestFailed', { status: response.status, detail: response.statusText }));
       }
 
       const data = asRecord(JSON.parse(response.text) as unknown);

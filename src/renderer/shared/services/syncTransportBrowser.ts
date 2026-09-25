@@ -26,6 +26,8 @@ import {
 } from '@shared/sync/chunkManifest';
 import type { SyncS3TransportConfig, SyncTransportConfig, SyncTransportObject, SyncWebDavTransportConfig } from '@shared/types';
 
+import { i18n } from '@/i18n';
+
 export interface BrowserTransportSecrets {
   password?: string;
   secretAccessKey?: string;
@@ -47,7 +49,7 @@ export function sanitizeTransportKey(key: string): string {
   const normalized = key.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
   const segments = normalized.split('/');
   if (!normalized || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
-    throw new Error(`非法对象键：${key}`);
+    throw new Error(i18n.t('errors:sync.invalidObjectKey', { key }));
   }
   return normalized;
 }
@@ -87,11 +89,11 @@ export function buildWebDavDirUrl(baseUrl: string, remoteDir: string | undefined
 
 export function buildWebDavAuthHeader(auth: WebDavAuth): Record<string, string> {
   if (auth.type === 'basic') {
-    if (!auth.username) throw new Error('WebDAV Basic 认证缺少用户名');
+    if (!auth.username) throw new Error(i18n.t('errors:webdav.basicUsernameMissing'));
     return { Authorization: `Basic ${toBase64(`${auth.username}:${auth.secret ?? ''}`)}` };
   }
   if (auth.type === 'bearer') {
-    if (!auth.secret) throw new Error('WebDAV Bearer 认证缺少令牌');
+    if (!auth.secret) throw new Error(i18n.t('errors:webdav.bearerSecretMissing'));
     return { Authorization: `Bearer ${auth.secret}` };
   }
   return {};
@@ -116,7 +118,7 @@ function createWebDavTransport(
   secrets: BrowserTransportSecrets,
   doFetch: FetchLike,
 ): BrowserTransport {
-  if (!config.baseUrl) throw new Error('WebDAV 缺少服务地址');
+  if (!config.baseUrl) throw new Error(i18n.t('errors:webdav.baseUrlMissing'));
   const auth: WebDavAuth = { type: config.authType, username: config.username, secret: secrets.password };
   const authHeaders = (): Record<string, string> => buildWebDavAuthHeader(auth);
   const dirUrl = buildWebDavDirUrl(config.baseUrl, config.remoteDir);
@@ -124,9 +126,9 @@ function createWebDavTransport(
   return {
     async test() {
       const response = await doFetch(dirUrl, { method: 'PROPFIND', headers: { ...authHeaders(), Depth: '0' } });
-      if (response.status === 401 || response.status === 403) throw new Error('认证失败：用户名、密码或令牌无效');
-      if (response.status === 404) throw new Error(`远端目录不存在：${dirUrl}`);
-      if (response.status !== 207 && !response.ok) throw new Error(`WebDAV 返回 ${response.status} ${response.statusText}`);
+      if (response.status === 401 || response.status === 403) throw new Error(i18n.t('errors:webdav.authFailed'));
+      if (response.status === 404) throw new Error(i18n.t('errors:webdav.dirMissing', { url: dirUrl }));
+      if (response.status !== 207 && !response.ok) throw new Error(i18n.t('errors:webdav.unexpectedStatus', { status: response.status, detail: response.statusText }));
     },
 
     async put(key, data) {
@@ -135,7 +137,7 @@ function createWebDavTransport(
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: data,
       });
-      if (!response.ok) throw new Error(`WebDAV 上传失败：${response.status} ${response.statusText}`);
+      if (!response.ok) throw new Error(i18n.t('errors:webdav.putFailed', { status: response.status, detail: response.statusText }));
     },
 
     async get(key) {
@@ -144,7 +146,7 @@ function createWebDavTransport(
         headers: authHeaders(),
       });
       if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`WebDAV 下载失败：${response.status} ${response.statusText}`);
+      if (!response.ok) throw new Error(i18n.t('errors:webdav.getFailed', { status: response.status, detail: response.statusText }));
       return response.text();
     },
 
@@ -153,7 +155,7 @@ function createWebDavTransport(
       const listUrl = cleanPrefix ? buildWebDavUrl(config.baseUrl, config.remoteDir, cleanPrefix) : dirUrl;
       const response = await doFetch(listUrl, { method: 'PROPFIND', headers: { ...authHeaders(), Depth: '1' } });
       if (response.status === 404) return [];
-      if (response.status !== 207 && !response.ok) throw new Error(`WebDAV 列举失败：${response.status} ${response.statusText}`);
+      if (response.status !== 207 && !response.ok) throw new Error(i18n.t('errors:webdav.listFailed', { status: response.status, detail: response.statusText }));
       const xml = await response.text();
       const dirPath = new URL(listUrl).pathname.replace(/\/+$/, '');
       const objects: SyncTransportObject[] = [];
@@ -177,7 +179,7 @@ function createWebDavTransport(
         method: 'DELETE',
         headers: authHeaders(),
       });
-      if (!response.ok && response.status !== 404) throw new Error(`WebDAV 删除失败：${response.status} ${response.statusText}`);
+      if (!response.ok && response.status !== 404) throw new Error(i18n.t('errors:webdav.deleteFailed', { status: response.status, detail: response.statusText }));
     },
   };
 }
@@ -283,10 +285,10 @@ interface S3Target {
 }
 
 function createS3Transport(config: SyncS3TransportConfig, secrets: BrowserTransportSecrets, doFetch: FetchLike): BrowserTransport {
-  if (!config.endpoint) throw new Error('S3 缺少端点地址');
-  if (!config.bucket) throw new Error('S3 缺少存储桶');
+  if (!config.endpoint) throw new Error(i18n.t('errors:s3.endpointMissing'));
+  if (!config.bucket) throw new Error(i18n.t('errors:s3.bucketMissing'));
   const secretAccessKey = secrets.secretAccessKey;
-  if (!secretAccessKey) throw new Error('S3 Secret Access Key 缺失：请在设置中重新保存凭据');
+  if (!secretAccessKey) throw new Error(i18n.t('errors:s3.secretMissing'));
   const endpoint = new URL(config.endpoint);
 
   const buildTarget = (key?: string, query: Record<string, string> = {}): S3Target => {
@@ -327,27 +329,27 @@ function createS3Transport(config: SyncS3TransportConfig, secrets: BrowserTransp
   return {
     async test() {
       const response = await send('GET', buildTarget(undefined, listQuery(config.prefix ?? '')));
-      if (response.status === 403) throw new Error('认证失败：Access Key ID 或 Secret Access Key 无效，或无桶权限');
-      if (response.status === 404) throw new Error('存储桶不存在或区域不匹配');
-      if (!response.ok) throw new Error(`S3 返回 ${response.status} ${response.statusText}`);
+      if (response.status === 403) throw new Error(i18n.t('errors:s3.authFailed'));
+      if (response.status === 404) throw new Error(i18n.t('errors:s3.bucketMismatch'));
+      if (!response.ok) throw new Error(i18n.t('errors:s3.unexpectedStatus', { status: response.status, detail: response.statusText }));
     },
 
     async put(key, data) {
       const response = await send('PUT', buildTarget(key), { body: data, headers: { 'content-type': 'application/json' } });
-      if (!response.ok) throw new Error(`S3 上传失败：${response.status} ${response.statusText}`);
+      if (!response.ok) throw new Error(i18n.t('errors:s3.putFailed', { status: response.status, detail: response.statusText }));
     },
 
     async get(key) {
       const response = await send('GET', buildTarget(key));
       if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`S3 下载失败：${response.status} ${response.statusText}`);
+      if (!response.ok) throw new Error(i18n.t('errors:s3.getFailed', { status: response.status, detail: response.statusText }));
       return response.text();
     },
 
     async list(prefix) {
       const combined = [config.prefix, prefix].filter((part): part is string => !!part).join('/');
       const response = await send('GET', buildTarget(undefined, listQuery(combined)));
-      if (!response.ok) throw new Error(`S3 列举失败：${response.status} ${response.statusText}`);
+      if (!response.ok) throw new Error(i18n.t('errors:s3.listFailed', { status: response.status, detail: response.statusText }));
       const xml = await response.text();
       const objects: SyncTransportObject[] = [];
       const contents = /<Contents>([\s\S]*?)<\/Contents>/g;
@@ -364,7 +366,7 @@ function createS3Transport(config: SyncS3TransportConfig, secrets: BrowserTransp
 
     async remove(key) {
       const response = await send('DELETE', buildTarget(key));
-      if (!response.ok && response.status !== 404) throw new Error(`S3 删除失败：${response.status} ${response.statusText}`);
+      if (!response.ok && response.status !== 404) throw new Error(i18n.t('errors:s3.deleteFailed', { status: response.status, detail: response.statusText }));
     },
   };
 }
@@ -422,12 +424,12 @@ export async function getChunkedBrowser(transport: BrowserTransport, key: string
   for (let index = 0; index < manifest.total; index += 1) {
     const partKey = cleanChunkPartKey(clean, index);
     const part = await transport.get(partKey);
-    if (part === null) throw new Error(`分片缺失：${partKey}，请重新上传同步包`);
+    if (part === null) throw new Error(i18n.t('errors:sync.chunkPartMissing', { partKey }));
     parts.push(part);
   }
   const data = parts.join('');
   if (!verifyChunkedData(manifest, data, await sha256Hex(data))) {
-    throw new Error(`同步包摘要校验失败：${clean}`);
+    throw new Error(i18n.t('errors:sync.digestMismatch', { detail: clean }));
   }
   return data;
 }
@@ -456,6 +458,6 @@ export function createBrowserTransport(
     case 's3':
       return createS3Transport(config, secrets, doFetch);
     case 'local':
-      throw new Error('浏览器端不支持本地目录传输，请改用 WebDAV 或 S3');
+      throw new Error(i18n.t('errors:sync.localDirUnsupported'));
   }
 }

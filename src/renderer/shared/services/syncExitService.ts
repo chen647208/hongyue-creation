@@ -16,6 +16,8 @@ import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import { EXIT_EXPORT_UPLOAD_TIMEOUT_MS } from '@shared/constants/sync';
 import type { SyncTransportConfig } from '@shared/types';
 
+import { i18n } from '@/i18n';
+
 import { localStore } from './localStore';
 import {
   appendSyncRecoveryRecord,
@@ -107,7 +109,7 @@ export async function runExitExport(deps: ExitExportDeps): Promise<ExitExportSum
   const transport = deps.loadTransport();
 
   if (!transport || !isTransportReady(transport)) {
-    const message = '未配置可用的同步传输后端，退出导出已跳过';
+    const message = i18n.t('errors:sync.noTransportConfigured');
     for (const project of projects) {
       deps.markFailed(project.id, message);
       deps.record({ kind: 'exit-export', outcome: 'failed', bookId: project.id, message });
@@ -142,7 +144,7 @@ export async function retryPendingExitExports(deps: ExitExportDeps): Promise<Exi
   const transport = deps.loadTransport();
 
   if (!transport || !isTransportReady(transport)) {
-    const message = '未配置可用的同步传输后端，无法重试退出导出';
+    const message = i18n.t('errors:sync.noTransportForRetry');
     for (const item of pending) {
       deps.markFailed(item.bookId, message);
       summary.failed.push({ bookId: item.bookId, title: titles.get(item.bookId) ?? item.bookId, message });
@@ -154,7 +156,7 @@ export async function retryPendingExitExports(deps: ExitExportDeps): Promise<Exi
     try {
       const result = await deps.upload(item.bookId, transport);
       deps.markSucceeded(item.bookId);
-      deps.record({ kind: 'exit-export', outcome: 'ok', bookId: item.bookId, applied: result.changeCount, message: '退出导出重试成功' });
+      deps.record({ kind: 'exit-export', outcome: 'ok', bookId: item.bookId, applied: result.changeCount, message: i18n.t('errors:sync.exitExportRetryOk') });
       summary.succeeded += 1;
     } catch (error) {
       const message = messageOf(error);
@@ -175,7 +177,7 @@ export function createExitExportDeps(listProjects: () => ExitExportProject[]): E
     upload: (bookId, config) => withTimeout(
       uploadSyncBundle(bookId, config, { maxAttempts: 1 }),
       EXIT_EXPORT_UPLOAD_TIMEOUT_MS,
-      `退出导出上传超时（${EXIT_EXPORT_UPLOAD_TIMEOUT_MS} 毫秒）`,
+      i18n.t('errors:sync.exitExportTimeout', { ms: EXIT_EXPORT_UPLOAD_TIMEOUT_MS }),
     ),
     record: appendSyncRecoveryRecord,
     markFailed: markExitExportFailed,

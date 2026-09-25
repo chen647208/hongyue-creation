@@ -7,6 +7,8 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
+import { i18n } from '@/i18n';
+
 import { type AppState, type StorageConfig } from '../../../shared/types';
 import { logger } from '../utils/logger';
 
@@ -113,7 +115,7 @@ export class AutoBackupService {
   // 获取存储路径
   private async getStoragePath(config: StorageConfig): Promise<string> {
     if (typeof window === 'undefined' || !window.electronAPI) {
-      throw new Error('不在Electron环境中');
+      throw new Error(i18n.t('errors:backup.desktopRequired'));
     }
 
     if (config.useCustomPath && config.dataPath) {

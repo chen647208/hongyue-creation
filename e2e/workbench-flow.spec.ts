@@ -2,6 +2,8 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
+
+import { flushPersistence } from './helpers';
 import { launchApp, createBook, cleanupUserDataDir } from './helpers';
 
 /**
@@ -56,8 +58,8 @@ test('同一数据目录重启后书籍仍在（持久化回归）', async () =>
   try {
     await createBook(first.page);
     await first.page.getByPlaceholder(/输入你的初始灵感|Enter your initial inspiration/).fill('持久化回归测试灵感');
-    // 等落盘：persistenceBridge 差分写盘，给 3 秒
-    await first.page.waitForTimeout(3_000);
+    // 走真实刷盘握手等差分落库（51 篇 e2e 约定，不赌防抖时长）
+    await flushPersistence(first.app);
   } finally {
     await first.app.close();
   }

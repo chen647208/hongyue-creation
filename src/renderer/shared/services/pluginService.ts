@@ -35,6 +35,7 @@ import { parseSignatureEnvelope } from '@shared/pluginSignature';
 import type { PluginInstallRequest, PluginInstallResult, PluginUninstallResult } from '@shared/types';
 import * as React from 'react';
 
+import { i18n } from '@/i18n';
 import { PluginEditorFrame } from '@/shared/ui/PluginEditorFrame';
 import { PluginFrame } from '@/shared/ui/PluginFrame';
 
@@ -48,7 +49,7 @@ import { uiSlotRegistry } from './uiSlots';
 
 function electron(): NonNullable<Window['electronAPI']> {
   if (!window.electronAPI) {
-    throw new Error('插件发现需要文件系统（预览环境不可用）');
+    throw new Error(i18n.t('errors:plugins.fsRequired'));
   }
   return window.electronAPI;
 }
@@ -76,13 +77,13 @@ function logicKey(pluginId: string, file: string): string {
 /** 执行插件逻辑贡献的具名函数（design/22 §3）：沙箱内运行，返回值经能力裁决。 */
 export async function runPluginLogic(pluginId: string, fn: string, input: unknown): Promise<SandboxRunResult> {
   if (!/^[A-Za-z_$][\w$]*$/.test(fn)) {
-    return { ok: false, error: { kind: 'runtime', message: `非法函数名：${fn}` } };
+    return { ok: false, error: { kind: 'runtime', message: i18n.t('errors:plugins.invalidFunctionName', { fn }) } };
   }
   // 权限边界：逻辑贡献在 ai 接缝执行。deny-by-default——插件未激活或未声明 write:ai 一律拒绝，不进沙箱。
   const host = activeHost;
   if (!host || !host.isActive(pluginId)) {
     logger.warn(`插件 ${pluginId} 逻辑执行被拒：插件未激活`);
-    return { ok: false, error: { kind: 'permission', message: `插件 ${pluginId} 未激活，拒绝执行逻辑贡献` } };
+    return { ok: false, error: { kind: 'permission', message: i18n.t('errors:plugins.notActive', { pluginId }) } };
   }
   try {
     host.assertCan(pluginId, 'write', 'ai');
@@ -95,11 +96,11 @@ export async function runPluginLogic(pluginId: string, fn: string, input: unknow
     .filter(([key]) => key.startsWith(`${pluginId}:`))
     .map(([, code]) => code);
   if (sources.length === 0) {
-    return { ok: false, error: { kind: 'runtime', message: `插件 ${pluginId} 无逻辑贡献` } };
+    return { ok: false, error: { kind: 'runtime', message: i18n.t('errors:plugins.noLogicContribution', { pluginId }) } };
   }
   const api = typeof window === 'undefined' ? undefined : window.electronAPI;
   if (!api?.pluginSandboxRun) {
-    return { ok: false, error: { kind: 'runtime', message: '当前环境不支持插件沙箱' } };
+    return { ok: false, error: { kind: 'runtime', message: i18n.t('errors:plugins.sandboxUnsupported') } };
   }
   const code = `${sources.join('\n;\n')}\n;globalThis.run = typeof ${fn} === 'function' ? ${fn} : undefined;`;
   const result = await api.pluginSandboxRun({ code, input, allowedTools: [] });
@@ -195,7 +196,7 @@ export async function discoverAndLoad(host: PluginHost): Promise<void> {
       // 来源白名单（design/21 §4）：配置非空时，manifest.source 必须在清单内
       const source = typeof (manifestJson as { source?: unknown }).source === 'string' ? (manifestJson as { source: string }).source : undefined;
       if (allowedPluginSources.length > 0 && (!source || !allowedPluginSources.includes(source))) {
-        host.markFailed(pluginId, 'discover', new Error(`插件来源不在白名单：${source ?? '未声明 source'}`));
+        host.markFailed(pluginId, 'discover', new Error(i18n.t('errors:plugins.sourceNotAllowed', { source: source ?? i18n.t('errors:plugins.sourceUndeclared') })));
         continue;
       }
 
@@ -210,14 +211,14 @@ export async function discoverAndLoad(host: PluginHost): Promise<void> {
         const fail = (reason: string): never => {
           throw new Error(reason);
         };
-        if (!envelope) fail('插件签名格式非法');
+        if (!envelope) fail(i18n.t('errors:plugins.signatureFormatInvalid'));
         else if (envelope.algorithm === 'ed25519') {
           const trusted = trustedPluginKeys.includes(envelope.publicKey);
           const verified =
             trusted && typeof api.pluginVerifySignature === 'function'
               ? await api.pluginVerifySignature(toBase64(manifestText), envelope.signature, envelope.publicKey)
               : false;
-          if (!verified) fail(trusted ? '插件签名校验失败' : '插件签名公钥不在信任清单');
+          if (!verified) fail(trusted ? i18n.t('errors:plugins.signatureVerifyFailed') : i18n.t('errors:plugins.signatureKeyUntrusted'));
           else signed = true;
         } else if (envelope.algorithm === 'cosign') {
           const verified =
@@ -229,14 +230,14 @@ export async function discoverAndLoad(host: PluginHost): Promise<void> {
                   certificateOidcIssuer: envelope.certificateOidcIssuer,
                 })
               : false;
-          if (!verified) fail('cosign 校验失败（需安装 cosign 且证书/公钥有效）');
+          if (!verified) fail(i18n.t('errors:plugins.cosignVerifyFailed'));
           else signed = true;
         } else {
           const ok =
             typeof api.pluginDigestMatches === 'function'
               ? await api.pluginDigestMatches(toBase64(manifestText), envelope.digest)
               : false;
-          if (!ok) fail('插件摘要不匹配');
+          if (!ok) fail(i18n.t('errors:plugins.digestMismatch'));
           // 摘要通过仅代表未被篡改，不放行可执行贡献
         }
       }
@@ -432,7 +433,7 @@ export function createContributionInstaller(deps: PluginDeps): ContributionInsta
       { signed: plugin.signed === true },
     );
     if (!executables.ok) {
-      throw new Error(executables.reason ?? '可执行贡献安装失败');
+      throw new Error(executables.reason ?? i18n.t('errors:plugins.installFailedGeneric'));
     }
     for (const disposable of executables.disposables) sink.add(disposable);
 
@@ -457,7 +458,7 @@ export function createContributionInstaller(deps: PluginDeps): ContributionInsta
 const scriptExecutionPort: ScriptExecutionPort = (request) => {
   const api = typeof window === 'undefined' ? undefined : window.electronAPI;
   if (!api?.pluginSandboxRun) {
-    return Promise.resolve({ ok: false, error: { kind: 'runtime', message: '当前环境不支持插件沙箱' } });
+    return Promise.resolve({ ok: false, error: { kind: 'runtime', message: i18n.t('errors:plugins.sandboxUnsupported') } });
   }
   return api.pluginSandboxRun(request);
 };
@@ -572,7 +573,7 @@ export async function installPluginFromDirectory(
 ): Promise<PluginInstallResult> {
   const api = typeof window === 'undefined' ? undefined : window.electronAPI;
   if (!api?.pluginStore) {
-    return { ok: false, reason: '当前环境不支持插件安装（缺少文件系统）' };
+    return { ok: false, reason: i18n.t('errors:plugins.installEnvUnsupported') };
   }
   return api.pluginStore.install(request);
 }

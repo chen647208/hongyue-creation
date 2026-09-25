@@ -185,7 +185,7 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
               {msg.attachments && msg.attachments.length > 0 && (
                 <div className="mb-2 space-y-1">
                   {msg.attachments.map((file, index) => (
-                    <div key={index} className={cn('flex items-center gap-2 rounded px-2 py-1 text-xs', msg.role === 'user' ? 'bg-black/10' : 'bg-muted/60')}>
+                    <div key={index} className={cn('flex items-center gap-2 rounded px-2 py-1 text-xs', msg.role === 'user' ? 'bg-accent/60' : 'bg-muted/60')}>
                       {file.type === 'context' ? <BookOpen className="size-4" /> : <Paperclip className="size-4" />}
                       <span className="max-w-[150px] truncate">{file.name}</span>
                     </div>

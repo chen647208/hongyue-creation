@@ -90,8 +90,10 @@ async function enterWorkspaceFromBookshelf(page: Page): Promise<void> {
 const canvasNodes = (page: Page) => page.locator('div[role="button"][tabindex="0"]');
 // 节点/连线按钮的 aria-label 由 ViewCanvas 用 ASCII 冒号加空格拼接（`${label}: ${nodeLabel}`），
 // 节点标签内部才是全角冒号（`{{kind}}：{{title}}`），故前缀匹配只认 ASCII 冒号。
-const connectButtons = (page: Page) => page.getByRole('button', { name: /^连线: / });
-const removeEdgeButtons = (page: Page) => page.getByRole('button', { name: /^删除连线: / });
+// 连线/删除按钮按目标节点标题后缀定位（章节投影的 title 即章节标题），不依赖 DOM 序。
+const connectButtonFor = (page: Page, titleSuffix: string) =>
+  page.getByRole('button', { name: new RegExp(`^连线: .*${titleSuffix}$`) });
+const removeEdgeButton = (page: Page) => page.getByRole('button', { name: /^删除连线: / });
 
 /**
  * 键盘微调节点：聚焦目标节点后按方向键，一次只按一格并等坐标落地。
@@ -269,18 +271,20 @@ test('协作画布：连线增删经 Yjs 两端收敛', async () => {
     // 增：窗口 1 在节点 0 与节点 1 之间建连线，窗口 2 出现同一条。
     // 两次点击之间要等「已进入连线态」落定：连接源是 React state，第一次点击后若 state
     // 尚未提交，第二次点击只会把连接源改成节点 1，连线根本建不出来。
-    await connectButtons(page).nth(0).click();
-    await expect(connectButtons(page).nth(0)).toHaveAttribute('aria-pressed', 'true');
-    await connectButtons(page).nth(1).click();
+    const connectFrom = connectButtonFor(page, '第1章');
+    const connectTo = connectButtonFor(page, '新章节 2');
+    await connectFrom.click();
+    await expect(connectFrom).toHaveAttribute('aria-pressed', 'true');
+    await connectTo.click();
     // 连线态随之退出（aria-pressed 回落），这才是 onConnect 已执行、Edge 已写入的信号
-    await expect(connectButtons(page).nth(0)).toHaveAttribute('aria-pressed', 'false');
-    await expect(removeEdgeButtons(page)).toHaveCount(1, { timeout: 15_000 });
-    await expect(removeEdgeButtons(page2)).toHaveCount(1, { timeout: 15_000 });
+    await expect(connectFrom).toHaveAttribute('aria-pressed', 'false');
+    await expect(removeEdgeButton(page)).toHaveCount(1, { timeout: 15_000 });
+    await expect(removeEdgeButton(page2)).toHaveCount(1, { timeout: 15_000 });
 
     // 删：窗口 2 删除连线，窗口 1 随之消失（删除走墓碑，不再参与投影）
-    await removeEdgeButtons(page2).click();
-    await expect(removeEdgeButtons(page)).toHaveCount(0, { timeout: 15_000 });
-    await expect(removeEdgeButtons(page2)).toHaveCount(0, { timeout: 15_000 });
+    await removeEdgeButton(page2).click();
+    await expect(removeEdgeButton(page)).toHaveCount(0, { timeout: 15_000 });
+    await expect(removeEdgeButton(page2)).toHaveCount(0, { timeout: 15_000 });
   } catch (error) {
     const state = await dumpCanvasState(page, logs);
     const state2 = await dumpCanvasState(page2 ?? page, logs2);
@@ -313,25 +317,27 @@ test('协作画布：断线重连后已删元素保持删除，协同继续可�
     logs2.push(...collectPageLogs(page2));
 
     // 先建一条连线并同步到两端（两次点击之间等「已进入连线态」落定，理由同增/录用例）
-    await connectButtons(page).nth(0).click();
-    await expect(connectButtons(page).nth(0)).toHaveAttribute('aria-pressed', 'true');
-    await connectButtons(page).nth(1).click();
-    await expect(connectButtons(page).nth(0)).toHaveAttribute('aria-pressed', 'false');
-    await expect(removeEdgeButtons(page2)).toHaveCount(1, { timeout: 15_000 });
+    const connectFrom = connectButtonFor(page, '第1章');
+    const connectTo = connectButtonFor(page, '新章节 2');
+    await connectFrom.click();
+    await expect(connectFrom).toHaveAttribute('aria-pressed', 'true');
+    await connectTo.click();
+    await expect(connectFrom).toHaveAttribute('aria-pressed', 'false');
+    await expect(removeEdgeButton(page2)).toHaveCount(1, { timeout: 15_000 });
 
     // 断线：关闭窗口 2（close 返回即渲染进程销毁，BroadcastChannel 对端确已离线）；
     // 窗口 1 在无对端状态下删除连线（文档写入墓碑）。墓碑协议按同步轮次收敛，
     // 与对端存活与否无关，无需额外等待。
     await page2.close();
-    await removeEdgeButtons(page).click();
-    await expect(removeEdgeButtons(page)).toHaveCount(0, { timeout: 15_000 });
+    await removeEdgeButton(page).click();
+    await expect(removeEdgeButton(page)).toHaveCount(0, { timeout: 15_000 });
 
     // 重连：新开窗口 3，收到窗口 1 的全量状态（含墓碑）后墓碑被清除，元素保持删除
     const page3 = await openSecondWindow(app, page.url());
     await enterWorkspaceFromBookshelf(page3);
     await openCanvasPanel(page3, false);
     await expectNodeCount(page3, 2);
-    await expect(removeEdgeButtons(page3)).toHaveCount(0, { timeout: 15_000 });
+    await expect(removeEdgeButton(page3)).toHaveCount(0, { timeout: 15_000 });
 
     // 协同仍可用：窗口 3 键盘微调节点，窗口 1 收敛到同一坐标
     await nudgeNode(page3, 0, 2, 2);

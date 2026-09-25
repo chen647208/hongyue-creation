@@ -24,17 +24,19 @@ export default defineConfig({
     globals: false,
     setupFiles: [path.resolve(rootDir, 'src/renderer/i18n/vitest-setup.ts')],
     // 覆盖率强约束（分层锁线，低于即测试失败；只允许随测试补充上调）：
-    // - src/core 领域层高标准（当前 86.84/74.3/86.35/90.63）
-    // - src/main 主进程锁当前基线（Electron 边界代码覆盖成本高）
-    // - src/renderer 锁当前基线（UI 组件归 E2E 测试覆盖）
+    // - src/core 领域层高标准（当前 88.44/78.24/91.64/92.78）
+    // - src/main 主进程锁当前基线（Electron 边界代码覆盖成本高；当前 60.21/54.95/52.27/61.46）
+    // - src/main/mcp 单列（协议层可测，高于 main 均值；当前 73.31/52.89/77.94/76.75）
+    // - src/renderer 锁当前基线（UI 组件归 E2E 测试覆盖；当前 38.16/31.55/32.01/39.08）
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts', 'src/**/*.tsx'],
-      exclude: ['src/**/__tests__/**', 'src/**/*.test.{ts,tsx}', 'src/main/mcp/**'],
+      exclude: ['src/**/__tests__/**', 'src/**/*.test.{ts,tsx}'],
       thresholds: {
-        'src/core/**': { statements: 85, branches: 73, functions: 85, lines: 89 },
-        'src/main/**': { statements: 50, branches: 46, functions: 38, lines: 52 },
-        'src/renderer/**': { statements: 23, branches: 17, functions: 19, lines: 23 },
+        'src/core/**': { statements: 88, branches: 78, functions: 91, lines: 92 },
+        'src/main/mcp/**': { statements: 73, branches: 52, functions: 77, lines: 76 },
+        'src/main/**': { statements: 60, branches: 54, functions: 52, lines: 61 },
+        'src/renderer/**': { statements: 38, branches: 31, functions: 32, lines: 39 },
       },
     },
   },

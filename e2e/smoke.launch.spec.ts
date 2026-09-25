@@ -39,7 +39,9 @@ test('dev app launches with a visible app window', async () => {
     page!.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text());
     });
-    await page!.waitForTimeout(5_000);
+    // 观察窗：等书架主界面渲染完成再收口（替代固定 5 秒盲等）
+    await page!.getByText(/书籍库|Bookshelf/).first().waitFor({ state: 'visible', timeout: 30_000 });
+    await page!.waitForTimeout(1_000);
     expect(errors, JSON.stringify(errors.slice(0, 5))).toEqual([]);
   } finally {
     await app.close();

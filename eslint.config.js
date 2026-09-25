@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import js from '@eslint/js';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
@@ -38,7 +39,6 @@ export default tseslint.config(
       'dist/**',
       '*.config.js',
       '*.config.ts',
-      'scripts/**',
     ],
   },
 
@@ -47,6 +47,19 @@ export default tseslint.config(
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
+
+  {
+    // 运维脚本：Node 全局可用；console 是脚本的合法输出通道
+    files: ['scripts/**/*.mjs', 'scripts/**/*.cjs'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+    rules: {
+      'no-console': 'off',
+      // .cjs 以 CommonJS 约定运行，require 合法
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
 
   {
     files: ['src/**/*.{ts,tsx}'],

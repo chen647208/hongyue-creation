@@ -2,6 +2,8 @@ import { existsSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
+
+import { flushPersistence } from './helpers';
 import { cleanupUserDataDir, launchApp, createBook } from './helpers';
 
 /**
@@ -23,7 +25,7 @@ test('章节拆分与合并：光标处拆出新章，再合并回本章', async
     const editor = page.locator('.ProseMirror').first();
     await editor.waitFor({ state: 'attached', timeout: 30_000 });
     await editor.focus();
-    await page.waitForTimeout(300);
+    await expect(page.locator('.ProseMirror.focus-visible, .ProseMirror.ProseMirror-focused').first()).toBeAttached({ timeout: 10_000 });
     await page.keyboard.type('第一段AAA');
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
@@ -64,10 +66,14 @@ test('自动备份按间隔落盘（预置 5 秒间隔）', async () => {
   try {
     await createBook(page);
     await page.getByPlaceholder(/输入你的初始灵感|Enter your initial inspiration/).fill('自动备份回归');
-    // 等一个间隔 + 落盘余量
-    await page.waitForTimeout(13_000);
+    // 自动备份按固定间隔触发：轮询等首个备份文件出现（上限 30s，出现即走）
     const backupDir = join(userDataDir, 'backups');
-    expect(existsSync(backupDir), '备份目录未创建').toBe(true);
+    await expect
+      .poll(() => {
+        if (!existsSync(backupDir)) return 0;
+        return readdirSync(backupDir).filter((f) => f.startsWith('novalist-backup-') && f.endsWith('.json')).length;
+      }, { timeout: 30_000, intervals: [1_000, 2_000, 5_000] })
+      .toBeGreaterThan(0);
     const files = readdirSync(backupDir).filter((f) => f.startsWith('novalist-backup-') && f.endsWith('.json'));
     expect(files.length, '未按间隔生成备份文件').toBeGreaterThan(0);
   } finally {
@@ -83,7 +89,7 @@ test('主题切换后重启保持（深色持久化）', async () => {
     await createBook(first.page);
     await first.page.locator('[title="切换到深色主题"]').click();
     await expect(first.page.locator('html.dark')).toHaveCount(1, { timeout: 10_000 });
-    await first.page.waitForTimeout(5_000);
+    await flushPersistence(first.app);
   } finally {
     await first.app.close();
   }
@@ -150,7 +156,7 @@ test('查找替换：Ctrl+F 打开并全部替换', async () => {
     const editor = page.locator('.ProseMirror').first();
     await editor.waitFor({ state: 'attached', timeout: 30_000 });
     await editor.focus();
-    await page.waitForTimeout(300);
+    await expect(page.locator('.ProseMirror.ProseMirror-focused').first()).toBeAttached({ timeout: 10_000 });
     await page.keyboard.type('aaa bbb aaa');
 
     await page.keyboard.press('Control+f');

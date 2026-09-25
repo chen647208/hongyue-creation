@@ -40,7 +40,7 @@ writeFileSync(relPath, rel);
 
 // 3. CHANGELOG.md：在 [Unreleased] 之后、最早已发布版本之前插入
 const clPath = path.join(root, 'CHANGELOG.md');
-let cl = '';
+let cl;
 try { cl = readFileSync(clPath, 'utf-8'); } catch { cl = '# 更新日志 (Changelog)\n'; }
 const block = `## [${next}] - ${today}\n\n### 新增\n- ${zh || en || 'release'}\n\n`;
 if (!cl.includes(`## [${next}]`)) {
