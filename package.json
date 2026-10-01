@@ -150,7 +150,7 @@
     "clsx": "^2.1.1",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
-    "dependency-cruiser": "^18.2.0",
+    "dependency-cruiser": "^18.4.0",
     "electron": "^44.4.3",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
