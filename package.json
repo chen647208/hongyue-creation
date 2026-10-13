@@ -148,7 +148,7 @@
     "axe-core": "^4.13.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "concurrently": "^9.2.1",
+    "concurrently": "^9.2.5",
     "cross-env": "^10.1.0",
     "dependency-cruiser": "^18.2.0",
     "electron": "^44.4.3",
