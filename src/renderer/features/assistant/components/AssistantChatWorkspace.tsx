@@ -27,7 +27,6 @@ import type { CardPromptTemplate, KnowledgeItem } from '../../../../shared/types
 import type { ChatMessage } from '../types';
 import AttachmentMenuButton from './AttachmentMenuButton';
 import SpeakButton from './SpeakButton';
-import SpeechInputButton from './SpeechInputButton';
 
 
 interface AssistantChatWorkspaceProps {
@@ -411,11 +410,6 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
               refreshKey={attachmentsRefreshKey}
               onAttach={(item) => setPendingFiles((prev) => [...prev, item])}
               onFilesSelected={handleFileUpload}
-            />
-            <SpeechInputButton
-              onTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
-              lang={speechLocale(i18n.language)}
-              disabled={contextPanelOpen || editPanelOpen}
             />
             <Textarea
               ref={inputRef}

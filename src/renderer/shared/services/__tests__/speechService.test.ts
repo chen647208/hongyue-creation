@@ -8,13 +8,7 @@
  */
 import { describe, expect,it } from 'vitest';
 
-import {
-  createDictation,
-  isDictationSupported,
-  isSpeechSynthesisSupported,
-  speak,
-  speechLocale,
-} from '@/shared/services/speechService';
+import { isSpeechSynthesisSupported, speak, speechLocale } from '@/shared/services/speechService';
 
 // jsdom 不实现 Web Speech API，故这里覆盖"不支持环境"的分支与纯映射函数。
 describe('speechLocale', () => {
@@ -29,12 +23,8 @@ describe('speechLocale', () => {
 });
 
 describe('speech capability detection', () => {
-  it('jsdom 下听写与朗读均判为不支持', () => {
-    expect(isDictationSupported()).toBe(false);
+  it('jsdom 下朗读判为不支持', () => {
     expect(isSpeechSynthesisSupported()).toBe(false);
-  });
-  it('不支持时创建听写抛错', () => {
-    expect(() => createDictation({ onResult: () => {} })).toThrow('dictation-unsupported');
   });
   it('不支持时朗读抛错', () => {
     expect(() => speak('测试')).toThrow('speech-unsupported');
