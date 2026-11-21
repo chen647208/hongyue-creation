@@ -16,12 +16,11 @@ import {
   DEFAULT_BUILD_PROFILE,
   listRenderers,
   listTransformers,
-  parseProfileYaml,
   registerTransformer,
   roundtripProfile,
   runBuild,
-  serializeProfileYaml,
 } from '../index.js';
+import { parseProfileYaml, serializeProfileYaml } from '../profileYaml.js';
 
 function node(id: string, type: string, title: string, body: string): NodeEntity {
   return { id, bookId: 'b1', type, title, body, createdAt: 0, updatedAt: 0, erased: false } as NodeEntity;

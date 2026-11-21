@@ -27,7 +27,6 @@ import {
 } from '@/shared/services/aiSemanticCheckService';
 import { AICardCommandService } from '@/shared/services/cards/aiCardCommandService';
 import { AICardCreationService } from '@/shared/services/cards/aiCardCreationService';
-import { fetchAsPlugin } from '@/shared/services/pluginService';
 import { roleLabel } from '@/shared/utils/displayLabels';
 
 import type { RecommendationContext } from './smartRecommendationService';
@@ -563,6 +562,7 @@ export const netFetchTool: ToolSpec = {
     const pluginId = str(args.pluginId, 'pluginId');
     const url = str(args.url, 'url');
     const method = typeof args.method === 'string' ? args.method : 'GET';
+    const { fetchAsPlugin } = await import('@/shared/services/pluginService');
     const result = await fetchAsPlugin(pluginId, { url, method });
     if (!result.ok) {
       return { ok: false, error: result.error ?? '网络请求失败' };

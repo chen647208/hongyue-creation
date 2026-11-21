@@ -19,7 +19,6 @@ import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useStat
 import { useTranslation } from 'react-i18next';
 
 import { ASSISTANT_FEATURE_ID } from '@/features/assistant/constants';
-import { registerCoreSettingsTabs } from '@/features/settings/coreSettingsTabs';
 import { dt } from '@/i18n';
 import { COMMAND_PALETTE_EVENT } from '@/shared/constants/appEvents';
 import { useGlobalKeymap } from '@/shared/keymap';
@@ -63,7 +62,11 @@ import { useFeatureAvailability } from './useFeatureAvailability';
 const SECTION_ORDER: SectionId[] = WORKSPACE_SECTIONS.map((s) => s.id);
 
 registerCoreSlots();
-registerCoreSettingsTabs();
+// 设置页签含插件面板与同步面板：分包异步注册，主包启动不解析这两块；
+// 用户点开设置前早已完成注册，注册表读取方无需等待。
+void import('@/features/settings/coreSettingsTabs').then(({ registerCoreSettingsTabs }) => {
+  registerCoreSettingsTabs();
+});
 registerFeaturePanels();
 registerAssistantRuntime();
 

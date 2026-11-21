@@ -9,7 +9,7 @@
 import { describe, expect,it } from 'vitest';
 
 import type { Project } from '../../../../../shared/types';
-import { buildExportPackage } from '../../utils';
+import { buildExportPackage } from '../exportBuild';
 
 const project = (chapters: Project['chapters']): Project =>
   ({

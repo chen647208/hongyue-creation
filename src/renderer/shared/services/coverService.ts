@@ -12,7 +12,7 @@
  * 不可用（测试/无 DOM）时退回另存 SVG。
  */
 
-import { buildCoverSvg, type CoverOptions } from '@core/build';
+import { buildCoverSvg, type CoverOptions } from '@core/build/cover';
 
 import { dt } from '@/i18n';
 

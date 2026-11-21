@@ -13,8 +13,8 @@
  * 类型为 core/build 单源 BuildProfile（见 design/18 §五 已统一）。
  * 用户档案存 localStorage（安装级偏好），存档与取档走 validateProfile 校验。
  */
-import { type BuildProfile,COMPENDIUM_BUILD_PROFILE, DEFAULT_BUILD_PROFILE, MANUSCRIPT_BUILD_PROFILE } from '@core/build';
-import { buildProfileKey,BuildProfileRegistry } from '@core/plugin';
+import { type BuildProfile,COMPENDIUM_BUILD_PROFILE, DEFAULT_BUILD_PROFILE, MANUSCRIPT_BUILD_PROFILE } from '@core/build/profile';
+import { buildProfileKey,BuildProfileRegistry } from '@core/plugin/contributions';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 
 import { localStore } from './localStore';
