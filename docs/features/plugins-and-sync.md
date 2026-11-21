@@ -43,7 +43,8 @@
 - **脚本事件触发（`PluginHost.emit`）**：宿主声明的事件挂点单源在 `HOST_SCRIPT_EVENTS`
   （`project.open` / `chapter.open` / `chapter.save`）。事件触发时遍历已注册且已激活、`on` 对齐的脚本逐一执行；
   未知事件直接返回，单脚本失败只记日志、不阻断其余脚本与主流程。应用触发点为打开项目、切换章节、
-  章节落盘成功；触发异步非阻塞，无脚本订阅时零开销。
+  章节落盘成功；触发异步非阻塞，无脚本订阅时零开销。`chapter.save` 只对内容变化的章节派发，
+  变化按 `canonicalHash` 内容指纹判定，引用重建但内容相同不重复派发；无前序基线的首帧全量落盘逐章派发。
 - **能力通道与工具提议**：宿主只把描述符声明且过权限回查的能力名交执行端口，未声明能力不可见；
   脚本返回的工具调用按能力白名单裁决，经 `tool:propose` 提议后交注入的 `ToolProposalPort`
   进提案/审批管线，脚本无直接写路径。端口缺省即拒绝（fail-closed）。
@@ -156,7 +157,10 @@
 - **跨设备冲突**：复用同步包与 `core/sync` 的 `mergeBundle` 分类——双方都改的章节
   以冲突副本落库，本地原稿不动；不在移动端另造合并判定。
 - **PWA**：`manifest.webmanifest` 提供主屏安装与显示名（图标为既有 `icon.png`）。
-  离线壳需构建期 service worker，当前未接入。
+  `scripts/build-service-worker.mjs` 随构建产出 `build/renderer/sw.js`，缓存名带 `package.json`
+  版本（`hongyue-shell-<版本>`），预缓存应用壳与构建资源；`registerServiceWorker.ts` 只在浏览器
+  生产环境注册，Electron 与 `file:` 协议不注册。e2e 的 `mobile-pwa` 项目（390×844，`PWA_E2E=1`）
+  验证注册成功、断网可再加载与缓存名随版本变化。
 
 ## 逐条目加密
 
