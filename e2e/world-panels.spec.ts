@@ -19,8 +19,12 @@ test('世界分区：数据视图与双轴时间线面板可开合', async () =>
     await expect(outline).toBeVisible({ timeout: 10_000 });
     await outline.click();
 
-    const timelineToggle = page.getByRole('button', { name: /双轴时间线/ }).first();
-    await timelineToggle.click();
+    // 时间线三种视图收在同一个面板里：先开「时间线」卡，再切「双轴时间线」页签。
+    const timelineCard = page.getByRole('button', { name: /^时间线/ }).first();
+    await timelineCard.click();
+    const dualTab = page.getByRole('tab', { name: /双轴时间线/ }).first();
+    await dualTab.click();
+    await expect(dualTab).toHaveAttribute('aria-selected', 'true', { timeout: 10_000 });
     await expect(page.getByRole('button', { name: /添加标记/ })).toBeVisible({ timeout: 10_000 });
   } finally {
     await app.close();
