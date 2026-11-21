@@ -30,7 +30,7 @@ import { toast } from '../shared/services/toastService';
 import { logger } from '../shared/utils/logger';
 import { INITIAL_APP_STATE } from './initialState';
 import { startShellSync } from './services/shellSync';
-import { composeAppState, seedPersistBaseline, startPersistenceBridge } from './stores/persistenceBridge';
+import { seedPersistBaseline, startPersistenceBridge } from './stores/persistenceBridge';
 import { useProjectStore } from './stores/projectStore';
 import { useSettingsStore } from './stores/settingsStore';
 
@@ -103,22 +103,25 @@ export function useAppBootstrap(): void {
           void dialogService.alert(dt('app:storage.corrupt', { result: integrity.result }));
         }
         const saved = await repository.loadAll();
+        let persisted: typeof INITIAL_APP_STATE | null = null;
         if (saved) {
           logger.debug('成功加载应用状态，应用数据迁移');
-          const loaded = { ...INITIAL_APP_STATE, ...saved,
+          persisted = { ...INITIAL_APP_STATE, ...saved,
             embeddingModels: saved.embeddingModels || [],
             activeEmbeddingModelId: saved.activeEmbeddingModelId || null,
           };
-          hydrateStoresFromState(loaded);
-          if (loaded.language) changeLanguage(loaded.language);
-          applyTheme(loaded.theme);
+          hydrateStoresFromState(persisted);
+          if (persisted.language) changeLanguage(persisted.language);
+          applyTheme(persisted.theme);
           // 上次用 localStorage、本次 OPFS 可用时提议一次性迁移（失败保留原数据）
           void offerLocalToOpfsMigration();
         } else {
           logger.debug('没有找到保存的状态，使用初始状态');
         }
-        // 建立差分基线（磁盘现状 == 组合态），再启动持久化桥
-        seedPersistBaseline(composeAppState());
+        // 基线取磁盘现状，不取当前组合态：用户在加载完成前建的书（首启向导里点跳过/开始写）
+        // 若被当成基线，差分永远算不出来，下一次启动就丢。磁盘为空时基线为 null，
+        // 第一次刷盘走全量落盘。
+        seedPersistBaseline(persisted);
         // 已导入字体读回注册（逐个失败跳过，不挡启动）
         void bootCustomFonts().catch((error) => logger.error('自定义字体加载失败:', error));
         await vectorIntegrationService.initialize();
