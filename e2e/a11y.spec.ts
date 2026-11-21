@@ -220,16 +220,20 @@ test('键盘可完成建书→工作台→分区→设置→弹层全链路', as
   const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-a11y-keyboard-'));
   const { app, page } = await launchApp(userDataDir);
   try {
-    // 首启向导：键盘跳过
+    // 首启向导在 hydrate 后才出现：先等它一次，避免抢在渲染前走新建分支。
     const skip = page.getByRole('button', { name: /跳过|Skip/ });
-    if (await skip.isVisible({ timeout: 10_000 }).catch(() => false)) {
+    const hasOnboarding = await skip
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (hasOnboarding) {
       await skip.focus();
       await page.keyboard.press('Enter');
     }
 
     // 建书：非首启走新建模态（键盘打开并提交）；首启向导跳过会直接进入工作台
     const newBook = page.getByRole('button', { name: /新建书籍|New Book/ }).first();
-    if (await newBook.isVisible({ timeout: 10_000 }).catch(() => false)) {
+    if (await newBook.isVisible()) {
       await newBook.focus();
       await page.keyboard.press('Enter');
 
