@@ -138,7 +138,7 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
     copyTimer.current = setTimeout(() => setCopiedId(null), 1500);
   };
 
-  // 输入框自增高：随内容（含两行占位符）撑开，上限 max-h-32。
+  // 输入框自增高：随内容撑开，上限 max-h-32。
   React.useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -419,8 +419,8 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
             />
             <Textarea
               ref={inputRef}
-              className="max-h-32 min-h-[58px] flex-1"
-              rows={2}
+              className="max-h-32 min-h-[44px] flex-1"
+              rows={1}
               placeholder={t('chat.inputPlaceholder')}
               value={input}
               onChange={(event) => setInput(event.target.value)}
