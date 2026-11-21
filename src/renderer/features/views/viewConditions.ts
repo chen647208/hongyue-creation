@@ -42,7 +42,10 @@ export function insertConditionAt(
   child: QueryCondition,
 ): QueryCondition {
   if (!condition) return child.type === 'leaf' ? { type: 'and', children: [child] } : child;
-  if (condition.type === 'leaf') return condition;
+  // 根是单条叶子时没有可追加的 children：包一层 AND 承载原叶子与新节点，原条件不被丢弃。
+  if (condition.type === 'leaf') {
+    return path.length === 0 ? { type: 'and', children: [condition, child] } : condition;
+  }
   if (path.length === 0) return { type: condition.type, children: [...condition.children, child] };
   const [index, ...rest] = path;
   const children = condition.children.map((item, position) =>

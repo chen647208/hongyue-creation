@@ -73,6 +73,23 @@ describe('insertConditionAt', () => {
     });
   });
 
+  it('根是单条叶子时追加条件：原叶子保留，与新叶子并入 AND 根', () => {
+    const leaf: QueryCondition = { type: 'leaf', field: 'kind', operator: 'eq', value: 'character' };
+    const next = insertConditionAt(leaf, [], makeConditionLeaf('title', 'contains', '港'));
+    expect(next).toEqual({
+      type: 'and',
+      children: [leaf, { type: 'leaf', field: 'title', operator: 'contains', value: '港' }],
+    });
+  });
+
+  it('根是单条叶子时追加分组：原叶子保留，分组并入 AND 根', () => {
+    const leaf: QueryCondition = { type: 'leaf', field: 'kind', operator: 'eq', value: 'character' };
+    expect(insertConditionAt(leaf, [], { type: 'or', children: [] })).toEqual({
+      type: 'and',
+      children: [leaf, { type: 'or', children: [] }],
+    });
+  });
+
   it('or/not 树上首次编辑只改命中的分组，未命中分支原样保留', () => {
     const next = insertConditionAt(handWrittenOrNotTree(), [], makeConditionLeaf('title', 'contains', '港'));
     expect(next).toEqual({
