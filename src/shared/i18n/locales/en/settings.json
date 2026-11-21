@@ -28,7 +28,9 @@
     "removeType": "Remove type",
     "removeField": "Remove field"
   },
+  "tabNavLabel": "Settings sections",
   "tabGroup": {
+    "basic": "General",
     "ai": "AI Models",
     "prompts": "Prompts",
     "system": "System",
@@ -44,7 +46,8 @@
     "embedding": "Embedding Models",
     "general": "General",
     "plugins": "Plugins",
-    "sync": "Sync Transport"
+    "sync": "Sync Transport",
+    "tts": "Speech"
   },
   "general": {
     "title": "General Settings",
@@ -189,21 +192,24 @@
     "custom": "Custom Endpoints"
   },
   "models": {
-    "namePlaceholder": "Name this model...",
+    "namePlaceholder": "Name this provider...",
     "activeBadge": "Active",
     "setActiveLabel": "Set as active model",
     "deploymentLocal": "Local",
     "deploymentCloud": "Cloud",
     "deleteTitle": "Delete this model",
     "connectionLog": "Connection log",
-    "channelLabel": "Select Channel",
-    "modelNameLabel": "Model Name",
+    "channelLabel": "Provider type",
+    "modelNameLabel": "Default model",
+    "modelNameHint": "The model ID sent to the provider's API; pick one from the list or enter it manually.",
+    "selectProviderLabel": "Select a model provider",
     "selectModelPlaceholder": "Select a model...",
-    "manualModelName": "Enter model name manually",
     "fetchingList": "Fetching model list...",
     "loadedCount": "Loaded {{count}} available models",
     "refreshList": "Refresh Models",
-    "manualInputPlaceholder": "Or enter model name manually...",
+    "manualInputPlaceholder": "Enter the model name...",
+    "manualToggle": "Enter manually",
+    "listToggle": "Choose from list",
     "endpointLabel": "Endpoint",
     "endpointPlaceholderGemini": "Official default (blank) or proxy URL",
     "endpointPlaceholderAnthropic": "e.g. https://api.anthropic.com or https://host/anthropic/v1",
@@ -237,7 +243,7 @@
     "testing": "Testing connection...",
     "testNow": "Test Connection Now",
     "addProvider": "Add AI Provider",
-    "searchPlaceholder": "Search providers / models…",
+    "searchPlaceholder": "Search providers…",
     "filter": {
       "all": "All",
       "enabled": "Enabled",
@@ -679,5 +685,38 @@
     "mergeHint": "Download a sync bundle from the configured transport and merge it into the local library; conflicts offer keep-copy / use-remote / defer.",
     "mergeOpen": "Open sync panel",
     "desktopOnly": "Folder selection and exit export are available on desktop only."
+  },
+  "tts": {
+    "title": "Speech (TTS)",
+    "hint": "Controls voice playback for assistant messages and the writing area. System voices work offline; cloud engines sound better and bill per character.",
+    "providerLabel": "Engine",
+    "provider": {
+      "system": "System voice (offline)",
+      "openai": "OpenAI-compatible",
+      "azure": "Azure Speech",
+      "elevenlabs": "ElevenLabs"
+    },
+    "providerHint": {
+      "system": "Uses voices installed on your OS. Offline and free; quality depends on the system.",
+      "openai": "Any service exposing POST /audio/speech works: OpenAI, gateways, local inference servers.",
+      "azure": "Microsoft Cognitive Services speech. Many voices, natural Chinese; needs region and key.",
+      "elevenlabs": "Best quality, billed per character; pick a voice ID from your account."
+    },
+    "voiceLabel": "Voice",
+    "voiceHint": "Pick an installed system voice, or enter the provider-side voice identifier.",
+    "voicePlaceholder": "Voice ID",
+    "refreshVoices": "Refresh voices",
+    "endpointLabel": "Endpoint",
+    "modelLabel": "Model",
+    "apiKeyLabel": "API key",
+    "regionLabel": "Region (e.g. eastasia)",
+    "rateLabel": "Speed {{value}}×",
+    "pitchLabel": "Pitch {{value}}×",
+    "sample": "This is a preview of the reading voice.",
+    "preview": "Preview",
+    "stop": "Stop",
+    "previewHint": "Plays the text above with current settings. No audio is saved.",
+    "unsupported": "This engine is unavailable here. Check your system voices or finish the settings above.",
+    "systemDefaultVoice": "System default voice"
   }
 }

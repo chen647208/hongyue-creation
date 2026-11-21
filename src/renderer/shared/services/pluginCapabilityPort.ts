@@ -26,8 +26,8 @@ import {
   type CapabilityDispatchAdapters,
   createCapabilityDispatchPort,
   parseCapabilityTool,
-  type ToolProposalPort,
-} from '@core/plugin';
+} from '@core/plugin/capabilityDispatch';
+import type { ToolProposalPort } from '@core/plugin/execution';
 import { PLUGIN_SCRIPT_MAX_OUTPUT_BYTES } from '@shared/constants/pluginExecution';
 import type { AppState, ModelConfig } from '@shared/types';
 

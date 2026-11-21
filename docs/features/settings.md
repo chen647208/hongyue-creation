@@ -8,7 +8,7 @@
 ## 核心文件
 
 - `SettingsModal.tsx`：设置弹窗主编排器
-- `components/SettingsTabNav.tsx` + `SettingsTabContent.tsx`：标签导航与内容分发
+- `components/SettingsTabNav.tsx` + `SettingsTabContent.tsx`：分组导航与内容分发；宽屏左侧纵向列表，窄屏回落顶部横向换行，插件页签按声明分组并入
 - `components/SettingsModalHeader.tsx` + `SettingsModalFooter.tsx`：头尾（含暂存保存按钮）
 - `components/GeneralSettingsPanel.tsx`：语言/主题/字体/快捷键/系统/代理（直写 store 即时生效）
 - `components/SystemPanel.tsx`：最小化到托盘 + 开机自启（经 `shellSync.ts` 下发主进程）
@@ -16,6 +16,7 @@
 - `components/ModelSettingsPanel.tsx`：模型配置面板（`ModelSettings.tsx` 为入口组件）
 - `components/ProviderSidebar.tsx` + `ProviderEditor.tsx`：渠道侧栏与参数编辑
 - `components/EmbeddingSettingsPanel.tsx` + `EmbeddingSidebar.tsx` + `EmbeddingEditor.tsx`：Embedding 配置
+- `components/TtsSettingsPanel.tsx`：朗读引擎（系统语音 / OpenAI 兼容 / Azure / ElevenLabs）、音色、语速音高与试听
 - `components/PromptTemplatesPanel.tsx`：提示词模板管理
 - `components/CardPromptSettingsPanel.tsx`：卡牌命令模板管理
 - `components/ConsistencyPromptSettingsPanel.tsx`：一致性检查模板管理
@@ -34,6 +35,16 @@
 - `SettingsModal.tsx` 负责标签页切换、设置项收集和整体保存流程
 - 各 `Panel` 组件分别管理单一设置主题，降低设置弹窗复杂度
 - 服务层负责模型列表拉取、Embedding 配置读写和相关辅助逻辑
+
+## 朗读（TTS）
+
+- 配置存 `AppState.tts`（SQLite settings 表键 `tts`，JSON 后端随整份状态），加载与导入时经
+  `normalizeTtsConfig` 回退默认值；API Key 与其他凭据同路入 vault，落盘只存 `vault:` 引用。
+- 系统引擎在渲染层用 `speechSynthesis` 合成，离线可用；云端引擎经主进程 `ai:speak`
+  （`src/main/ai/tts.ts`）合成 mp3 分段，Key 只在主进程解引用。
+- 长文按句切段（`shared/constants/tts.ts` 的 `splitForSpeech`，单段 600 字、总量 6 万字上限），
+  播放服务 `shared/services/ttsService.ts` 逐段播放并预取下一段；助手消息与写作区共用
+  `shared/hooks/useSpeechPlayback`。
 
 ## 关联模块
 

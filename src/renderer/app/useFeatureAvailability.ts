@@ -8,7 +8,8 @@
  */
 
 /** 发行档 → 功能可用性 hook：设置面板切换发行档后经 PROFILE_CHANGED_EVENT 刷新。 */
-import { DEFAULT_RELEASE_PROFILE, enabledFeatureIds, PROFILE_CHANGED_EVENT } from '@core/plugin';
+import { enabledFeatureIds, PROFILE_CHANGED_EVENT } from '@core/plugin/availability';
+import { DEFAULT_RELEASE_PROFILE } from '@core/plugin/bundles';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import { useEffect, useState } from 'react';
 

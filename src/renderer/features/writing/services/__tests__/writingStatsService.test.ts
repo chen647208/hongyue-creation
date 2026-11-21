@@ -11,7 +11,7 @@ import { DEFAULT_BUILD_PROFILE, runBuild } from '@core/build';
 import { describe, expect,it } from 'vitest';
 
 import type { Project } from '../../../../../shared/types';
-import { projectToBuildEntities } from '../../utils';
+import { projectToBuildEntities } from '../buildEntities';
 import { computeBookStats, computeChapterStats, countableChapters, formatCharCount } from '../writingStatsService';
 
 describe('computeChapterStats', () => {

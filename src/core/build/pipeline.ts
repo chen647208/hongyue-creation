@@ -573,7 +573,7 @@ function escapeRtf(s: string): string {
 /**
  * RTF 渲染（Word/WPS 可直接打开）：首行为文档头（fonttbl+默认样式），
  * 尾行是闭合括号；章节标题加粗放大，分页符跟随 profile.render.chapterPageBreak。
- * 导出侧在首行后插入书名块（见 writing/utils.buildExportContent），故首行须保持单行。
+ * 导出侧在首行后插入书名块（见 features/writing/services/exportBuild.ts 的 buildExportContent），故首行须保持单行。
  */
 function renderRtf(blocks: DocBlock[], profile: BuildProfile): string {
   const font = profile.render.font ?? 'SimSun';

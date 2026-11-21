@@ -9,12 +9,10 @@
 
 /** 多平台预览：用编译产出的 HTML 在桌面/平板/手机宽度下渲染当前章节。 */
 import type { Chapter, Project } from '@shared/types';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { useTranslation } from '@/i18n';
 import { SegmentedControl } from '@/shared/ui/ViewModeToggle';
-
-import { buildExportContent } from '../utils';
 
 type PreviewDevice = 'desktop' | 'tablet' | 'phone';
 
@@ -28,10 +26,22 @@ interface ReaderPreviewProps {
 const ReaderPreview: React.FC<ReaderPreviewProps> = ({ project, chapter }) => {
   const { t } = useTranslation('writing');
   const [device, setDevice] = useState<PreviewDevice>('desktop');
-  const html = useMemo(
-    () => (chapter ? buildExportContent(project, new Set([chapter.id]), 'html') : ''),
-    [project, chapter],
-  );
+  // 编译管线按需加载：写作主界面先出来，预览打开后再取导出构建模块。
+  const [html, setHtml] = useState('');
+  useEffect(() => {
+    if (!chapter) {
+      setHtml('');
+      return;
+    }
+    let cancelled = false;
+    setHtml('');
+    void import('../services/exportBuild').then(({ buildExportContent }) => {
+      if (!cancelled) setHtml(buildExportContent(project, new Set([chapter.id]), 'html'));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [project, chapter]);
 
   return (
     <div className="space-y-3">

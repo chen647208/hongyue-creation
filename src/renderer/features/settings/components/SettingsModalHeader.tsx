@@ -14,23 +14,18 @@ import { useTranslation } from '@/i18n';
 import { Button } from '@/shared/ui/Button';
 
 import type { SettingsModalHeaderProps } from '../types';
-import SettingsTabNav from './SettingsTabNav';
 
-const SettingsModalHeader: React.FC<SettingsModalHeaderProps> = ({ activeTab, onChange, onClose }) => {
+const SettingsModalHeader: React.FC<SettingsModalHeaderProps> = ({ onClose }) => {
   const { t } = useTranslation(['settings', 'common']);
   return (
-    <div className="flex flex-col gap-5 border-b border-border bg-muted/30 px-6 pt-5 pb-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-serif text-xl font-medium text-foreground">{t('title')}</h2>
-          <p className="mt-0.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('subtitle')}</p>
-        </div>
-        <Button variant="ghost" size="icon" onClick={onClose} title={t('common:close')}>
-          <X className="size-4" />
-        </Button>
+    <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted/30 px-6 py-4">
+      <div>
+        <h2 className="font-serif text-xl font-medium text-foreground">{t('title')}</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">{t('subtitle')}</p>
       </div>
-
-      <SettingsTabNav activeTab={activeTab} onChange={onChange} />
+      <Button variant="ghost" size="icon" onClick={onClose} title={t('common:close')} aria-label={t('common:close')}>
+        <X className="size-4" />
+      </Button>
     </div>
   );
 };

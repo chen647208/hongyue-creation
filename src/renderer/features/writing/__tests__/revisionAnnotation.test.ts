@@ -15,8 +15,8 @@ import { describe, expect,it } from 'vitest';
 
 import type { ChapterAnnotation, Project } from '../../../../shared/types';
 import { diffChars, mergeRevisionDecisions, uniformDecisions } from '../../../editor/revisionDiff';
+import { buildExportContent } from '../services/exportBuild';
 import { computeChapterStats } from '../services/writingStatsService';
-import { buildExportContent } from '../utils';
 
 const chapter = (content: string, annotations?: ChapterAnnotation[]): Project['chapters'][number] =>
   ({ id: 'c1', title: '第一章', summary: '', content, order: 0, annotations });

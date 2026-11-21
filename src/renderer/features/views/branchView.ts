@@ -12,8 +12,8 @@
  * 复用 EntityViewData，可直接用既有表格/卡片/关系图视图呈现。
  * 只做投影，不执行分支——运行时执行由下游引擎负责。
  */
-import type { BranchIssue, BranchScene, BranchVariable } from '@core/build';
-import { buildJumpTable, validateBranching } from '@core/build';
+import type { BranchIssue, BranchScene, BranchVariable } from '@core/build/branching';
+import { buildJumpTable, validateBranching } from '@core/build/branching';
 import type { BranchingModel } from '@shared/types';
 
 import type { EntityViewData, ViewColumn, ViewLink, ViewRow } from './types';

@@ -8,63 +8,9 @@
  */
 
 /**
- * 语音（docs/design/16）：Web Speech API 听写（SpeechRecognition）与朗读
- * （speechSynthesis）。均为浏览器能力，不支持的环境由调用方隐藏入口。
+ * 朗读：浏览器 speechSynthesis 把文本念出来（助手消息、写作区整章朗读）。
+ * 不提供听写——语音识别在 Chromium 里要连厂商的在线服务，网络受限时不可用。
  */
-
-interface SpeechRecognitionAlternativeLike {
-  transcript: string;
-}
-interface SpeechRecognitionResultLike {
-  readonly length: number;
-  isFinal: boolean;
-  item(index: number): SpeechRecognitionAlternativeLike;
-  [index: number]: SpeechRecognitionAlternativeLike;
-}
-interface SpeechRecognitionResultListLike {
-  readonly length: number;
-  item(index: number): SpeechRecognitionResultLike;
-  [index: number]: SpeechRecognitionResultLike;
-}
-interface SpeechRecognitionEventLike {
-  resultIndex: number;
-  results: SpeechRecognitionResultListLike;
-}
-interface SpeechRecognitionErrorEventLike {
-  error: string;
-}
-interface SpeechRecognitionLike {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
-  onend: (() => void) | null;
-}
-type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
-
-/**
- * 挂载听写构造器的 window 面：标准名 SpeechRecognition、Chrome 前缀名 webkitSpeechRecognition，
- * 均为可选（lib.dom 未声明这两个全局，支持与否由浏览器决定）。
- */
-type SpeechRecognitionWindow = Window & {
-  SpeechRecognition?: SpeechRecognitionCtor;
-  webkitSpeechRecognition?: SpeechRecognitionCtor;
-};
-
-function recognitionCtor(): SpeechRecognitionCtor | undefined {
-  if (typeof window === 'undefined') return undefined;
-  const w: SpeechRecognitionWindow = window;
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
-}
-
-/** 环境是否支持听写。 */
-export function isDictationSupported(): boolean {
-  return recognitionCtor() !== undefined;
-}
 
 /** 环境是否支持朗读。 */
 export function isSpeechSynthesisSupported(): boolean {
@@ -74,47 +20,6 @@ export function isSpeechSynthesisSupported(): boolean {
 /** 把 i18n 语言码映射到 Web Speech 的 BCP-47（仅覆盖项目语言）。 */
 export function speechLocale(language: string): string {
   return language.startsWith('zh') ? 'zh-CN' : 'en-US';
-}
-
-export interface DictationOptions {
-  lang?: string;
-  /** 识别到一段结果；isFinal 表示该段已定型。 */
-  onResult: (text: string, isFinal: boolean) => void;
-  onError?: (code: string) => void;
-  onEnd?: () => void;
-}
-
-export interface DictationController {
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-
-/** 创建一次听写会话；调用方在组件卸载时 abort。 */
-export function createDictation(options: DictationOptions): DictationController {
-  const Ctor = recognitionCtor();
-  if (!Ctor) throw new Error('dictation-unsupported');
-  const recognition = new Ctor();
-  recognition.lang = options.lang ?? 'zh-CN';
-  recognition.continuous = true;
-  recognition.interimResults = true;
-
-  recognition.onresult = (event) => {
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const result = event.results[i];
-      if (!result) continue;
-      const transcript = result.item(0)?.transcript ?? '';
-      if (transcript) options.onResult(transcript, result.isFinal);
-    }
-  };
-  recognition.onerror = (event) => options.onError?.(event.error);
-  recognition.onend = () => options.onEnd?.();
-
-  return {
-    start: () => recognition.start(),
-    stop: () => recognition.stop(),
-    abort: () => recognition.abort(),
-  };
 }
 
 export interface SpeechHandle {

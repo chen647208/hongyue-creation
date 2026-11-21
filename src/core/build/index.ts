@@ -93,9 +93,7 @@ export {
   DEFAULT_BUILD_PROFILE,
   MANUSCRIPT_BUILD_PROFILE,
   normalizeProfile,
-  parseProfileYaml,
   roundtripProfile,
-  serializeProfileYaml,
   typeMatches,
   validateProfile,
 } from './profile.js';

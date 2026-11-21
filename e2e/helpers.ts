@@ -83,8 +83,12 @@ export const waitCollaborationReady = async (page: Page): Promise<void> => {
 };
 
 /** 建书进工作台灵感分区（首启走向导跳过，非首启走新建模态）。 */
-export const createBook = async (page: Page): Promise<void> => {  const skip = page.getByRole('button', { name: /跳过|Skip/ });
-  if (await skip.isVisible({ timeout: 10_000 }).catch(() => false)) {
+export const createBook = async (page: Page): Promise<void> => {
+  const skip = page.getByRole('button', { name: /跳过|Skip/ });
+  // 首启向导在 hydrate 后才出现：先等它一次，避免抢在渲染前走新建分支，
+  // 然后被引导层的遮罩挡住点不动「新建书籍」。
+  await skip.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
+  if (await skip.isVisible()) {
     // 跳过必须走键盘确认：部分环境下鼠标 click 会被 dialog 动画吞掉（onboarding 不关闭）
     await skip.focus();
     await page.keyboard.press('Enter');

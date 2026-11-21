@@ -11,7 +11,7 @@
  * 章节导出编排（从 WritingEditor 抽出）：选择章节/格式/编译档案/覆盖项并执行落盘。
  * 编译覆盖项叠加在所选档案之上，预览与落盘共用同一生效档案（所见即导出）。
  */
-import { type BuildProfile, clampHeadingLevel, COMPILE_DEFAULTS, validateProfile } from '@core/build';
+import { type BuildProfile, clampHeadingLevel, COMPILE_DEFAULTS, validateProfile } from '@core/build/profile';
 import type { TFunction } from 'i18next';
 import { useMemo, useState } from 'react';
 
@@ -24,16 +24,9 @@ import {
 import { dialogService } from '@/shared/services/dialogService';
 
 import type { Project } from '../../../../shared/types';
+import { buildExportFilename, saveExportFile, savePackageFile } from '../services/exportFiles';
+import { applyExportCompileOptions, buildQuickExportProfile } from '../services/exportProfiles';
 import type { ExportCompileOptions,ExportFormat } from '../types';
-import {
-  applyExportCompileOptions,
-  buildExportContent,
-  buildExportFilename,
-  buildExportPackage,
-  buildQuickExportProfile,
-  saveExportFile,
-  savePackageFile,
-} from '../utils';
 
 interface UseChapterExportOptions {
   project: Project;
@@ -145,6 +138,8 @@ export function useChapterExport({ project, t }: UseChapterExportOptions) {
     setError(null);
     const filename = buildExportFilename(project.title, format);
     try {
+      // 编译管线按需加载：确认导出时才取出版打包与渲染器，写作主界面不付这份体积。
+      const { buildExportContent, buildExportPackage } = await import('../services/exportBuild');
       if (format === 'epub' || format === 'docx' || format === 'odt') {
         const files = buildExportPackage(project, selectedIds, format, effectiveProfile);
         const fallbackHtml = buildExportContent(project, selectedIds, 'html', effectiveProfile);

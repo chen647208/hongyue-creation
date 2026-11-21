@@ -17,6 +17,7 @@ import { useEffect } from 'react';
 import { vectorIntegrationService } from '@/shared/services/knowledge/vectorIntegrationService';
 import { normalizeProjectKinds } from '@/shared/utils/characterKinds';
 
+import { DEFAULT_TTS_CONFIG, normalizeTtsConfig } from '../../shared/constants/tts';
 import { loadUserSkills } from '../features/assistant/services/userSkillsService';
 import { bootCustomFonts } from '../features/settings/services/customFontService';
 import { changeLanguage } from '../i18n';
@@ -55,6 +56,7 @@ export function hydrateStoresFromState(state: typeof INITIAL_APP_STATE): void {
     editorFont: state.editorFont,
     customFonts: state.customFonts ?? [],
     mcpServers: state.mcpServers ?? [],
+    tts: state.tts ?? DEFAULT_TTS_CONFIG,
     uiFontSize: state.uiFontSize,
     editorFontSize: state.editorFontSize,
     editorLineHeight: state.editorLineHeight,
@@ -107,6 +109,7 @@ export function useAppBootstrap(): void {
         if (saved) {
           logger.debug('成功加载应用状态，应用数据迁移');
           persisted = { ...INITIAL_APP_STATE, ...saved,
+            tts: normalizeTtsConfig(saved.tts),
             embeddingModels: saved.embeddingModels || [],
             activeEmbeddingModelId: saved.activeEmbeddingModelId || null,
           };

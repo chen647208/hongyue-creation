@@ -12,6 +12,6 @@
  * 插件装配（aiRuntime → bootstrapPlugins）与视图面板共用此实例；
  * 公式是可序列化派生字段，求值走 shared/formulaScript 白名单沙箱，不执行插件代码。
  */
-import { FormulaRegistry } from '@core/plugin';
+import { FormulaRegistry } from '@core/plugin/contributions';
 
 export const formulaRegistry = new FormulaRegistry();

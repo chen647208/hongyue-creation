@@ -87,21 +87,6 @@ export const KnowledgeSearchBar: React.FC<KnowledgeSearchBarProps> = ({
           ))}
         </div>
       </div>
-
-      <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-primary" />
-          {t('center.hybridLegend')}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-chart-1" />
-          {t('center.semanticLegend')}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-chart-5" />
-          {t('center.keywordLegend')}
-        </span>
-      </div>
     </div>
   );
 };

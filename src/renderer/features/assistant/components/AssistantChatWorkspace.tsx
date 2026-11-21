@@ -8,7 +8,7 @@
  */
 
 import type { Citation } from '@core/ai';
-import { AlertCircle, BookOpen, Calculator, Check, Clock, Copy, Cpu, FileText, Flag, Keyboard, Landmark, Link2, MapPin, MessagesSquare, Paperclip, Pencil, Reply, Send, Settings2, Square, Trash2, User, X, Zap } from 'lucide-react';
+import { AlertCircle, BookOpen, Calculator, Check, Clock, Copy, Cpu, FileText, Flag, Keyboard, Landmark, Link2, MapPin, MessagesSquare, Paperclip, Pencil, Plus, Reply, Send, Settings2, Square, Trash2, User, X, Zap } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,6 +16,7 @@ import { templateDisplayName } from '@/i18n';
 import { createDeleteGuard } from '@/shared/services/deleteGuard';
 import { speechLocale } from '@/shared/services/speechService';
 import { Button } from '@/shared/ui/Button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/DropdownMenu';
 import { MarkdownView } from '@/shared/ui/Markdown';
 import { Select } from '@/shared/ui/Select';
 import { Spinner } from '@/shared/ui/Spinner';
@@ -24,9 +25,8 @@ import { cn } from '@/shared/utils/cn';
 
 import type { CardPromptTemplate, KnowledgeItem } from '../../../../shared/types';
 import type { ChatMessage } from '../types';
-import SavedAttachmentsButton from './SavedAttachmentsButton';
+import AttachmentMenuButton from './AttachmentMenuButton';
 import SpeakButton from './SpeakButton';
-import SpeechInputButton from './SpeechInputButton';
 
 
 interface AssistantChatWorkspaceProps {
@@ -47,7 +47,7 @@ interface AssistantChatWorkspaceProps {
   onStopGeneration: () => void;
   onDeleteMessage: (id: string) => void;
   lastToolChain: Array<{ toolId: string; ok: boolean }>;
-  handleFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  handleFileUpload: (files: FileList) => void;
   cardPromptTemplates: CardPromptTemplate[];
   selectedCardTemplateId: string | null;
   setSelectedCardTemplateId: React.Dispatch<React.SetStateAction<string | null>>;
@@ -137,7 +137,7 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
     copyTimer.current = setTimeout(() => setCopiedId(null), 1500);
   };
 
-  // 输入框自增高：随内容（含两行占位符）撑开，上限 max-h-32。
+  // 输入框自增高：随内容撑开，上限 max-h-32。
   React.useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -344,36 +344,11 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
         <div className="shrink-0 border-t border-border bg-card p-3">
           {!contextPanelOpen && (
           <>
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
-            <span className="py-1 text-2xs uppercase tracking-wider text-muted-foreground">{t('chat.quickCreateLabel')}</span>
-            {quickCommands.map((item) => {
-              const cmd = `${i18n.language === 'en' ? item.en : item.zh} `;
-              return (
-                <Button
-                  key={cmd}
-                  variant="outline"
-                  onClick={() => {
-                    setInput(cmd);
-                    const defaultTemplate = cardPromptTemplates.find((template) => template.category === item.category);
-                    if (defaultTemplate) {
-                      setSelectedCardTemplateId(defaultTemplate.id);
-                    }
-                  }}
-                  className="h-auto gap-1 px-2 py-1 text-2xs font-normal text-muted-foreground hover:border-primary/40 hover:text-primary"
-                  title={t('chat.commandTitle', { cmd: cmd.trim() })}
-                >
-                  <item.icon className="size-3" />
-                  {cmd.trim()}
-                </Button>
-              );
-            })}
-          </div>
-
           {input.startsWith('/') && cardPromptTemplates.length > 0 && (
-            <div className="mb-2 flex items-center gap-2 px-1">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
               <span className="text-2xs uppercase tracking-wider text-muted-foreground">{t('chat.templateLabel')}</span>
               <Select
-                className="h-7 flex-1 text-xs"
+                className="h-7 w-48 text-xs"
                 value={selectedCardTemplateId || ''}
                 onChange={(event) => setSelectedCardTemplateId(event.target.value || null)}
               >
@@ -399,24 +374,47 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
           )}
 
           <div className="flex items-end gap-2">
-            <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:size-9">
-              <Paperclip className="size-5" />
-              <input type="file" multiple className="hidden" onChange={handleFileUpload} accept=".txt,.md,.json,.js,.ts,.csv,.pdf,.png,.jpg,.jpeg,.webp" />
-            </label>
-            <SavedAttachmentsButton
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  title={t('chat.quickCreateLabel')}
+                  aria-label={t('chat.quickCreateLabel')}
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                {quickCommands.map((item) => {
+                  const cmd = `${i18n.language === 'en' ? item.en : item.zh} `;
+                  return (
+                    <DropdownMenuItem
+                      key={cmd}
+                      onSelect={() => {
+                        setInput(cmd);
+                        const defaultTemplate = cardPromptTemplates.find((template) => template.category === item.category);
+                        if (defaultTemplate) setSelectedCardTemplateId(defaultTemplate.id);
+                      }}
+                    >
+                      <item.icon className="size-4" />
+                      {cmd.trim()}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <AttachmentMenuButton
               bookId={bookId}
               refreshKey={attachmentsRefreshKey}
               onAttach={(item) => setPendingFiles((prev) => [...prev, item])}
-            />
-            <SpeechInputButton
-              onTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
-              lang={speechLocale(i18n.language)}
-              disabled={contextPanelOpen || editPanelOpen}
+              onFilesSelected={handleFileUpload}
             />
             <Textarea
               ref={inputRef}
-              className="max-h-32 min-h-[58px] flex-1"
-              rows={2}
+              className="max-h-32 min-h-[44px] flex-1"
+              rows={1}
               placeholder={t('chat.inputPlaceholder')}
               value={input}
               onChange={(event) => setInput(event.target.value)}

@@ -28,6 +28,7 @@ export const SETTING_KEYS = [
   'consistencyCheckConfig',
   'embeddingModels',
   'customFonts',
+  'tts',
 ] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
