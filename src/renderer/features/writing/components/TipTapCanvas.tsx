@@ -202,6 +202,9 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
   }, []);
   // 已发信号的章节：同一章内的重复渲染（本地输入、装饰刷新）不重复触发。
   const readyChapterRef = useRef<string | null>(null);
+  // 句柄闭包读取当前章：切章不重建句柄，补发判定要拿最新值。
+  const activeChapterIdRef = useRef(activeChapterId);
+  activeChapterIdRef.current = activeChapterId;
 
   // 声明顺序在受控同步之后：非协作模式切章时 setContent 已执行；协作模式换绑后
   // editor 指向新实例（重建过程中间的已销毁实例不发信号）。内容相同的两章也发信号，
@@ -444,6 +447,11 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
       },
       onEditorReady(listener: () => void) {
         readyListeners.current.add(listener);
+        // 订阅晚于就绪信号时补发一次：宿主在切章提交里重订订阅，子组件的就绪
+        // 通知可能先于重订执行。当前章文档已就绪，直接回调，待跳队列不会漏信号。
+        if (editor && !editor.isDestroyed && readyChapterRef.current === activeChapterIdRef.current) {
+          listener();
+        }
         return () => {
           readyListeners.current.delete(listener);
         };
