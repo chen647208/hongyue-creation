@@ -9,14 +9,19 @@
 
 /**
  * 渲染层产物体积预算：统计 build/renderer 下 JS + CSS 总量，超预算即失败。
+ * 同时输出体积组成（各 chunk 实际大小、top 依赖占比、首屏预载检查），
+ * 并写入 build/bundle-report.txt 供构建日志留存。
  * 只算应用代码与样式（排除 wasm / 图标等二进制资源）；预算随功能分期复核，优化后下调。
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { buildBundleReport } from './bundle-analyze.mjs';
+
 /** 预算（KB，当前基线约 3790KB；键位与缩放接管后复核上调，待 bundle 组成分析 + 懒加载优化后下调）。 */
 const BUDGET_KB = 3900;
 const DIR = path.resolve(process.cwd(), 'build/renderer');
+const REPORT = path.resolve(process.cwd(), 'build/bundle-report.txt');
 
 if (!fs.existsSync(DIR)) {
   console.error(`未找到渲染产物目录 ${path.relative(process.cwd(), DIR)}，请先运行 npm run electron:build。`);
@@ -35,6 +40,16 @@ function walk(dir, out = []) {
 const files = walk(DIR);
 const totalKb = files.reduce((sum, f) => sum + fs.statSync(f).size, 0) / 1024;
 const rounded = Math.round(totalKb * 10) / 10;
+
+const report = buildBundleReport();
+if (report) {
+  fs.writeFileSync(REPORT, `${report}\n`, 'utf8');
+  console.log(report);
+  console.log('');
+  console.log(`组成分析已写入 ${path.relative(process.cwd(), REPORT)}。`);
+} else {
+  console.warn('未找到 build/bundle-stats.json，跳过组成分析；请先运行 npm run electron:build。');
+}
 
 if (totalKb > BUDGET_KB) {
   console.error(`渲染产物体积超预算：${rounded}KB > ${BUDGET_KB}KB。`);

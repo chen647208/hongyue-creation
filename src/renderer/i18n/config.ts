@@ -54,13 +54,20 @@ export async function initI18n(initialLanguage?: AppLanguage): Promise<typeof i1
     .use(initReactI18next)
     .init({
     lng: initialLanguage,
-    fallbackLng: DEFAULT_LANGUAGE,
+    // 中英字典键集由一致性测试锁死，不需要跨语言回退；关闭后一次只加载当前语言，
+    // 不会为了兜底把另一份语料也拉进首屏。
+    fallbackLng: false,
     supportedLngs: [...SUPPORTED_LANGUAGES],
     nonExplicitSupportedLngs: false,
     load: 'languageOnly',
     defaultNS: 'common',
     ns: [...NAMESPACES],
-    detection: { order: ['navigator'], caches: [] },
+    detection: {
+      order: ['navigator'],
+      caches: [],
+      // 不受支持的浏览器语言统一落到默认语言，避免出现无字典可用的语言。
+      convertDetectedLanguage: (language: string) => normalizeLanguage(language) ?? DEFAULT_LANGUAGE,
+    },
     // React 以文本节点渲染所有译文，已负责转义；i18next 再转义会对插值内容（如含 & 的书名）二次转义。
     interpolation: { escapeValue: false },
     returnNull: false,
