@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { createDictation, type DictationController,isDictationSupported } from '@/shared/services/speechService';
+import { toast } from '@/shared/services/toastService';
 import { Button } from '@/shared/ui/Button';
 import { logger } from '@/shared/utils/logger';
 
@@ -47,6 +48,9 @@ const SpeechInputButton: React.FC<SpeechInputButtonProps> = ({ onTranscript, lan
         onError: (code) => {
           logger.warn('dictation error:', code);
           setListening(false);
+          // 浏览器听写把音频送到厂商服务端识别：无网/被墙时只回 network 错误，
+          // 原来只写日志，用户看到的是「点了没反应」。
+          toast.error(t(code === 'network' ? 'chat.dictateNetworkError' : 'chat.dictateError'));
         },
         onEnd: () => setListening(false),
       });
