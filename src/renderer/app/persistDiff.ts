@@ -15,7 +15,7 @@ import type { CommitOptions } from '../shared/services/repository/types';
 const NON_PROJECT_KEYS = [
   'models', 'prompts', 'cardPrompts', 'consistencyPrompts', 'consistencyCheckConfig',
   'embeddingModels', 'activeProjectId', 'activeModelId', 'activeEmbeddingModelId', 'language', 'theme',
-  'uiFont', 'editorFont', 'customFonts', 'mcpServers',
+  'uiFont', 'editorFont', 'customFonts', 'mcpServers', 'tts',
   'uiFontSize', 'editorFontSize', 'editorLineHeight',
   'proxy', 'minimizeToTray', 'autoLaunch',
 ] as const;

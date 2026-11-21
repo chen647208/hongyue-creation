@@ -10,10 +10,11 @@
 /** 写作工具：一键排版、规则纠错、快捷词、多平台预览。 */
 import type { Chapter, Project } from '@shared/types';
 import { Plus, Trash2 } from 'lucide-react';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
+import { useSettingsStore } from '@/app/stores/settingsStore';
 import { useTranslation } from '@/i18n';
-import { isSpeechSynthesisSupported, speak, type SpeechHandle } from '@/shared/services/speechService';
+import { useSpeechPlayback } from '@/shared/hooks/useSpeechPlayback';
 import { Button } from '@/shared/ui/Button';
 import { Checkbox } from '@/shared/ui/Checkbox';
 import { Input } from '@/shared/ui/Input';
@@ -64,23 +65,8 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
   const sensitiveWords = useMemo(() => parseSensitiveWords(sensitiveRaw), [sensitiveRaw]);
   const issues = useMemo(() => findProofreadIssues(chapter?.content ?? '', sensitiveWords), [chapter?.content, sensitiveWords]);
 
-  const speechRef = useRef<SpeechHandle | null>(null);
-  const [speaking, setSpeaking] = useState(false);
-  const speechSupported = isSpeechSynthesisSupported();
-  const startReading = () => {
-    if (!chapter?.content.trim()) return;
-    try {
-      speechRef.current = speak(chapter.content.slice(0, 6000));
-      setSpeaking(true);
-    } catch {
-      setSpeaking(false);
-    }
-  };
-  const stopReading = () => {
-    speechRef.current?.cancel();
-    speechRef.current = null;
-    setSpeaking(false);
-  };
+  const tts = useSettingsStore((s) => s.tts);
+  const speech = useSpeechPlayback(tts);
 
   const updateSnippets = (next: Snippet[]) => {
     setSnippets(next);
@@ -119,11 +105,16 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
               <option value="lined">{t('tools.format.paperLined')}</option>
               <option value="sepia">{t('tools.format.paperSepia')}</option>
             </Select>
-            {speechSupported &&
-              (speaking ? (
-                <Button size="sm" variant="outline" onClick={stopReading}>{t('tools.format.stopRead')}</Button>
+            {speech.supported &&
+              (speech.speaking ? (
+                <Button size="sm" variant="outline" onClick={speech.stop}>
+                  {t('tools.format.stopRead')}
+                  {speech.progress && <span className="tabular-nums text-muted-foreground">{speech.progress.index}/{speech.progress.total}</span>}
+                </Button>
               ) : (
-                <Button size="sm" variant="outline" disabled={!chapter} onClick={startReading}>{t('tools.format.readAloud')}</Button>
+                <Button size="sm" variant="outline" disabled={!chapter?.content.trim()} onClick={() => chapter && speech.start(chapter.content)}>
+                  {t('tools.format.readAloud')}
+                </Button>
               ))}
           </div>
           <div className="flex flex-wrap gap-2">

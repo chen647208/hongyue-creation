@@ -22,12 +22,11 @@ import { type ConsistencyCheckConfig,type ConsistencyCheckPromptTemplate, type D
 import { repository } from '../../shared/services/repository';
 import { logger } from '../../shared/utils/logger';
 import { KnowledgeDetailPanel } from './components/KnowledgeDetailPanel';
-import { KnowledgeFeatureEditors } from './components/KnowledgeFeatureEditors';
+import { KnowledgeFeatureEditors,type TimelineView } from './components/KnowledgeFeatureEditors';
 import KnowledgeFeaturePanels from './components/KnowledgeFeaturePanels';
 import { KnowledgeListPanel } from './components/KnowledgeListPanel';
 import { KnowledgeSearchBar, type KnowledgeSearchMode } from './components/KnowledgeSearchBar';
 import { KnowledgeSearchResults } from './components/KnowledgeSearchResults';
-import { KnowledgeStatsGrid } from './components/KnowledgeStatsGrid';
 import { useKnowledgeIndex } from './hooks/useKnowledgeIndex';
 
 interface StepKnowledgeEnhancedProps {
@@ -63,19 +62,15 @@ const StepKnowledgeEnhanced: React.FC<StepKnowledgeEnhancedProps> = ({
 
   const [showLocationEditor, setShowLocationEditor] = useState(false);
   const [showFactionEditor, setShowFactionEditor] = useState(false);
-  
-  const [showTimelineEditor, setShowTimelineEditor] = useState(false);
-  
+  const [timelineView, setTimelineView] = useState<TimelineView | null>(null);
   const [showRuleSystemEditor, setShowRuleSystemEditor] = useState(false);
-  
+
   const [showWorldViewGraph, setShowWorldViewGraph] = useState(false);
   const [graphInitialType, setGraphInitialType] = useState<DiagramType>('mixed');
-  
+
   const [showConsistencyChecker, setShowConsistencyChecker] = useState(false);
   const [showSmartRecommender, setShowSmartRecommender] = useState(false);
-  const [showEnhancedTimeline, setShowEnhancedTimeline] = useState(false);
   const [showDataViews, setShowDataViews] = useState(false);
-  const [showDualTimeline, setShowDualTimeline] = useState(false);
   const [showScreenplay, setShowScreenplay] = useState(false);
   const [consistencyPrompts, setConsistencyPrompts] = useState<ConsistencyCheckPromptTemplate[]>([]);
   const [consistencyConfig, setConsistencyConfig] = useState<ConsistencyCheckConfig | null>(null);
@@ -97,21 +92,21 @@ const StepKnowledgeEnhanced: React.FC<StepKnowledgeEnhancedProps> = ({
       case 'location':
         setShowFactionEditor(false);
         setShowRuleSystemEditor(false);
-        setShowEnhancedTimeline(false);
+        setTimelineView(null);
         setNavTarget({ type: 'location', id });
         setShowLocationEditor(true);
         break;
       case 'faction':
         setShowLocationEditor(false);
         setShowRuleSystemEditor(false);
-        setShowEnhancedTimeline(false);
+        setTimelineView(null);
         setNavTarget({ type: 'faction', id });
         setShowFactionEditor(true);
         break;
       case 'rule':
         setShowLocationEditor(false);
         setShowFactionEditor(false);
-        setShowEnhancedTimeline(false);
+        setTimelineView(null);
         setNavTarget({ type: 'rule', id });
         setShowRuleSystemEditor(true);
         break;
@@ -121,7 +116,7 @@ const StepKnowledgeEnhanced: React.FC<StepKnowledgeEnhancedProps> = ({
         setShowFactionEditor(false);
         setShowRuleSystemEditor(false);
         setNavTarget({ type: 'timeline', id });
-        setShowEnhancedTimeline(true);
+        setTimelineView('enhanced');
         break;
       case 'character':
         onNavigateToCharacter?.(id);
@@ -137,6 +132,12 @@ const StepKnowledgeEnhanced: React.FC<StepKnowledgeEnhancedProps> = ({
   // 面板关闭时清除对应导航目标（仅当当前 navTarget 属于该面板）
   const clearNavTargetFor = (type: string) => {
     setNavTarget(prev => (prev && prev.type === type ? null : prev));
+  };
+
+  // 时间线三种视图共用一个面板：离开增强视图（选中事件所在处）即清空跳转目标
+  const changeTimelineView = (view: TimelineView | null) => {
+    setTimelineView(view);
+    if (view !== 'enhanced') clearNavTargetFor('timeline');
   };
 
   useEffect(() => {
@@ -350,8 +351,6 @@ const StepKnowledgeEnhanced: React.FC<StepKnowledgeEnhancedProps> = ({
 
       <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-6">
 
-      <KnowledgeStatsGrid project={project} />
-
       {showSearchResults && searchResults.length > 0 && (
         <KnowledgeSearchResults
           results={searchResults}
@@ -373,20 +372,16 @@ const StepKnowledgeEnhanced: React.FC<StepKnowledgeEnhancedProps> = ({
         setShowLocationEditor={(v) => { setShowLocationEditor(v); if (v === false) clearNavTargetFor('location'); }}
         showFactionEditor={showFactionEditor}
         setShowFactionEditor={(v) => { setShowFactionEditor(v); if (v === false) clearNavTargetFor('faction'); }}
-        showTimelineEditor={showTimelineEditor}
-        setShowTimelineEditor={setShowTimelineEditor}
+        timelineView={timelineView}
+        setTimelineView={changeTimelineView}
         showRuleSystemEditor={showRuleSystemEditor}
         setShowRuleSystemEditor={(v) => { setShowRuleSystemEditor(v); if (v === false) clearNavTargetFor('rule'); }}
-        showEnhancedTimeline={showEnhancedTimeline}
-        setShowEnhancedTimeline={(v) => { setShowEnhancedTimeline(v); if (v === false) clearNavTargetFor('timeline'); }}
         showConsistencyChecker={showConsistencyChecker}
         setShowConsistencyChecker={setShowConsistencyChecker}
         showSmartRecommender={showSmartRecommender}
         setShowSmartRecommender={setShowSmartRecommender}
         showDataViews={showDataViews}
         setShowDataViews={setShowDataViews}
-        showDualTimeline={showDualTimeline}
-        setShowDualTimeline={setShowDualTimeline}
         showScreenplay={showScreenplay}
         setShowScreenplay={setShowScreenplay}
         setShowWorldViewGraph={setShowWorldViewGraph}
@@ -404,14 +399,13 @@ const StepKnowledgeEnhanced: React.FC<StepKnowledgeEnhancedProps> = ({
         graphInitialType={graphInitialType}
         showLocationEditor={showLocationEditor}
         showFactionEditor={showFactionEditor}
-        showTimelineEditor={showTimelineEditor}
+        timelineView={timelineView}
+        onTimelineViewChange={changeTimelineView}
         showRuleSystemEditor={showRuleSystemEditor}
-        showEnhancedTimeline={showEnhancedTimeline}
         showConsistencyChecker={showConsistencyChecker}
         showSmartRecommender={showSmartRecommender}
         showWorldViewGraph={showWorldViewGraph}
         showDataViews={showDataViews}
-        showDualTimeline={showDualTimeline}
         showScreenplay={showScreenplay}
         onCloseWorldViewGraph={() => setShowWorldViewGraph(false)}
         onNavigateToChapter={onNavigateToChapter}

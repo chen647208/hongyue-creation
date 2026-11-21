@@ -17,12 +17,13 @@
  */
 import { app, ipcMain } from 'electron';
 
-import type { AiCallOptions, AIResponse, AiStreamEvent, ModelConfig } from '../../shared/types.js';
+import type { AiCallOptions, AIResponse, AiStreamEvent, ModelConfig, TtsConfig, TtsSynthesisResult } from '../../shared/types.js';
 import type { Provider } from '../app/container.js';
 import { resolveVaultApiKey, VAULT_UNAVAILABLE, withVaultKey } from '../app/secureStore.js';
 import { IPC } from '../channels.js';
 import { aiT, initAiI18n } from './i18n.js';
 import { resolveAdapter } from './resolve.js';
+import { synthesizeSpeech } from './tts.js';
 
 /** 进行中的请求：requestId → 取消控制器。complete 与 stream 共用一张表。 */
 const active = new Map<string, AbortController>();
@@ -210,6 +211,13 @@ export const aiGatewayProvider: Provider = {
     });
 
     ipcMain.handle(IPC.ai.http, (_event, request: GatewayHttpRequest): Promise<GatewayHttpResponse> => performAiHttp(request));
+
+    ipcMain.handle(IPC.ai.speak, (_event, config: TtsConfig, segments: string[]): Promise<TtsSynthesisResult> => {
+      if (!config || !Array.isArray(segments) || segments.some((s) => typeof s !== 'string')) {
+        throw new TypeError('Invalid ai:speak arguments');
+      }
+      return synthesizeSpeech(config, segments);
+    });
   },
   shutdown() {
     for (const controller of active.values()) controller.abort();

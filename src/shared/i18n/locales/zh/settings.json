@@ -28,7 +28,9 @@
     "removeType": "删除类型",
     "removeField": "删除字段"
   },
+  "tabNavLabel": "设置分类",
   "tabGroup": {
+    "basic": "常规",
     "ai": "AI 模型",
     "prompts": "提示词",
     "system": "系统",
@@ -44,7 +46,8 @@
     "embedding": "向量模型",
     "general": "通用",
     "plugins": "插件",
-    "sync": "同步传输"
+    "sync": "同步传输",
+    "tts": "朗读"
   },
   "general": {
     "title": "通用设置",
@@ -189,21 +192,24 @@
     "custom": "自定义接口"
   },
   "models": {
-    "namePlaceholder": "给模型起个名字...",
+    "namePlaceholder": "给这个提供商起个名字...",
     "activeBadge": "当前",
     "setActiveLabel": "设为当前模型",
     "deploymentLocal": "本地",
     "deploymentCloud": "云端",
     "deleteTitle": "删除该模型",
     "connectionLog": "连接日志",
-    "channelLabel": "选择渠道",
-    "modelNameLabel": "模型具体名称",
+    "channelLabel": "提供商类型",
+    "modelNameLabel": "默认模型",
+    "modelNameHint": "调用接口时填给对方的模型 ID；可从列表选择，也可手动填写。",
+    "selectProviderLabel": "选择模型提供商",
     "selectModelPlaceholder": "请选择模型...",
-    "manualModelName": "手动输入模型名称",
     "fetchingList": "正在获取模型列表...",
     "loadedCount": "已加载 {{count}} 个可用模型",
     "refreshList": "刷新模型列表",
-    "manualInputPlaceholder": "或手动输入模型名称...",
+    "manualInputPlaceholder": "输入模型名称...",
+    "manualToggle": "手动输入",
+    "listToggle": "从列表选择",
     "endpointLabel": "接口地址 (Endpoint)",
     "endpointPlaceholderGemini": "官方默认 (留空) 或 代理地址",
     "endpointPlaceholderAnthropic": "如 https://api.anthropic.com 或 https://host/anthropic/v1",
@@ -237,7 +243,7 @@
     "testing": "通信测试中...",
     "testNow": "立即测试连接",
     "addProvider": "新增 AI 服务提供商",
-    "searchPlaceholder": "搜索渠道 / 模型…",
+    "searchPlaceholder": "搜索提供商…",
     "filter": {
       "all": "全部",
       "enabled": "已启用",
@@ -246,7 +252,7 @@
     },
     "disabled": "已停用",
     "emptyFilter": "没有匹配的渠道，换个关键词试试",
-    "emptyAll": "还没有渠道，先添加一个",
+    "emptyAll": "还没有提供商，先添加一个",
     "enableLabel": "启用",
     "showKey": "显示",
     "hideKey": "隐藏",
@@ -679,5 +685,38 @@
     "mergeHint": "从已配置的传输后端下载同步包并合并到本地库；冲突按保留副本 / 应用远端 / 待处理三选。",
     "mergeOpen": "打开同步面板",
     "desktopOnly": "本地目录选择与退出导出仅在桌面端可用。"
+  },
+  "tts": {
+    "title": "朗读（TTS）",
+    "hint": "控制助手消息与写作区的语音播报。系统语音离线可用；接入云端合成可获得更自然的音色，按字符计费。",
+    "providerLabel": "合成引擎",
+    "provider": {
+      "system": "系统语音（离线）",
+      "openai": "OpenAI 兼容接口",
+      "azure": "Azure 语音服务",
+      "elevenlabs": "ElevenLabs"
+    },
+    "providerHint": {
+      "system": "使用操作系统已安装的语音，离线、免费，音色取决于系统。",
+      "openai": "任何兼容 POST /audio/speech 的服务都可接入：OpenAI、中转网关、本地推理服务。",
+      "azure": "微软认知服务语音合成，音色多、中文自然，需要区域与订阅 Key。",
+      "elevenlabs": "音质最好，按字符计费；需选择账号里的 voice id。"
+    },
+    "voiceLabel": "音色",
+    "voiceHint": "系统语音从已安装的语音中选择；云端填服务侧的音色标识。",
+    "voicePlaceholder": "音色标识",
+    "refreshVoices": "刷新音色",
+    "endpointLabel": "接口地址",
+    "modelLabel": "模型",
+    "apiKeyLabel": "API Key",
+    "regionLabel": "区域（如 eastasia）",
+    "rateLabel": "语速 {{value}}×",
+    "pitchLabel": "音高 {{value}}×",
+    "sample": "这是朗读效果试听。",
+    "preview": "试听",
+    "stop": "停止",
+    "previewHint": "使用上面的文本按当前配置试听，不会保存任何音频。",
+    "unsupported": "当前环境不支持该引擎，请检查系统语音或完善上方配置。",
+    "systemDefaultVoice": "系统默认音色"
   }
 }

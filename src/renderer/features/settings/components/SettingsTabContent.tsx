@@ -19,6 +19,7 @@ import ModelSettingsPanel from './ModelSettingsPanel';
 import PromptTemplatesPanel from './PromptTemplatesPanel';
 import StorageSettingsPanel from './StorageSettingsPanel';
 import SystemGuidePanel from './SystemGuidePanel';
+import TtsSettingsPanel from './TtsSettingsPanel';
 
 const SettingsTabContent: React.FC<SettingsTabContentProps> = (props) => {
   const {
@@ -78,6 +79,8 @@ const SettingsTabContent: React.FC<SettingsTabContentProps> = (props) => {
   onLanguageChange,
   theme,
   onThemeChange,
+  tts,
+  onTtsChange,
   } = props;
   return (
     <>
@@ -160,6 +163,10 @@ const SettingsTabContent: React.FC<SettingsTabContentProps> = (props) => {
       {settingsTabRegistry.list().map((tab) => (
         activeTab === tab.id ? <React.Fragment key={tab.id}>{tab.render(props)}</React.Fragment> : null
       ))}
+
+      {activeTab === 'tts' && (
+        <TtsSettingsPanel tts={tts} onTtsChange={onTtsChange} />
+      )}
 
       {activeTab === 'embedding' && (
         <EmbeddingSettingsPanel

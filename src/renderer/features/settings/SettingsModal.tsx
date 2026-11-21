@@ -18,6 +18,7 @@ import { dialogService } from '@/shared/services/dialogService';
 import { embeddingModelService } from '@/shared/services/embeddingModelService';
 import { Dialog, DialogContent } from '@/shared/ui/Dialog';
 
+import { DEFAULT_TTS_CONFIG } from '../../../shared/constants/tts';
 import {
   type CardPromptTemplate,
   type ConsistencyCheckPromptTemplate,
@@ -25,6 +26,7 @@ import {
   type ModelConfig,
   type PromptTemplate,
   type StorageConfig,
+  type TtsConfig,
 } from '../../../shared/types';
 import type { ModelProviderInfo } from '../../constants/modelProviders';
 import { repository } from '../../shared/services/repository';
@@ -33,6 +35,7 @@ import { isModelConfigured } from '../../shared/utils/modelReadiness';
 import SettingsModalFooter from './components/SettingsModalFooter';
 import SettingsModalHeader from './components/SettingsModalHeader';
 import SettingsTabContent from './components/SettingsTabContent';
+import SettingsTabNav from './components/SettingsTabNav';
 import { DEFAULT_IMPORT_EXPORT_MODE, DEFAULT_SETTINGS_TAB, DEFAULT_STORAGE_CONFIG } from './constants';
 import {
   createDefaultEmbeddingConfig,
@@ -58,10 +61,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   prompts, 
   cardPrompts = [],
   consistencyPrompts = [],
+  tts,
   onSaveModels, 
   onSavePrompts,
   onSaveCardPrompts,
   onSaveConsistencyPrompts,
+  onSaveTts,
   onClose,
   onClearData,
   language,
@@ -104,6 +109,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // 一致性检查提示词配置状态
   const [localConsistencyPrompts, setLocalConsistencyPrompts] = useState<ConsistencyCheckPromptTemplate[]>(consistencyPrompts);
+
+  // 朗读配置：即时写回 store（试听要读最新值），保存时与其他切片一并落盘
+  const [localTts, setLocalTts] = useState<TtsConfig>(tts ?? DEFAULT_TTS_CONFIG);
 
   // 异步加载的基线：加载完成才确立，避免加载过程误判为脏
   const storageBaseline = useRef<StorageConfig | null>(null);
@@ -360,6 +368,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     if (onSaveConsistencyPrompts) {
       onSaveConsistencyPrompts(localConsistencyPrompts);
     }
+
+    // 朗读：Key 与其他凭据同路入 vault，落盘只存引用
+    if (onSaveTts && localTts) {
+      let nextTts = localTts;
+      if (nextTts.apiKey && !isVaultRef(nextTts.apiKey)) {
+        const { stored, encrypted } = await persistApiKey('tts', nextTts.apiKey);
+        if (!encrypted) plainFallback += 1;
+        nextTts = { ...nextTts, apiKey: stored };
+      }
+      onSaveTts(nextTts);
+    }
     
     // 保存存储配置
     try {
@@ -487,6 +506,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     if (JSON.stringify(localPrompts) !== JSON.stringify(prompts)) return true;
     if (JSON.stringify(localCardPrompts) !== JSON.stringify(cardsBaseline)) return true;
     if (JSON.stringify(localConsistencyPrompts) !== JSON.stringify(consistencyPrompts)) return true;
+    if (JSON.stringify(localTts) !== JSON.stringify(tts ?? DEFAULT_TTS_CONFIG)) return true;
     if (storageBaseline.current && JSON.stringify(storageConfig) !== JSON.stringify(storageBaseline.current)) return true;
     if (embeddingBaseline.current) {
       if (JSON.stringify(embeddingConfigs) !== JSON.stringify(embeddingBaseline.current.configs)) return true;
@@ -509,13 +529,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         if (!open) void handleRequestClose();
       }}
     >
-      <DialogContent hideClose aria-label={i18n.t('settings:title')} className="flex h-[90vh] w-[94vw] max-w-6xl flex-col gap-0 overflow-hidden p-0">
-        <SettingsModalHeader
-          activeTab={activeTab}
-          onChange={setActiveTab}
-          onClose={() => void handleRequestClose()}
-        />
-        <div className=" flex-1 overflow-y-auto bg-background p-6">
+      <DialogContent hideClose aria-label={i18n.t('settings:title')} className="flex h-[90vh] w-[94vw] max-w-7xl flex-col gap-0 overflow-hidden p-0">
+        <SettingsModalHeader onClose={() => void handleRequestClose()} />
+        <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+          <SettingsTabNav activeTab={activeTab} onChange={setActiveTab} />
+          <div className="min-h-0 flex-1 overflow-y-auto bg-background p-6">
           <SettingsTabContent
             activeTab={activeTab}
             localModels={localModels}
@@ -573,7 +591,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             onLanguageChange={onLanguageChange}
             theme={theme}
             onThemeChange={onThemeChange}
+            tts={localTts}
+            onTtsChange={setLocalTts}
           />
+          </div>
         </div>
 
         <SettingsModalFooter

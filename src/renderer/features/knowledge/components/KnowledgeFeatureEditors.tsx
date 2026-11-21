@@ -8,14 +8,20 @@
  */
 
 /** 知识库中心的世界要素编辑器集合：地点/势力/规则/时间线/一致性/智能推荐/关系图。 */
+import { Clock, Film, LayoutList, X } from 'lucide-react';
 import React from 'react';
 
 import { type CommitOptions } from '@/app/stores/projectStore';
 import { useTranslation } from '@/i18n';
 import { dialogService } from '@/shared/services/dialogService';
 import { FeaturePanel } from '@/shared/ui/FeaturePanel';
+import { IconButton } from '@/shared/ui/IconButton';
+import { TabBar } from '@/shared/ui/TabBar';
 
 import type { ConsistencyCheckConfig, ConsistencyCheckPromptTemplate, DiagramType, EmbeddingModelConfig, ModelConfig, Project } from '../../../../shared/types';
+
+/** 时间线的三种视图：事件编辑、增强时间轴、双轴对齐。 */
+export type TimelineView = 'events' | 'enhanced' | 'dual';
 
 interface KnowledgeFeatureEditorsProps {
   project: Project;
@@ -28,14 +34,13 @@ interface KnowledgeFeatureEditorsProps {
   graphInitialType: DiagramType;
   showLocationEditor: boolean;
   showFactionEditor: boolean;
-  showTimelineEditor: boolean;
+  timelineView: TimelineView | null;
+  onTimelineViewChange: (view: TimelineView | null) => void;
   showRuleSystemEditor: boolean;
-  showEnhancedTimeline: boolean;
   showConsistencyChecker: boolean;
   showSmartRecommender: boolean;
   showWorldViewGraph: boolean;
   showDataViews: boolean;
-  showDualTimeline: boolean;
   showScreenplay: boolean;
   onCloseWorldViewGraph: () => void;
   onNavigateToChapter?: (id: string) => void;
@@ -53,14 +58,13 @@ export const KnowledgeFeatureEditors: React.FC<KnowledgeFeatureEditorsProps> = (
   graphInitialType,
   showLocationEditor,
   showFactionEditor,
-  showTimelineEditor,
+  timelineView,
+  onTimelineViewChange,
   showRuleSystemEditor,
-  showEnhancedTimeline,
   showConsistencyChecker,
   showSmartRecommender,
   showWorldViewGraph,
   showDataViews,
-  showDualTimeline,
   showScreenplay,
   onCloseWorldViewGraph,
   onNavigateToChapter,
@@ -85,20 +89,64 @@ export const KnowledgeFeatureEditors: React.FC<KnowledgeFeatureEditorsProps> = (
         </div>
       )}
 
-      {showTimelineEditor && (
-        <div className="max-h-[600px] overflow-y-auto rounded-lg border border-border bg-card p-6">
-          <FeaturePanel
-            id="timeline.editor"
-            projectId={project.id}
-            timeline={project.timeline}
-            characters={project.characters || []}
-            locations={project.locations || []}
-            factions={project.factions || []}
-            chapters={project.chapters || []}
-            onSave={(timeline: Project['timeline']) => {
-              onUpdate({ timeline });
-            }}
-          />
+      {timelineView && (
+        <div className="rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between gap-2 border-b border-border pl-2 pr-2">
+            <TabBar
+              value={timelineView}
+              onChange={(view) => onTimelineViewChange(view)}
+              className="border-b-0"
+              items={[
+                { id: 'events', label: t('panel.timelineEventsTab'), icon: Clock },
+                { id: 'enhanced', label: t('panel.enhancedTimelineTitle'), icon: LayoutList },
+                { id: 'dual', label: t('panel.dualTimelineTitle'), icon: Film },
+              ]}
+            />
+            <IconButton label={t('panel.closeTimeline')} onClick={() => onTimelineViewChange(null)}>
+              <X className="size-4" />
+            </IconButton>
+          </div>
+          <div className="p-4">
+            {timelineView === 'events' && (
+              <div className="max-h-[600px] overflow-y-auto">
+                <FeaturePanel
+                  id="timeline.editor"
+                  projectId={project.id}
+                  timeline={project.timeline}
+                  characters={project.characters || []}
+                  locations={project.locations || []}
+                  factions={project.factions || []}
+                  chapters={project.chapters || []}
+                  onSave={(timeline: Project['timeline']) => {
+                    onUpdate({ timeline });
+                  }}
+                />
+              </div>
+            )}
+            {timelineView === 'enhanced' && (
+              <FeaturePanel
+                id="timeline.enhanced"
+                project={project}
+                selectedEventId={navTarget?.type === 'timeline' ? navTarget.id : undefined}
+                onEventClick={(event: { id: string }) => {
+                  onNavigateToItem('timeline', event.id);
+                }}
+                onChapterClick={(chapter: { id: string }) => {
+                  onNavigateToChapter?.(chapter.id);
+                }}
+                showChapters={true}
+              />
+            )}
+            {timelineView === 'dual' && (
+              <FeaturePanel
+                id="timeline.dual"
+                project={project}
+                onUpdate={(updates: Partial<Project>) => onUpdate(updates)}
+                onNavigateToChapter={onNavigateToChapter}
+                onSelectEvent={(id: string) => onNavigateToItem('timeline', id)}
+              />
+            )}
+          </div>
         </div>
       )}
 
@@ -115,21 +163,6 @@ export const KnowledgeFeatureEditors: React.FC<KnowledgeFeatureEditorsProps> = (
             }}
           />
         </div>
-      )}
-
-      {showEnhancedTimeline && (
-        <FeaturePanel
-          id="timeline.enhanced"
-          project={project}
-          selectedEventId={navTarget?.type === 'timeline' ? navTarget.id : undefined}
-          onEventClick={(event: { id: string }) => {
-            onNavigateToItem('timeline', event.id);
-          }}
-          onChapterClick={(chapter: { id: string }) => {
-            onNavigateToChapter?.(chapter.id);
-          }}
-          showChapters={true}
-        />
       )}
 
       {showConsistencyChecker && (
@@ -197,16 +230,6 @@ export const KnowledgeFeatureEditors: React.FC<KnowledgeFeatureEditorsProps> = (
 
       {showDataViews && (
         <FeaturePanel id="view.entities" project={project} onSelectItem={onNavigateToItem} />
-      )}
-
-      {showDualTimeline && (
-        <FeaturePanel
-          id="timeline.dual"
-          project={project}
-          onUpdate={(updates: Partial<Project>) => onUpdate(updates)}
-          onNavigateToChapter={onNavigateToChapter}
-          onSelectEvent={(id: string) => onNavigateToItem('timeline', id)}
-        />
       )}
 
       {showScreenplay && (

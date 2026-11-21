@@ -49,6 +49,7 @@ const SETTINGS_TABS: Array<{ zh: string; en: string }> = [
   { zh: '通用', en: 'General' },
   { zh: '模型提供商', en: 'Model Providers' },
   { zh: '向量模型', en: 'Embedding Models' },
+  { zh: '朗读', en: 'Speech' },
   { zh: '提示词库', en: 'Prompt Library' },
   { zh: '卡片提示词', en: 'Card Prompts' },
   { zh: '一致性检查模板', en: 'Consistency Templates' },
@@ -136,9 +137,12 @@ test('书架/工作台各分区通过 axe 棘轮审计', async () => {
     await dataViewBtn.click();
     await expect(dataViewBtn).toHaveAttribute('aria-expanded', 'true', { timeout: 15_000 });
     await expectNoNewDebt(page, 'world.views');
-    const timelineBtn = page.getByRole('button', { name: /双轴时间线|Dual-Axis Timeline/ }).first();
-    await timelineBtn.click();
-    await expect(timelineBtn).toHaveAttribute('aria-expanded', 'true', { timeout: 15_000 });
+    // 时间线包含三视图：开「时间线」卡后切双轴页签再审计
+    const timelineCard = page.getByRole('button', { name: /^时间线|^Timeline/ }).first();
+    await timelineCard.click();
+    const dualTab = page.getByRole('tab', { name: /双轴时间线|Dual-Axis Timeline/ }).first();
+    await dualTab.click();
+    await expect(dualTab).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 });
     await expectNoNewDebt(page, 'world.timeline');
 
     // Ctrl+3 角色

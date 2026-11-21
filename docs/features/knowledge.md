@@ -8,9 +8,9 @@
 ## 核心文件
 
 - `StepKnowledgeEnhanced.tsx`：知识库主编排器（唯一入口）
-- `components/KnowledgeSearchBar.tsx` / `KnowledgeSearchResults.tsx` / `KnowledgeStatsGrid.tsx`：检索栏、结果卡片与世界要素统计
-- `components/KnowledgeFeatureEditors.tsx`：地点/势力/规则/时间线/一致性/推荐/图谱编辑器集合
-- `components/KnowledgeFeaturePanels.tsx`：`knowledge/components/` 下的世界构建能力入口面板
+- `components/KnowledgeSearchBar.tsx` / `KnowledgeSearchResults.tsx`：检索栏与结果卡片
+- `components/KnowledgeFeatureEditors.tsx`：地点/势力/规则/时间线/一致性/推荐/图谱编辑器集合；时间线的三种视图共用同一面板的页签
+- `components/KnowledgeFeaturePanels.tsx`：世界要素卡（地点/势力/时间线/规则）与视图检查工具条
 - `services/vectorIntegrationService.ts`：知识索引与检索接入层
 - `services/vectorService.ts`：底层向量搜索能力
 - `services/embeddingProvider.ts`：Embedding 提供方（api/local 选择 + 自动降级 + 刷新）
@@ -20,7 +20,7 @@
 ## 主要职责
 
 - `StepKnowledgeEnhanced.tsx` 负责知识条目列表、编辑区、搜索编排和多面板接线
-- `KnowledgeFeaturePanels.tsx` 负责地点、势力、时间线、规则系统、图谱、一致性与推荐入口
+- `KnowledgeFeaturePanels.tsx` 分两层：世界要素卡展示数量并打开编辑器，视图与检查工具条打开图谱、一致性、推荐、数据视图与剧本
 - 向量相关服务负责知识条目索引、语义检索和混合搜索
 
 ## 与其他模块的关系

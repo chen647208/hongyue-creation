@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 import type { Citation } from '@core/ai';
-import { BookOpenText, Bot, CircleStop, Layers, ListChecks, PenLine, RotateCcw, Trash2, X } from 'lucide-react';
+import { BookOpenText, Bot, CircleStop, Layers, ListChecks, MoreHorizontal, PenLine, RotateCcw, Trash2, X } from 'lucide-react';
 import React, { useEffect, useMemo,useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,6 +16,7 @@ import { AIService } from '@/shared/services/ai/aiService';
 import { dialogService } from '@/shared/services/dialogService';
 import { saveAttachmentFile } from '@/shared/services/documentAttachmentService';
 import { Button } from '@/shared/ui/Button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/DropdownMenu';
 import { Select } from '@/shared/ui/Select';
 import { normalizeGenderId, normalizeRoleId } from '@/shared/utils/characterKinds';
 import { cn } from '@/shared/utils/cn';
@@ -182,9 +183,9 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
     setContextPanelOpen(true);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const picked = Array.from(e.target.files);
+  const handleFileUpload = async (files: FileList) => {
+    if (files.length === 0) return;
+    const picked = Array.from(files);
     const electronApi = window.electronAPI;
     const { images, items } = await collectChatAttachments(picked, {
       visionAvailable: usableModel?.supportsVision !== false,
@@ -217,7 +218,6 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
         });
       }
     }
-    e.target.value = '';
   };
 
   const handleOpenEditPanel = (category: AssistantEditCategory) => {
@@ -589,25 +589,32 @@ const GlobalAssistant: React.FC<GlobalAssistantProps> = ({ models, activeModelId
             >
               <ListChecks className="size-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleRetry}
-              disabled={isLoading || !hasModel || !lastUserText.current.trim()}
-              className="size-11 text-muted-foreground hover:text-foreground sm:size-7 disabled:opacity-40"
-              title={t('chat.retryTitle')}
-            >
-              <RotateCcw className="size-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClearChat}
-              className="size-11 text-muted-foreground hover:text-destructive sm:size-7"
-              title={t('window.clearChatTitle')}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-11 text-muted-foreground hover:text-foreground sm:size-7"
+                  title={t('window.moreActions')}
+                  aria-label={t('window.moreActions')}
+                >
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  disabled={isLoading || !hasModel || !lastUserText.current.trim()}
+                  onSelect={() => handleRetry()}
+                >
+                  <RotateCcw className="size-4" />
+                  {t('chat.retryTitle')}
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onSelect={() => handleClearChat()}>
+                  <Trash2 className="size-4" />
+                  {t('window.clearChatTitle')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

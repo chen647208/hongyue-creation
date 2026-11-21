@@ -31,6 +31,7 @@ const SettingsModalHost: React.FC<SettingsModalHostProps> = ({ onClose, onClearD
   const cardPrompts = useSettingsStore(s => s.cardPrompts);
   const consistencyPrompts = useSettingsStore(s => s.consistencyPrompts);
   const consistencyCheckConfig = useSettingsStore(s => s.consistencyCheckConfig);
+  const tts = useSettingsStore(s => s.tts);
   const language = useSettingsStore(s => s.language);
   const theme = useSettingsStore(s => s.theme);
   const actions = useSettingsStore.getState();
@@ -63,6 +64,8 @@ const SettingsModalHost: React.FC<SettingsModalHostProps> = ({ onClose, onClearD
       onSaveCardPrompts={actions.setCardPrompts}
       onSaveConsistencyPrompts={actions.setConsistencyPrompts}
       onSaveConsistencyConfig={actions.setConsistencyConfig}
+      tts={tts}
+      onSaveTts={actions.setTts}
     />
   );
 };

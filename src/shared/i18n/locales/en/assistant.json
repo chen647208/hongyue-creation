@@ -16,7 +16,8 @@
     }
   },
   "attachments": {
-    "open": "Saved attachments",
+    "menuLabel": "Attachments",
+    "upload": "Upload file…",
     "title": "Saved document attachments",
     "empty": "No saved attachments yet. Reference files are saved to this book after sending.",
     "remove": "Remove attachment"
@@ -47,7 +48,8 @@
     "injectionTitle": "Auto-injected context",
     "stopStreamTitle": "Stop streaming response",
     "planModeTitle": "Plan mode: plan only, act after confirmation",
-    "clearChatTitle": "Clear chat history"
+    "clearChatTitle": "Clear chat history",
+    "moreActions": "More actions"
   },
   "chat": {
     "modelMissing": "❌ Please configure an AI model first",
@@ -74,14 +76,13 @@
     "totalPrefix": "Total: ",
     "finishReasonPrefix": "Finish reason: ",
     "errorPrefix": "Error: ",
-    "quickCreateLabel": "Quick create:",
-    "commandTitle": "Click to insert {{cmd}}",
+    "quickCreateLabel": "Quick create",
     "templateLabel": "Template:",
     "defaultTemplateOption": "Use default template",
     "resetTemplateTitle": "Reset to default template",
-    "inputPlaceholder": "Type a question, or use /character /location /faction commands to create quickly... (Shift+Enter for a new line)",
+    "inputPlaceholder": "Ask a question…",
     "stopTitle": "Stop generating",
-    "sendTitle": "Send",
+    "sendTitle": "Send (Enter)",
     "modelSelect": "Select model",
     "outputModeSelect": "Output mode",
     "imageTypeUnsupported": "Unsupported image type: {{name}} (png/jpg/webp only).",
@@ -90,8 +91,6 @@
     "pdfTooLarge": "{{name}} exceeds {{size}}MB. Split the file and retry.",
     "pdfEmpty": "No text could be extracted from {{name}} (scanned or encrypted PDFs are not supported yet).",
     "pdfFailed": "Failed to parse {{name}}.",
-    "dictateStart": "Voice input",
-    "dictateStop": "Stop voice input",
     "speakTitle": "Read aloud",
     "speakStopTitle": "Stop reading",
     "copyTitle": "Copy this message",
