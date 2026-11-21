@@ -1,51 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="红月创作">
   <defs>
-    <linearGradient id="hy-bg" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0%" stop-color="#241726"/>
-      <stop offset="55%" stop-color="#1a1020"/>
-      <stop offset="100%" stop-color="#120b18"/>
-    </linearGradient>
-    <radialGradient id="hy-halo" cx="50%" cy="46%" r="52%">
-      <stop offset="0%" stop-color="#e11d48" stop-opacity="0.42"/>
-      <stop offset="60%" stop-color="#9f1239" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#9f1239" stop-opacity="0"/>
+    <radialGradient id="hy-icon-moon" cx="40%" cy="34%" r="72%">
+      <stop offset="0%" stop-color="#e55472"/>
+      <stop offset="70%" stop-color="#c01e47"/>
+      <stop offset="100%" stop-color="#8a0d2e"/>
     </radialGradient>
-    <radialGradient id="hy-moon2" cx="38%" cy="32%" r="78%">
-      <stop offset="0%" stop-color="#ff9aa9"/>
-      <stop offset="42%" stop-color="#e11d48"/>
-      <stop offset="82%" stop-color="#9f1239"/>
-      <stop offset="100%" stop-color="#6b1026"/>
-    </radialGradient>
-    <linearGradient id="hy-enso2" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f3c98b" stop-opacity="0.9"/>
-      <stop offset="55%" stop-color="#e8b06a" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="#c98a4a" stop-opacity="0.14"/>
-    </linearGradient>
-    <clipPath id="hy-moon2-clip">
-      <circle cx="512" cy="512" r="250"/>
-    </clipPath>
   </defs>
 
   <!-- 圆角方底 -->
-  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#hy-bg)"/>
-  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#hy-halo)"/>
-  <rect x="33" y="33" width="958" height="958" rx="215" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="2"/>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="#17121b"/>
 
-  <!-- 星点 -->
-  <circle cx="250" cy="250" r="7" fill="#ffe4ea" opacity="0.55"/>
-  <circle cx="784" cy="286" r="5" fill="#ffe4ea" opacity="0.4"/>
-  <circle cx="806" cy="742" r="6" fill="#ffe4ea" opacity="0.45"/>
-  <circle cx="286" cy="768" r="4" fill="#ffe4ea" opacity="0.35"/>
+  <!-- 红月从摊开的书卷后升起 -->
+  <circle cx="512" cy="400" r="272" fill="url(#hy-icon-moon)"/>
 
-  <!-- 墨环 -->
-  <path d="M512 196a316 316 0 1 1-223.6 92.6" fill="none" stroke="url(#hy-enso2)"
-        stroke-width="20" stroke-linecap="round"/>
+  <!-- 左页 -->
+  <path d="M104 760Q312 664 496 752L496 920Q312 840 104 928Z"
+        fill="#f7f4ed" stroke="#c79a5b" stroke-width="40" stroke-linejoin="round"/>
+  <!-- 右页 -->
+  <path d="M920 760Q712 664 528 752L528 920Q712 840 920 928Z"
+        fill="#f7f4ed" stroke="#c79a5b" stroke-width="40" stroke-linejoin="round"/>
 
-  <!-- 红月 -->
-  <circle cx="512" cy="512" r="250" fill="url(#hy-moon2)"/>
-  <g clip-path="url(#hy-moon2-clip)">
-    <circle cx="620" cy="470" r="242" fill="#5c0d1f" opacity="0.32"/>
-    <ellipse cx="430" cy="408" rx="64" ry="42" fill="#ffffff" opacity="0.26" transform="rotate(-24 430 408)"/>
+  <!-- 书脊 -->
+  <path d="M496 752L496 920M496 752L528 752" fill="none" stroke="#c79a5b" stroke-width="32"/>
+
+  <!-- 页面上的一行字 -->
+  <g stroke="#c79a5b" stroke-width="12" stroke-linecap="round" opacity="0.6">
+    <line x1="176" y1="816" x2="384" y2="776"/>
+    <line x1="200" y1="872" x2="376" y2="836"/>
+    <line x1="848" y1="816" x2="640" y2="776"/>
+    <line x1="824" y1="872" x2="648" y2="836"/>
   </g>
-  <circle cx="512" cy="512" r="250" fill="none" stroke="#ffd9df" stroke-opacity="0.16" stroke-width="5"/>
 </svg>
