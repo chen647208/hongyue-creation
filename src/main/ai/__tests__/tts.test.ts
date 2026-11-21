@@ -74,12 +74,26 @@ describe('synthesizeSpeech', () => {
     expect(JSON.parse(init.body as string)).toMatchObject({ model: 'tts-1', voice: 'alloy', input: '第一段', speed: 1.5 });
   });
 
+  it('gpt-4o-mini-tts 不支持 speed：改走 instructions，且 rate=1 时不发该字段', async () => {
+    await synthesizeSpeech(config({ model: 'gpt-4o-mini-tts', rate: 1.5 }), ['hi']);
+    const body = JSON.parse((state.fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string) as Record<string, unknown>;
+    expect(body.speed).toBeUndefined();
+    expect(body.instructions).toContain('1.5');
+    state.fetchMock.mockClear();
+    await synthesizeSpeech(config({ model: 'gpt-4o-mini-tts', rate: 1 }), ['hi']);
+    const plain = JSON.parse((state.fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string) as Record<string, unknown>;
+    expect(plain.instructions).toBeUndefined();
+  });
+
   it('Azure：SSML 体 + 订阅 Key 头', async () => {
     const result = await synthesizeSpeech(config({ provider: 'azure', region: 'eastasia', voice: 'zh-CN-XiaoxiaoNeural', rate: 1.2 }), ['你好']);
     expect(result.ok).toBe(true);
     const [url, init] = state.fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://eastasia.tts.speech.microsoft.com/cognitiveservices/v1');
     expect((init.headers as Record<string, string>)['Ocp-Apim-Subscription-Key']).toBe('sk-1');
+    // Azure 要求必填 User-Agent
+    expect((init.headers as Record<string, string>)['User-Agent']).toBeTruthy();
+    expect((init.body as string)).toContain('xml:lang="zh-CN"');
     expect((init.body as string)).toContain('<prosody rate="+120%"');
     expect((init.body as string)).toContain('zh-CN-XiaoxiaoNeural');
   });

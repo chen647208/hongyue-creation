@@ -35,17 +35,21 @@ function buildTtsRequest(config: TtsConfig, text: string): { request: TtsRequest
   switch (config.provider) {
     case 'openai': {
       const base = (config.endpoint || 'https://api.openai.com/v1').replace(/\/+$/, '');
+      const model = config.model || 'gpt-4o-mini-tts';
       return {
         mimeType: 'audio/mpeg',
         request: {
           url: `${base}/audio/speech`,
           headers: { 'Content-Type': 'application/json' },
+          // speed 仅 tts-1 / tts-1-hd 支持；gpt-4o-mini-tts 走 instructions 控制语速
           body: JSON.stringify({
-            model: config.model || 'gpt-4o-mini-tts',
+            model,
             voice: config.voice || 'alloy',
             input: text,
             response_format: 'mp3',
-            speed: config.rate,
+            ...(model.startsWith('tts-1')
+              ? { speed: config.rate }
+              : config.rate === 1 ? {} : { instructions: `Speak at about ${config.rate} times the normal speed.` }),
           }),
         },
       };
@@ -53,7 +57,9 @@ function buildTtsRequest(config: TtsConfig, text: string): { request: TtsRequest
     case 'azure': {
       if (!config.region) return null;
       const voice = config.voice || 'zh-CN-XiaoxiaoNeural';
-      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="zh-CN"><voice name="${escapeXml(voice)}"><prosody rate="${rate >= 0 ? '+' : ''}${rate}%" pitch="${pitch >= 0 ? '+' : ''}${pitch}%">${escapeXml(text)}</prosody></voice></speak>`;
+      // xml:lang 取自音色前缀（zh-CN-… / en-US-…），与服务端校验一致
+      const lang = /^([a-z]{2}-[A-Z]{2})-/.exec(voice)?.[1] ?? 'zh-CN';
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="${lang}"><voice xml:lang="${lang}" name="${escapeXml(voice)}"><prosody rate="${rate >= 0 ? '+' : ''}${rate}%" pitch="${pitch >= 0 ? '+' : ''}${pitch}%">${escapeXml(text)}</prosody></voice></speak>`;
       return {
         mimeType: 'audio/mpeg',
         request: {
@@ -61,6 +67,8 @@ function buildTtsRequest(config: TtsConfig, text: string): { request: TtsRequest
           headers: {
             'Content-Type': 'application/ssml+xml',
             'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+            // Azure 要求必填
+            'User-Agent': 'hongyue-creation',
           },
           body: ssml,
         },
