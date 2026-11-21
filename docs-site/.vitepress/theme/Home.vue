@@ -36,6 +36,7 @@ const entries = [
   <div class="home">
     <section class="hero">
       <div class="hero__copy">
+        <span class="hero__rule" aria-hidden="true"></span>
         <h1 class="hero__title">把小说写完。</h1>
         <p class="hero__lede">
           大纲、人物、伏笔、章节在同一个窗口里。稿件保存在本机，不配置 AI 模型也能写。
@@ -99,11 +100,17 @@ const entries = [
   grid-template-columns: minmax(0, 1.15fr) minmax(220px, 0.85fr);
   align-items: center;
   gap: 48px;
-  margin: 24px 0 0;
-  padding: 72px 56px 72px;
-  border-radius: 4px;
-  background: var(--home-ink);
-  color: var(--home-text);
+  margin: 0;
+  padding: 64px 0 72px;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.hero__rule {
+  display: block;
+  width: 48px;
+  height: 3px;
+  margin-bottom: 26px;
+  background: var(--home-red);
 }
 
 .hero__title {
@@ -113,6 +120,7 @@ const entries = [
   font-weight: 600;
   line-height: 1.18;
   letter-spacing: 0.01em;
+  color: var(--vp-c-text-1);
 }
 
 .hero__lede {
@@ -120,7 +128,7 @@ const entries = [
   margin: 28px 0 0;
   font-size: 16px;
   line-height: 1.9;
-  color: var(--home-muted);
+  color: var(--vp-c-text-2);
 }
 
 .hero__actions {
@@ -136,16 +144,17 @@ const entries = [
   justify-content: center;
   min-height: 44px;
   padding: 0 22px;
-  border: 1px solid rgba(242, 236, 228, 0.28);
+  border: 1px solid var(--vp-c-border);
   border-radius: 2px;
-  color: var(--home-text);
+  color: var(--vp-c-text-1);
   font-size: 15px;
   text-decoration: none;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
 }
 
 .action:hover {
-  border-color: var(--home-text);
+  border-color: var(--home-red);
+  color: var(--home-red);
 }
 
 .action--primary {
