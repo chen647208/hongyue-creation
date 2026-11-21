@@ -4,7 +4,7 @@
 收录运行期依赖（package-lock.json 中排除 dev/link）的许可证声明；
 各依赖的完整许可证文本随发行包内 `node_modules` 一并分发。
 
-共 401 个运行期依赖。
+共 371 个运行期依赖。
 
 | 依赖 | 版本 | 许可证 |
 | --- | --- | --- |
@@ -22,9 +22,8 @@
 | @floating-ui/react-dom | 2.1.9 | MIT |
 | @floating-ui/utils | 0.2.12 | MIT |
 | @google/genai | 1.34.0 | Apache-2.0 |
-| @grpc/grpc-js | 1.14.4 | Apache-2.0 |
+| @grpc/grpc-js | 1.14.7 | Apache-2.0 |
 | @grpc/proto-loader | 0.8.1 | Apache-2.0 |
-| @isaacs/cliui | 8.0.2 | ISC |
 | @jitl/quickjs-ffi-types | 0.32.0 | MIT |
 | @jitl/quickjs-wasmfile-release-sync | 0.32.0 | MIT |
 | @js-sdsl/ordered-map | 4.4.2 | MIT |
@@ -33,7 +32,6 @@
 | @lezer/lr | 1.4.10 | MIT |
 | @marijn/find-cluster-break | 1.0.4 | MIT |
 | @mixmark-io/domino | 2.2.0 | BSD-2-Clause |
-| @pkgjs/parseargs | 0.11.0 | MIT |
 | @protobufjs/aspromise | 1.1.2 | BSD-3-Clause |
 | @protobufjs/base64 | 1.1.2 | BSD-3-Clause |
 | @protobufjs/codegen | 2.0.5 | BSD-3-Clause |
@@ -123,20 +121,16 @@
 | @ungap/structured-clone | 1.4.0 | ISC |
 | agent-base | 7.1.4 | MIT |
 | ansi-regex | 5.0.1 | MIT |
-| ansi-regex | 6.2.2 | MIT |
 | ansi-regex | 6.3.0 | MIT |
 | ansi-styles | 4.3.0 | MIT |
-| ansi-styles | 6.2.3 | MIT |
 | ansi-styles | 6.2.3 | MIT |
 | argparse | 2.0.1 | Python-2.0 |
 | aria-hidden | 1.2.6 | MIT |
 | bail | 2.0.2 | MIT |
-| balanced-match | 1.0.2 | MIT |
 | base64-js | 1.5.1 | MIT |
 | better-sqlite3-multiple-ciphers | 13.0.3 | MIT |
 | bignumber.js | 9.3.1 | MIT |
 | boolbase | 1.0.0 | ISC |
-| brace-expansion | 2.1.4 | MIT |
 | buffer | 6.0.3 | MIT |
 | buffer-equal-constant-time | 1.0.1 | BSD-3-Clause |
 | builder-util-runtime | 9.7.0 | MIT |
@@ -155,7 +149,6 @@
 | colorette | 2.0.20 | MIT |
 | comma-separated-tokens | 2.0.3 | MIT |
 | crelt | 1.0.7 | MIT |
-| cross-spawn | 7.0.6 | MIT |
 | css-select | 5.2.2 | BSD-2-Clause |
 | css-what | 6.2.2 | BSD-2-Clause |
 | csstype | 3.2.3 | MIT |
@@ -170,12 +163,10 @@
 | domhandler | 5.0.3 | BSD-2-Clause |
 | domutils | 3.2.2 | BSD-2-Clause |
 | dotenv | 17.4.2 | BSD-2-Clause |
-| eastasianwidth | 0.2.0 | MIT |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 |
 | electron-updater | 6.8.9 | MIT |
 | emoji-regex | 10.6.0 | MIT |
 | emoji-regex | 8.0.0 | MIT |
-| emoji-regex | 9.2.2 | MIT |
 | emoji-regex | 9.2.2 | MIT |
 | encoding-sniffer | 0.2.1 | MIT |
 | entities | 4.5.0 | BSD-2-Clause |
@@ -187,16 +178,14 @@
 | extend | 3.0.2 | MIT |
 | fast-equals | 5.4.2 | MIT |
 | fetch-blob | 3.2.0 | MIT |
-| foreground-child | 3.3.1 | ISC |
 | formdata-polyfill | 4.0.10 | MIT |
 | fountain-js | 1.2.4 | MIT |
 | fs-extra | 10.1.0 | MIT |
-| gaxios | 7.1.3 | Apache-2.0 |
+| gaxios | 7.3.1 | Apache-2.0 |
 | gcp-metadata | 8.1.2 | Apache-2.0 |
 | get-caller-file | 2.0.5 | ISC |
 | get-east-asian-width | 1.6.0 | MIT |
 | get-nonce | 1.0.1 | MIT |
-| glob | 10.5.0 | ISC |
 | google-auth-library | 10.5.0 | Apache-2.0 |
 | google-logging-utils | 1.1.3 | Apache-2.0 |
 | gpt-tokenizer | 3.4.0 | MIT |
@@ -219,9 +208,7 @@
 | is-fullwidth-code-point | 3.0.0 | MIT |
 | is-hexadecimal | 2.0.1 | MIT |
 | is-plain-obj | 4.1.0 | MIT |
-| isexe | 2.0.0 | ISC |
 | isomorphic.js | 0.2.5 | MIT |
-| jackspeak | 3.4.3 | BlueOak-1.0.0 |
 | js-yaml | 4.3.2 | MIT |
 | js-yaml | 5.4.2 | MIT |
 | json-bigint | 1.0.0 | MIT |
@@ -237,7 +224,6 @@
 | lodash.isequal | 4.5.0 | MIT |
 | long | 5.3.2 | Apache-2.0 |
 | longest-streak | 3.1.0 | MIT |
-| lru-cache | 10.4.3 | ISC |
 | markdown-table | 3.0.4 | MIT |
 | mdast-util-find-and-replace | 3.0.2 | MIT |
 | mdast-util-from-markdown | 2.0.3 | MIT |
@@ -282,8 +268,6 @@
 | micromark-util-subtokenize | 2.1.0 | MIT |
 | micromark-util-symbol | 2.0.1 | MIT |
 | micromark-util-types | 2.0.2 | MIT |
-| minimatch | 9.0.9 | ISC |
-| minipass | 7.1.3 | BlueOak-1.0.0 |
 | ms | 2.1.3 | MIT |
 | node-addon-api | 8.9.2 | MIT |
 | node-domexception | 1.0.0 | MIT |
@@ -291,13 +275,10 @@
 | nth-check | 2.1.1 | BSD-2-Clause |
 | openai | 6.49.0 | Apache-2.0 |
 | orderedmap | 2.1.1 | MIT |
-| package-json-from-dist | 1.0.1 | BlueOak-1.0.0 |
 | parse-entities | 4.0.2 | MIT |
 | parse5 | 7.3.0 | MIT |
 | parse5-htmlparser2-tree-adapter | 7.1.0 | MIT |
 | parse5-parser-stream | 7.1.2 | MIT |
-| path-key | 3.1.1 | MIT |
-| path-scurry | 1.11.1 | BlueOak-1.0.0 |
 | property-information | 7.2.0 | MIT |
 | prosemirror-changeset | 2.4.2 | MIT |
 | prosemirror-commands | 1.7.2 | MIT |
@@ -327,27 +308,19 @@
 | remark-rehype | 11.1.2 | MIT |
 | remark-stringify | 11.0.0 | MIT |
 | require-directory | 2.1.1 | MIT |
-| rimraf | 5.0.10 | ISC |
 | rope-sequence | 1.3.4 | MIT |
 | safe-buffer | 5.2.1 | MIT |
 | safer-buffer | 2.1.2 | MIT |
 | sax | 1.6.1 | BlueOak-1.0.0 |
 | scheduler | 0.28.0 | MIT |
 | semver | 7.7.4 | ISC |
-| shebang-command | 2.0.0 | MIT |
-| shebang-regex | 3.0.0 | MIT |
-| signal-exit | 4.1.0 | ISC |
 | space-separated-tokens | 2.0.2 | MIT |
 | string-width | 4.2.3 | MIT |
-| string-width | 4.2.3 | MIT |
-| string-width | 5.1.2 | MIT |
 | string-width | 7.2.0 | MIT |
 | string-width | 7.2.0 | MIT |
 | string-width | 8.2.2 | MIT |
 | stringify-entities | 4.0.4 | MIT |
 | strip-ansi | 6.0.1 | MIT |
-| strip-ansi | 6.0.1 | MIT |
-| strip-ansi | 7.1.2 | MIT |
 | strip-ansi | 7.2.0 | MIT |
 | style-mod | 4.1.3 | MIT |
 | style-to-js | 1.1.21 | MIT |
@@ -358,8 +331,8 @@
 | tslib | 2.8.1 | 0BSD |
 | turndown | 7.2.2 | MIT |
 | typescript | 5.8.3 | Apache-2.0 |
-| undici | 7.29.1 | MIT |
-| undici | 8.10.2 | MIT |
+| undici | 7.30.2 | MIT |
+| undici | 8.13.1 | MIT |
 | undici-types | 6.21.0 | MIT |
 | unified | 11.0.5 | MIT |
 | unist-util-is | 6.0.1 | MIT |
@@ -381,7 +354,6 @@
 | web-streams-polyfill | 3.3.3 | MIT |
 | whatwg-encoding | 3.1.1 | MIT |
 | whatwg-mimetype | 4.0.0 | MIT |
-| which | 2.0.2 | ISC |
 | wink-bm25-text-search | 3.1.2 | MIT |
 | wink-distance | 2.0.2 | MIT |
 | wink-eng-lite-web-model | 1.8.1 | MIT |
@@ -394,8 +366,6 @@
 | wink-porter2-stemmer | 2.0.1 | MIT |
 | wink-tokenizer | 5.3.0 | MIT |
 | wrap-ansi | 7.0.0 | MIT |
-| wrap-ansi | 7.0.0 | MIT |
-| wrap-ansi | 8.1.0 | MIT |
 | wrap-ansi | 9.0.2 | MIT |
 | ws | 8.21.3 | MIT |
 | y-prosemirror | 1.3.7 | MIT |
@@ -406,6 +376,6 @@
 | yargs-parser | 21.1.1 | ISC |
 | yargs-parser | 22.0.0 | ISC |
 | yjs | 13.6.32 | MIT |
-| zod | 4.6.2 | MIT |
+| zod | 4.6.7 | MIT |
 | zustand | 5.0.15 | MIT |
 | zwitch | 2.0.4 | MIT |

@@ -42,7 +42,7 @@ function findNode(editor: Editor, typeName: string): { node: PmNode; pos: number
 }
 
 /** 通过真实 keydown 事件走 ProseMirror 快捷键管线（jsdom 下 view.dom 已挂载监听）。 */
-function pressKey(editor: Editor, init: KeyboardEventInit & { keyCode?: number }): boolean {
+function pressKey(editor: Editor, init: KeyboardEventInit): boolean {
   editor.view.dom.focus();
   const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
   editor.view.dom.dispatchEvent(event);
@@ -100,7 +100,7 @@ describe('placeholder (InsertPlaceholder)', () => {
   it('Mod-Shift-X 插入 placeholder 行内原子', () => {
     editor = makeEditor('正文');
     editor.commands.focus('end');
-    pressKey(editor, { key: 'X', ctrlKey: true, shiftKey: true, keyCode: 88 });
+    pressKey(editor, { key: 'x', ctrlKey: true, shiftKey: true });
     const hit = findNode(editor, 'placeholder');
     expect(hit).not.toBeNull();
     expect(hit!.node.attrs.name).toBe('待填');
