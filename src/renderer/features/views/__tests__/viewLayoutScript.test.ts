@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import { projectCanvas } from '../canvasView';
 import type { ViewLayout } from '../types';
-import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from '../viewLayout';
+import { DEFAULT_VIEW_LAYOUT, findComputedKeyConflicts, parseViewLayout, serializeViewLayout } from '../viewLayout';
 
 describe('viewLayout 公式脚本编解码', () => {
   it('表达式计算列可往返，且不需要 operator/operands', () => {
@@ -40,6 +40,35 @@ describe('viewLayout 公式脚本编解码', () => {
     const layout: ViewLayout = { ...DEFAULT_VIEW_LAYOUT, fieldAliases: { 画面: 'image', 景别: 'framing' } };
     expect(parseViewLayout(serializeViewLayout(layout)).fieldAliases).toEqual({ 画面: 'image', 景别: 'framing' });
     expect(parseViewLayout({ fieldAliases: { 画面: 1, 景别: '' } }).fieldAliases).toBeUndefined();
+  });
+});
+
+describe('findComputedKeyConflicts：保存前报错', () => {
+  const flat = { key: 'computed:double', label: '双倍', operator: 'add' as const, operands: ['age', 'age'] };
+
+  it('与既有列、保留键或彼此重复的键都返回，顺序按首次冲突', () => {
+    const config = {
+      columns: [
+        { key: 'title', label: '标题' },
+        { key: 'shotNumber', label: '镜号' },
+      ],
+      computed: [
+        { ...flat, key: 'title' },
+        { ...flat, key: 'age' },
+        { ...flat, key: 'age', label: '第二条' },
+        { ...flat, key: 'kind' },
+      ],
+    };
+    expect(findComputedKeyConflicts(config, ['kind'])).toEqual(['title', 'age', 'kind']);
+  });
+
+  it('columns 缺席时以内置列为既有列', () => {
+    expect(findComputedKeyConflicts({ computed: [{ ...flat, key: 'title' }] })).toEqual(['title']);
+  });
+
+  it('无冲突返回空数组', () => {
+    expect(findComputedKeyConflicts({ columns: [{ key: 'title', label: '标题' }], computed: [flat] }, ['age'])).toEqual([]);
+    expect(findComputedKeyConflicts({})).toEqual([]);
   });
 });
 

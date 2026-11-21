@@ -41,7 +41,7 @@ import { insertConditionAt, removeConditionAt } from './viewConditions';
 import { serializeViewTable, type TableFormat } from './viewExport';
 import { buildTemplateFieldLabels } from './viewFieldLabels';
 import ViewGraph from './ViewGraph';
-import { DEFAULT_VIEW_LAYOUT, parseViewLayout, serializeViewLayout } from './viewLayout';
+import { DEFAULT_VIEW_LAYOUT, findComputedKeyConflicts, parseViewLayout, serializeViewLayout } from './viewLayout';
 import ViewOutline from './ViewOutline';
 import { VIEW_PRESETS, type ViewPreset } from './viewPresets';
 import { aggregateRows, applyViewQuery } from './viewQuery';
@@ -350,9 +350,10 @@ const MultiViewPanel: React.FC<MultiViewPanelProps> = ({ project, onSelectItem }
 
   const insertPreset = async (preset: ViewPreset) => {
     const config = serializeViewLayout(preset.layout);
-    const conflict = (parseViewLayout(config).computed ?? []).find((column) => baseColumnKeys.has(column.key));
+    // 保存前对原始声明查重：与预设列、内置列、行字段或另一条计算列撞键都拒绝，不静默丢列。
+    const [conflict] = findComputedKeyConflicts(config, baseColumnKeys);
     if (conflict) {
-      dialogService.alert(t('views.computed.keyConflict', { key: conflict.key }));
+      dialogService.alert(t('views.computed.keyConflict', { key: conflict }));
       return;
     }
     const id = `view:${project.id}:${crypto.randomUUID()}`;

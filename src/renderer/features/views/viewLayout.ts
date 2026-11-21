@@ -142,6 +142,31 @@ function parseComputedColumns(value: unknown, reservedKeys: ReadonlySet<string>)
   return columns.length > 0 ? columns : undefined;
 }
 
+/**
+ * 保存前校验计算列键：返回与既有列、保留键（行字段）或另一条计算列重复的键，空数组表示无冲突。
+ * 读取旧配置时 parseComputedColumns 按 deny-by-default 丢弃冲突列；保存入口改用本函数先报错，
+ * 避免把冲突配置写进库后静默丢列或同名单元格互相覆盖。
+ */
+export function findComputedKeyConflicts(
+  config: Record<string, unknown>,
+  reservedKeys: Iterable<string> = [],
+): string[] {
+  const taken = new Set<string>(reservedKeys);
+  for (const column of parseColumns(config.columns)) taken.add(column.key);
+  const conflicts: string[] = [];
+  for (const item of Array.isArray(config.computed) ? config.computed : []) {
+    if (typeof item !== 'object' || item === null) continue;
+    const key = (item as Record<string, unknown>).key;
+    if (typeof key !== 'string' || key === '') continue;
+    if (taken.has(key)) {
+      if (!conflicts.includes(key)) conflicts.push(key);
+      continue;
+    }
+    taken.add(key);
+  }
+  return conflicts;
+}
+
 function parseFieldAliases(value: unknown): Record<string, string> | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
   const aliases: Record<string, string> = {};
