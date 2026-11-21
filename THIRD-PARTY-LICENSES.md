@@ -16,7 +16,7 @@
 | @codemirror/search | 6.7.2 | MIT |
 | @codemirror/state | 6.7.5 | MIT |
 | @codemirror/theme-one-dark | 6.1.3 | MIT |
-| @codemirror/view | 6.43.11 | MIT |
+| @codemirror/view | 6.43.15 | MIT |
 | @floating-ui/core | 1.8.0 | MIT |
 | @floating-ui/dom | 1.8.0 | MIT |
 | @floating-ui/react-dom | 2.1.9 | MIT |
@@ -28,7 +28,7 @@
 | @jitl/quickjs-wasmfile-release-sync | 0.32.0 | MIT |
 | @js-sdsl/ordered-map | 4.4.2 | MIT |
 | @lezer/common | 1.5.2 | MIT |
-| @lezer/highlight | 1.2.3 | MIT |
+| @lezer/highlight | 1.2.5 | MIT |
 | @lezer/lr | 1.4.10 | MIT |
 | @marijn/find-cluster-break | 1.0.4 | MIT |
 | @mixmark-io/domino | 2.2.0 | BSD-2-Clause |
