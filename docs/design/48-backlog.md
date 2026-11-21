@@ -81,19 +81,6 @@
 
 未做：结构页 CodeMirror `.cm-placeholder` 对比度仍登记为欠账 1（第三方渲染，未改内核源码）；视图 feature 与编辑器内核其余低对比类已改语义变量。win32 视觉基线已重生，Linux 基线由 CI 校验通过。
 
-## 未落地项（v0 分诊「可拖」，逐条给验收）
-
-阶段 0–11 的能力已全部落地，下表是 `docs/guides/v0-readiness.md` §二 分诊清单里标「可拖」的残项。
-每条给现状、缺口、依赖、验收、规模（S/M/L 为相对值）；落地后移出本表，回写 `docs/features/` 对应篇。
-
-### 1. 渲染产物体积：导出与插件运行时按需加载
-
-- 现状：`npm run bundle:check` 输出各 chunk 实际大小、Top 依赖占比、跨 chunk 重复模块与首屏预载检查，并写入 `build/bundle-report.txt`；i18n 中英语料各自成块，启动只加载当前语言。已有的按需加载共四处：`src/renderer/app/App.tsx`（助手与设置等四个挂载层）、`app-shell/WorkspaceView.tsx`（各分区 Step）、`features/views/MultiViewPanel.tsx`（ChartView 与 ViewCanvas）、`shared/services/rendererExecutionPort.ts`（quickjs 动态 import）。
-- 缺口：导出链（`core/build` + `zipStore`）与插件运行时未系统拆出。`vite.config.ts` 明确放弃 `manualChunks`（分包环曾致白屏），当前完全靠 Rollup 自动切分。
-- 依赖：无。
-- 验收：导出与插件运行时改为按需加载后总量下降且 `npm run test:e2e` 全绿（防分包环复现）；预算随实测下调。
-- 规模：M。
-
 ## 有意挂起（不做，非欠账）
 
 - 卡片服务从 `shared/services/cards` 迁入 `features/cards`：会重新引入 `assistant→cards`、`settings→cards` 跨 feature 依赖债（与 02 的边界规则和既有清理方向相反）；卡片服务属跨功能共享，保留在 `shared/services/cards`，`features/cards` 目录仅在未来出现卡片专属 UI 时使用。
@@ -109,5 +96,5 @@
 - 每项落地走同一门禁：`npm run verify`，运行时/UI 改动跑 `npm run test:e2e`，独立提交。
 - 功能落地同步 `docs/features/` 对应篇，本表移除该项。
 - 许可审查：只借鉴设计，不引入 copyleft 代码；重型运行时仅限可选插件。
-- 体积与性能：渲染器按需加载，纳入体积预算。预算值与当前基线以 `scripts/check-bundle-size.mjs` 为唯一来源（本文件不复制数字）；待精简未引用 wasm、导出与插件模块懒加载、i18n 分片后下调。
+- 体积与性能：渲染器、导出链与插件运行时按需加载，纳入体积预算。预算值与当前基线以 `scripts/check-bundle-size.mjs` 为唯一来源（本文件不复制数字）。
 - 插件可执行协议（见 49）：协议层、宿主接线、脚本异步执行、渲染器同步执行、能力派发与审批接线、`core/build` 消费插件渲染器、事件触发（`project.open`/`chapter.open`/`chapter.save`）与 QuickJS 单变体精简均已落地。

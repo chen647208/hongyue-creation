@@ -47,7 +47,6 @@ import { aiGatewayClient } from '@/shared/services/ai/gatewayClient.js';
 import { vectorIntegrationService } from '@/shared/services/knowledge/vectorIntegrationService';
 import { resolveEffectiveModel } from '@/shared/services/localInferenceService';
 import { syncMcpTools } from '@/shared/services/mcpClient';
-import { runPluginLogic } from '@/shared/services/pluginService';
 
 import { aiTrialSnapshots } from './aiTrialSnapshotService';
 import { buildHistoryText } from './chatHistory.js';
@@ -271,6 +270,7 @@ export class AiSessionManager {
     const logicPolicyTexts: string[] = [];
     for (const policy of aiPolicies) {
       if (policy.do === 'logic') {
+        const { runPluginLogic } = await import('@/shared/services/pluginService');
         const r = await runPluginLogic(policy.pluginId, policy.fn, { task: input.task });
         if (r.ok && typeof r.output === 'string' && r.output) logicPolicyTexts.push(r.output);
       }
@@ -336,7 +336,10 @@ export class AiSessionManager {
                 return runSkillHandler(skill, skillInput);
               },
               // 插件逻辑贡献：沙箱执行 + 能力裁决（design/22 §3）
-              pluginRun: (pluginId: string, fn: string, pluginInput: unknown) => runPluginLogic(pluginId, fn, pluginInput),
+              pluginRun: async (pluginId: string, fn: string, pluginInput: unknown) => {
+                const { runPluginLogic } = await import('@/shared/services/pluginService');
+                return runPluginLogic(pluginId, fn, pluginInput);
+              },
             },
             extra: {
               // 会话历史：宿主截断后的最近 N 轮，经 history section 注入（空即跳过）

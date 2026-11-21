@@ -17,7 +17,8 @@ import { setAssistantRuntime } from '@/shared/services/assistantRuntime';
 import { setBuildRendererHost } from '@/shared/services/buildRendererPort';
 
 import type { Project } from '../../../../../shared/types';
-import { buildExportContent, buildQuickExportProfile, setSelectedExportRenderer } from '../../utils';
+import { buildExportContent, setSelectedExportRenderer } from '../../services/exportBuild';
+import { buildQuickExportProfile } from '../../services/exportProfiles';
 import ExportChapterModal from '../ExportChapterModal';
 
 const PLUGIN_ID = 'com.example.rtfx';

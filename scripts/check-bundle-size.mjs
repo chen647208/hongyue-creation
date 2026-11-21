@@ -18,8 +18,8 @@ import path from 'node:path';
 
 import { buildBundleReport } from './bundle-analyze.mjs';
 
-/** 预算（KB，当前基线约 3790KB；键位与缩放接管后复核上调，待 bundle 组成分析 + 懒加载优化后下调）。 */
-const BUDGET_KB = 3900;
+/** 预算（KB，当前基线约 3790KB；导出链与插件运行时按需加载后从 3900 下调）。 */
+const BUDGET_KB = 3850;
 const DIR = path.resolve(process.cwd(), 'build/renderer');
 const REPORT = path.resolve(process.cwd(), 'build/bundle-report.txt');
 

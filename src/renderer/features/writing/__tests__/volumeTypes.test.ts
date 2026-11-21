@@ -10,8 +10,10 @@
 import type { Project } from '@shared/types';
 import { describe, expect,it } from 'vitest';
 
+import { listBuildContentTypes, projectToBuildEntities } from '../services/buildEntities';
+import { buildExportContent } from '../services/exportBuild';
+import { applyExportCompileOptions } from '../services/exportProfiles';
 import type { ExportCompileOptions } from '../types';
-import { applyExportCompileOptions, buildExportContent, listBuildContentTypes, projectToBuildEntities } from '../utils';
 
 function bookWithGroup(): Project {
   return {

@@ -10,10 +10,9 @@
 /**
  * Build Profile（docs/design/07 §2）：选择 → 变换 → 渲染 的声明式定义。
  * Profile 是一等公民：多套并存、可 diff、可分享。序列化支持 JSON 与
- * YAML（.novel/builds/*.yml，js-yaml 双向往返，验收 2）。
+ * YAML（.novel/builds/*.yml，js-yaml 双向往返，验收 2，见 profileYaml.ts）。
  * 编译档案（docs/design/39）：在 profile 上追加 compile 编排（分卷/前后置页/目录/标题层级）。
  */
-import { dump, load } from 'js-yaml';
 
 /** 素材口径：exclude 剔除素材；include 保留原序；prefer 保留并前移。 */
 export type MaterialPolicy = 'exclude' | 'include' | 'prefer';
@@ -220,11 +219,6 @@ export function clampHeadingLevel(level?: number): number {
   return Math.min(6, Math.max(1, Math.round(level)));
 }
 
-/** Profile → YAML 文本（.yml 分享单元）。 */
-export function serializeProfileYaml(profile: BuildProfile): string {
-  return dump(profile, { lineWidth: 120, noRefs: true });
-}
-
 /**
  * 读侧窄化组：YAML/JSON 载入的档案是未知结构，先逐字段窄化成 BuildProfile（readProfile），
  * 再走 validateProfile 的语义校验（取值范围、交叉规则）。必填字段缺失或类型不符即判脏，
@@ -423,7 +417,7 @@ function readReferences(value: unknown): BuildReferences | undefined {
  * 返回 undefined；可选字段无效时忽略该字段。取值合法性（层级 1..6、范围起点≤终点等）
  * 仍由 validateProfile 判，两者分工不重叠。
  */
-function readProfile(value: unknown): BuildProfile | undefined {
+export function readProfile(value: unknown): BuildProfile | undefined {
   const data = readRecord(value);
   if (data === undefined) return undefined;
   const name = readString(data.name);
@@ -447,26 +441,6 @@ function readProfile(value: unknown): BuildProfile | undefined {
   if (references !== undefined) profile.references = references;
   // 已校验字段覆盖在后，保证必填项是校验过的值；未声明键由展开保留。
   return { ...data, ...profile };
-}
-
-/** YAML 文本 → Profile；结构校验失败抛错（导入 UI 捕获提示）。 */
-export function parseProfileYaml(text: string): BuildProfile {
-  const parsed = load(text);
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error('Profile YAML 必须是对象');
-  }
-  const m = parsed as ProfileRecord;
-  // 顶层键缺失给逐字段报错（用户直接可读）；类型窄化交给 readProfile。
-  for (const key of ['name', 'format', 'selection', 'transform', 'render']) {
-    if (!(key in m)) throw new Error(`Profile YAML 缺少字段：${key}`);
-  }
-  const profile = readProfile(m);
-  if (profile === undefined) {
-    throw new Error('Profile YAML 结构无效：必填字段缺失或类型不符');
-  }
-  const errors = validateProfile(profile);
-  if (errors.length > 0) throw new Error(`编译档案无效：${errors.join('；')}`);
-  return profile;
 }
 
 /**

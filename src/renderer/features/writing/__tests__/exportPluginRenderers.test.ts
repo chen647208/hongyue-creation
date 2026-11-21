@@ -14,12 +14,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { setBuildRendererHost } from '@/shared/services/buildRendererPort';
 
 import type { Project } from '../../../../shared/types';
-import {
-  buildExportContent,
-  buildQuickExportProfile,
-  listPluginRendererOptions,
-  setSelectedExportRenderer,
-} from '../utils';
+import { buildExportContent, listPluginRendererOptions, setSelectedExportRenderer } from '../services/exportBuild';
+import { buildQuickExportProfile } from '../services/exportProfiles';
 
 const PLUGIN_ID = 'com.example.rtfx';
 /** 命名空间化 id = `<插件短名>.renderer.<声明 id>`（见 @core/plugin 的 rendererId）。 */

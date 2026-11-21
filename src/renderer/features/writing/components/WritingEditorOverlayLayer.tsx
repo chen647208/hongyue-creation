@@ -13,9 +13,11 @@ import AIHistoryViewer from '../AIHistoryViewer';
 import type { WritingEditorOverlayLayerProps } from '../types';
 import ChapterGenerationModal from './ChapterGenerationModal';
 import ChapterHistoryModal from './ChapterHistoryModal';
-import ExportChapterModal from './ExportChapterModal';
 import WritingEditModal from './WritingEditModal';
 import WritingSelectionMenu from './WritingSelectionMenu';
+
+// 导出对话框带编译管线与出版打包：打开时再加载，写作主界面不为导出付首屏成本。
+const ExportChapterModal = React.lazy(() => import('./ExportChapterModal'));
 
 const WritingEditorOverlayLayer: React.FC<WritingEditorOverlayLayerProps> = ({
   genModal,
@@ -163,27 +165,31 @@ const WritingEditorOverlayLayer: React.FC<WritingEditorOverlayLayerProps> = ({
         onSubmit={onEditSubmit}
       />
 
-      <ExportChapterModal
-        isOpen={exportModalOpen}
-        project={project}
-        chapters={project.chapters}
-        selectedChapterIds={selectedExportChapterIds}
-        format={exportFormat}
-        exportProfileId={exportProfileId}
-        onExportProfileChange={onExportProfileChange}
-        exportProfile={exportProfile}
-        exportCompile={exportCompile}
-        onExportCompileChange={onExportCompileChange}
-        exportUserProfiles={exportUserProfiles}
-        onSaveExportProfile={onSaveExportProfile}
-        onDeleteExportProfile={onDeleteExportProfile}
-        exportError={exportError}
-        onClose={onCloseExportModal}
-        onToggleAll={onToggleAllExport}
-        onToggleChapter={onToggleExportChapter}
-        onFormatChange={onExportFormatChange}
-        onConfirm={onConfirmExport}
-      />
+      {exportModalOpen && (
+        <React.Suspense fallback={null}>
+          <ExportChapterModal
+            isOpen
+            project={project}
+            chapters={project.chapters}
+            selectedChapterIds={selectedExportChapterIds}
+            format={exportFormat}
+            exportProfileId={exportProfileId}
+            onExportProfileChange={onExportProfileChange}
+            exportProfile={exportProfile}
+            exportCompile={exportCompile}
+            onExportCompileChange={onExportCompileChange}
+            exportUserProfiles={exportUserProfiles}
+            onSaveExportProfile={onSaveExportProfile}
+            onDeleteExportProfile={onDeleteExportProfile}
+            exportError={exportError}
+            onClose={onCloseExportModal}
+            onToggleAll={onToggleAllExport}
+            onToggleChapter={onToggleExportChapter}
+            onFormatChange={onExportFormatChange}
+            onConfirm={onConfirmExport}
+          />
+        </React.Suspense>
+      )}
 
       <WritingSelectionMenu
         menuPos={menuPos}

@@ -13,7 +13,8 @@
  */
 
 import type { Skill } from '@core/ai';
-import { adjudicateHandlerResult, type SandboxRunResult, type WasmHostFunctionSpec, type WasmHostKind } from '@core/plugin';
+import { adjudicateHandlerResult } from '@core/plugin/sandbox/capabilities';
+import type { SandboxRunResult, WasmHostFunctionSpec, WasmHostKind } from '@core/plugin/sandbox/types';
 
 const WASM_HOST_KINDS: readonly WasmHostKind[] = ['now', 'log', 'hash'];
 
