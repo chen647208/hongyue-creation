@@ -8,28 +8,27 @@
  */
 
 import type { AppLanguage } from '../types.js';
-import zh from './locales/zh.js';
 
 /** 命名空间名 → 该命名空间的译文表。 */
 export type Dictionary = Record<string, Record<string, unknown>>;
 
-/**
- * 字典加载：默认语言随主包静态装入，其余语言按需动态加载。
- * 未启用语言因此不进首屏 chunk（一份完整字典约 260KB）。
- *
- * 静态键是「默认语言」的优化位，不是正确性依赖：改 `catalog` 的 DEFAULT_LANGUAGE
- * 不会让取词出错，只会让该语言失去静态装入的好处。新增语言时在 lazy 里加一行。
- */
-const staticDictionaries: Partial<Record<AppLanguage, Dictionary>> = { zh };
-
-const lazyDictionaries: Partial<Record<AppLanguage, () => Promise<{ default: Dictionary }>>> = {
+/** 每种语言的字典各自成块，只有该语言被选中时才加载（一份完整字典约 130KB minified）。 */
+const loaders: Partial<Record<AppLanguage, () => Promise<{ default: Dictionary }>>> = {
+  zh: () => import('./locales/zh.js'),
   en: () => import('./locales/en.js'),
 };
 
-/** 取一份语言的完整字典；静态语言同步可用，动态语言首次调用才加载。 */
+/** 同一语言只加载一次：i18next 会按命名空间并发调用 read，复用同一个 Promise。 */
+const pending = new Map<AppLanguage, Promise<Dictionary>>();
+
+/** 取一份语言的完整字典；首次调用触发该语言分包加载，之后复用已加载的 Promise。 */
 export function loadDictionary(language: AppLanguage): Promise<Dictionary | undefined> {
-  const staticOne = staticDictionaries[language];
-  if (staticOne) return Promise.resolve(staticOne);
-  const load = lazyDictionaries[language];
-  return load ? load().then((module) => module.default) : Promise.resolve(undefined);
+  const loader = loaders[language];
+  if (!loader) return Promise.resolve(undefined);
+  let dictionary = pending.get(language);
+  if (!dictionary) {
+    dictionary = loader().then((module) => module.default);
+    pending.set(language, dictionary);
+  }
+  return dictionary;
 }
