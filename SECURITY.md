@@ -12,6 +12,12 @@
 
 我们会在 7 天内确认收到，并在修复可用后协调披露时间；修复版本会写入 `CHANGELOG.md`。
 
+## 依赖漏洞口径
+
+- 发行产物只含生产依赖；CI 的 `npm audit --omit=dev --audit-level=high` 必须零告警。
+- 开发与构建依赖的告警不进入发行包，由 Dependabot 跟踪、随上游升级消除；文档站
+  vitepress 1.6.4 锁定的 Vite 5.4.21 属此类，上游未发修复前不阻断发布。
+
 ## 支持范围
 
 仅最新发布版本接受安全报告。使用 Electron 加固（`contextIsolation`、`sandbox`、
