@@ -9,13 +9,19 @@
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-/** 文档目录：整体拷入站点对应路径。 */
-for (const sub of ['design', 'guides', 'features', 'archive']) {
+/** 公开站点只收使用与开发文档；设计蓝图和归档留在仓库，不进站点。 */
+for (const sub of ['guides', 'features']) {
   const src = join('docs', sub);
   const dst = join('docs-site', 'src', sub);
   if (!existsSync(src)) continue;
   if (existsSync(dst)) rmSync(dst, { recursive: true });
   cpSync(src, dst, { recursive: true });
+}
+
+/** 清掉旧构建残留的内部目录，避免被 VitePress 扫进产物。 */
+for (const stale of ['design', 'archive']) {
+  const dst = join('docs-site', 'src', stale);
+  if (existsSync(dst)) rmSync(dst, { recursive: true, force: true });
 }
 
 /** 在正文前插入 frontmatter；已有 frontmatter 时原样返回。 */

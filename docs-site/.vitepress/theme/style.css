@@ -1,29 +1,61 @@
-/* 站点样式补充。颜色一律取默认主题的语义变量，不写死色值。 */
+/* 站点样式：品牌色与字体取自项目自身的红月图标；所有颜色走 VitePress 语义变量。 */
 
-/* 前瞻设计横幅：出现在 design/ 每页正文之前 */
-.design-banner {
-  margin: 0 0 24px;
-  padding: 12px 16px;
-  border: 1px solid var(--vp-c-warning-1);
-  border-radius: 8px;
-  background-color: var(--vp-c-warning-soft);
-  color: var(--vp-c-text-1);
-  font-size: 14px;
-  line-height: 1.7;
+:root {
+  --vp-c-brand-1: #a8203e;
+  --vp-c-brand-2: #b82449;
+  --vp-c-brand-3: #c62b52;
+  --vp-c-brand-soft: rgba(168, 32, 62, 0.13);
+  --vp-c-bg: #f7f4ed;
+  --vp-c-bg-alt: #f1ece2;
+  --vp-c-bg-soft: #ede7db;
+  --vp-c-bg-elv: #fbf8f2;
+  --vp-c-text-1: #221d24;
+  --vp-c-text-2: #5b535d;
+  --vp-c-text-3: #8b828c;
+  --vp-c-divider: rgba(34, 29, 36, 0.14);
+  --vp-c-border: rgba(34, 29, 36, 0.18);
+  --vp-c-gutter: rgba(34, 29, 36, 0.1);
+  --vp-nav-bg-color: var(--vp-c-bg);
+  --vp-sidebar-bg-color: var(--vp-c-bg-alt);
+  --vp-font-family-base: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Noto Sans SC', system-ui, sans-serif;
 }
 
-.design-banner strong {
-  margin-right: 6px;
-  color: var(--vp-c-warning-1);
+.dark {
+  --vp-c-brand-1: #f0607f;
+  --vp-c-brand-2: #e94f70;
+  --vp-c-brand-3: #d63f60;
+  --vp-c-brand-soft: rgba(240, 96, 127, 0.16);
+  --vp-c-bg: #151118;
+  --vp-c-bg-alt: #1b1620;
+  --vp-c-bg-soft: #241e28;
+  --vp-c-bg-elv: #1f1a24;
+  --vp-c-text-1: #efe9e2;
+  --vp-c-text-2: #b3a9b1;
+  --vp-c-text-3: #8a8189;
+  --vp-c-divider: rgba(239, 233, 226, 0.16);
+  --vp-c-border: rgba(239, 233, 226, 0.2);
+  --vp-c-gutter: rgba(239, 233, 226, 0.12);
 }
 
-.design-banner a {
-  color: var(--vp-c-brand-1);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+/* 首页是深色板块，正文页面保持纸色，二者之间靠留白分隔。 */
+.VPPage {
+  padding: 0;
 }
 
-/* 教程页与功能页正文较宽时更易读 */
-.vp-doc > div > h2 {
+/* 正文标题不抢首页的衬线排版，保持无衬线，阅读更稳。 */
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3 {
+  letter-spacing: 0;
+}
+
+.vp-doc h2 {
   scroll-margin-top: 88px;
+}
+
+/* 页脚与页头同色，避免浅色页面下方出现一条突兀的白带。 */
+.VPFooter {
+  background-color: var(--vp-c-bg-alt);
+  border-top-color: var(--vp-c-divider);
 }
