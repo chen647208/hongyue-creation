@@ -8,10 +8,30 @@
  */
 
 /** 表格视图：基于 @tanstack/react-table 提供排序与列显隐。 */
-import { type ColumnDef, flexRender, getCoreRowModel, getSortedRowModel, type SortingState,useReactTable } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  createSortedRowModel,
+  flexRender,
+  rowSortingFeature,
+  sortFn_alphanumeric,
+  sortFn_text,
+  type SortingState,
+  tableFeatures,
+  useTable,
+} from '@tanstack/react-table';
 import React, { useMemo, useState } from 'react';
 
 import type { ViewColumn, ViewRow } from './types';
+
+const features = tableFeatures({
+  rowSortingFeature,
+  columnVisibilityFeature,
+  columnSizingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
+});
 
 interface ViewTableProps {
   rows: ViewRow[];
@@ -38,7 +58,7 @@ const ViewTable: React.FC<ViewTableProps> = ({
 }) => {
   const [sorting, setSorting] = useState<SortingState>(sortKey ? [{ id: sortKey, desc: !!sortDesc }] : []);
 
-  const columnDefs = useMemo<ColumnDef<ViewRow>[]>(
+  const columnDefs = useMemo<ColumnDef<typeof features, ViewRow>[]>(
     () =>
       columns.map((column) => ({
         id: column.key,
@@ -55,7 +75,8 @@ const ViewTable: React.FC<ViewTableProps> = ({
     [columns, hidden],
   );
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: rows,
     columns: columnDefs,
     state: { sorting, columnVisibility },
@@ -68,8 +89,6 @@ const ViewTable: React.FC<ViewTableProps> = ({
       const next = typeof updater === 'function' ? updater(columnVisibility) : updater;
       onHiddenChange(columns.filter((column) => next[column.key] === false).map((column) => column.key));
     },
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
   });
 
   if (rows.length === 0) {
