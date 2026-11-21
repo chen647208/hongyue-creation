@@ -16,7 +16,8 @@
     }
   },
   "attachments": {
-    "open": "Saved attachments",
+    "menuLabel": "Attachments",
+    "upload": "Upload file…",
     "title": "Saved document attachments",
     "empty": "No saved attachments yet. Reference files are saved to this book after sending.",
     "remove": "Remove attachment"
@@ -47,7 +48,8 @@
     "injectionTitle": "Auto-injected context",
     "stopStreamTitle": "Stop streaming response",
     "planModeTitle": "Plan mode: plan only, act after confirmation",
-    "clearChatTitle": "Clear chat history"
+    "clearChatTitle": "Clear chat history",
+    "moreActions": "More actions"
   },
   "chat": {
     "modelMissing": "❌ Please configure an AI model first",
@@ -74,8 +76,7 @@
     "totalPrefix": "Total: ",
     "finishReasonPrefix": "Finish reason: ",
     "errorPrefix": "Error: ",
-    "quickCreateLabel": "Quick create:",
-    "commandTitle": "Click to insert {{cmd}}",
+    "quickCreateLabel": "Quick create",
     "templateLabel": "Template:",
     "defaultTemplateOption": "Use default template",
     "resetTemplateTitle": "Reset to default template",

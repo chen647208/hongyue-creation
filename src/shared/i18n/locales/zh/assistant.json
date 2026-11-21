@@ -16,7 +16,8 @@
     }
   },
   "attachments": {
-    "open": "文档附件库",
+    "menuLabel": "附件",
+    "upload": "上传文件…",
     "title": "已存文档附件",
     "empty": "暂无已存附件。发送参考文件后会自动保存到本书。",
     "remove": "删除附件"
@@ -47,7 +48,8 @@
     "injectionTitle": "自动注入上下文",
     "stopStreamTitle": "停止流式响应",
     "planModeTitle": "计划模式：只出计划不执行，确认后再行动",
-    "clearChatTitle": "清空聊天记录"
+    "clearChatTitle": "清空聊天记录",
+    "moreActions": "更多操作"
   },
   "chat": {
     "modelMissing": "❌ 请先配置AI模型",
@@ -74,8 +76,7 @@
     "totalPrefix": "总计: ",
     "finishReasonPrefix": "完成原因: ",
     "errorPrefix": "错误: ",
-    "quickCreateLabel": "快捷创建:",
-    "commandTitle": "点击快速输入 {{cmd}}",
+    "quickCreateLabel": "快捷创建",
     "templateLabel": "模板:",
     "defaultTemplateOption": "使用默认模板",
     "resetTemplateTitle": "重置为默认模板",

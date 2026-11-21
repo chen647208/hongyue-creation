@@ -8,7 +8,8 @@
 ## 核心文件
 
 - `GlobalAssistant.tsx`：固定右侧边栏（显隐开关、Ctrl+J、左框拖动调宽并持久化）
-- `components/AssistantChatWorkspace.tsx`：聊天记录展示、模板选择、附件、输入区
+- `components/AssistantChatWorkspace.tsx`：聊天记录展示、模板选择、快捷指令与输入区
+- `components/AttachmentMenuButton.tsx`：回形针菜单（上传文件 + 已存文档附件）
 - `components/AssistantContextPanel.tsx`：上下文分析与项目快照面板
 - `components/AssistantEditPanel.tsx`：项目数据编辑面板
 - `components/ApprovalHost.tsx`：审批对话框 + 待审箱角标（write 档操作经用户批准）
@@ -59,8 +60,8 @@
   面板关闭或切换分区都不中止。顶栏指示器显示排队/运行/已完成任务，可逐条中止与清理。
 - 并行隔离：会话管理器按会话 id 存事件流与注入上下文，技能激活按会话作用域（`SkillCatalog` 的 scope）
   隔离——一个会话激活写法技能不污染另一个会话的上下文。
-- 文档附件按书持久化：发送的参考文件存入 `attachments`/`blobs`（仅 SQLite 后端），
-  输入区附件按钮旁的附件库可再次引用（PDF 重新解析、文本按 UTF-8 解码），也可删除。
+- 文档附件按书持久化：发送的参考文件存入 `attachments`/`blobs`（仅 SQLite 后端）。
+  输入区的回形针菜单同时提供「上传文件」与已存附件列表，可再次引用（PDF 重新解析、文本按 UTF-8 解码），也可删除。
 
 ## 外部 MCP 服务
 
