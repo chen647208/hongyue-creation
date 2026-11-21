@@ -17,6 +17,7 @@ import { Checkbox } from '@/shared/ui/Checkbox';
 import { Input } from '@/shared/ui/Input';
 import { Select } from '@/shared/ui/Select';
 import { Spinner } from '@/shared/ui/Spinner';
+import { Switch } from '@/shared/ui/Switch';
 import { Textarea } from '@/shared/ui/Textarea';
 import { cn } from '@/shared/utils/cn';
 
@@ -52,6 +53,11 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
 }) => {
   const { t, i18n } = useTranslation('settings');
   const [showKey, setShowKey] = useState(false);
+  // 有模型列表时默认下拉选择；自定义名称（聚合网关常见）切到手动输入
+  const [manualModel, setManualModel] = useState(false);
+  const availableModels = model.availableModels ?? [];
+  const hasModelList = availableModels.length > 0;
+  const showModelSelect = hasModelList && !manualModel;
   const errorDiag = isErrorResult(testResult) ? classifyProviderError(testResult ?? '') : null;
   const preset = findProviderPreset(channelValueFor(model));
   const isGateway = preset?.id === 'gateway-openai' || preset?.id === 'custom-openai';
@@ -84,12 +90,8 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-            <Checkbox
-              className="size-3.5"
-              checked={isProviderEnabled(model)}
-              onChange={(e) => onUpdate({ isEnabled: e.target.checked })}
-            />
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <Switch checked={isProviderEnabled(model)} onCheckedChange={(checked) => onUpdate({ isEnabled: checked })} />
             {t('models.enableLabel', '启用')}
           </label>
           <Button variant="ghost" size="icon" className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={onRemove} title={t('models.deleteTitle')}>
@@ -118,15 +120,35 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
             <p className={hintText}>{(() => { const p = findProviderPreset(channelValueFor(model)); return p ? dt(p.descriptionKey) : ''; })()}</p>
           </div>
           <div>
-            <label className={fieldLabel} htmlFor={`provider-model-name-${model.id}`}>{t('models.modelNameLabel')}</label>
-            <Select id={`provider-model-name-${model.id}`} value={model.modelName} onChange={(e) => onUpdate({ modelName: e.target.value })} disabled={listLoading} className="font-mono">
-              <option value="">{t('models.selectModelPlaceholder')}</option>
-              {model.availableModels && model.availableModels.length > 0 ? (
-                model.availableModels.map((n) => <option key={n} value={n}>{n}</option>)
-              ) : (
-                <option value={model.modelName || ''}>{model.modelName || t('models.manualModelName')}</option>
+            <div className="flex items-center justify-between">
+              <label className={fieldLabel} htmlFor={`provider-model-name-${model.id}`}>{t('models.modelNameLabel')}</label>
+              {hasModelList && (
+                <button
+                  type="button"
+                  className="mb-1.5 text-xs text-primary hover:underline"
+                  onClick={() => setManualModel((v) => !v)}
+                >
+                  {showModelSelect ? t('models.manualToggle') : t('models.listToggle')}
+                </button>
               )}
-            </Select>
+            </div>
+            {showModelSelect ? (
+              <Select id={`provider-model-name-${model.id}`} value={model.modelName} onChange={(e) => onUpdate({ modelName: e.target.value })} disabled={listLoading} className="font-mono">
+                <option value="">{t('models.selectModelPlaceholder')}</option>
+                {model.modelName && !availableModels.includes(model.modelName) && (
+                  <option value={model.modelName}>{model.modelName}</option>
+                )}
+                {availableModels.map((n) => <option key={n} value={n}>{n}</option>)}
+              </Select>
+            ) : (
+              <Input
+                id={`provider-model-name-${model.id}`}
+                className="font-mono text-xs"
+                value={model.modelName}
+                onChange={(e) => onUpdate({ modelName: e.target.value })}
+                placeholder={t('models.manualInputPlaceholder')}
+              />
+            )}
             <div className="mt-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {listLoading && <div className="flex items-center gap-1 text-xs text-primary"><Spinner className="size-4" /><span>{t('models.fetchingList')}</span></div>}
