@@ -1087,6 +1087,8 @@ export interface AppState {
   customFonts?: CustomFontMeta[];
   /** 外部 MCP server 配置（客户端直连，设置页管理） */
   mcpServers?: McpServerConfig[];
+  /** 朗读（TTS）配置；缺席视为 system 引擎 + 默认语速。 */
+  tts?: TtsConfig;
   /** 界面字号 px；undefined 表默认 14 */
   uiFontSize?: number;
   /** 正文字号 px；undefined 表默认 18 */
@@ -1611,6 +1613,8 @@ export interface ElectronAPI {
       apiKeyHost?: string;
       timeoutMs?: number;
     }) => Promise<{ ok: boolean; status: number; statusText: string; text: string }>;
+    /** 云端语音合成：Key 由主进程解引用，返回分段 base64 音频（每段对应一段输入文本）。 */
+    speak: (config: TtsConfig, segments: string[]) => Promise<{ ok: boolean; segments: string[]; mimeType: string; error?: string }>;
   };
 
   // 安全密钥库（safeStorage/OS 钥匙串；渲染端持久化只存 vault: 引用）
@@ -1705,6 +1709,39 @@ export interface EmbeddingModelConfig {
   modelsLastFetched?: number;
   /** 测试失败错误信息 */
   testError?: string;
+}
+
+/** 朗读引擎：system 走操作系统语音合成（离线），其余为云端 TTS。 */
+export type TtsProvider = 'system' | 'openai' | 'azure' | 'elevenlabs';
+
+/**
+ * 朗读配置（全局一份，设置页「朗读」管理）。
+ * 未配置或引擎不可用时，朗读入口回退到 system。
+ */
+export interface TtsConfig {
+  provider: TtsProvider;
+  /** OpenAI 兼容端点（含版本路径，如 https://api.openai.com/v1）；azure/elevenlabs 按服务默认。 */
+  endpoint?: string;
+  /** API Key 的 vault 引用或明文（仅主进程解引用）。 */
+  apiKey?: string;
+  /** OpenAI 兼容模型（tts-1 / gpt-4o-mini-tts）或 ElevenLabs 模型 id。 */
+  model?: string;
+  /** 音色：OpenAI 音色名 / Azure 音色名（zh-CN-XiaoxiaoNeural）/ ElevenLabs voiceId / system 的 voice.name。 */
+  voice?: string;
+  /** Azure 资源区域（用于默认端点）。 */
+  region?: string;
+  /** 语速倍率：0.5–2，1 为正常。 */
+  rate: number;
+  /** 音高倍率：0.5–2，1 为正常（仅 system/azure 生效）。 */
+  pitch: number;
+}
+
+/** 合成结果：每段一条 base64 mp3，失败带 error。 */
+export interface TtsSynthesisResult {
+  ok: boolean;
+  segments?: string[];
+  mimeType?: string;
+  error?: string;
 }
 
 /** 连接测试结果 */

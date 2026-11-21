@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { Brain, Cpu, Database, GraduationCap, type LucideIcon,SlidersHorizontal, Stethoscope, Terminal, WandSparkles } from 'lucide-react';
+import { Brain, Cpu, Database, GraduationCap, type LucideIcon,SlidersHorizontal, Stethoscope, Terminal, Volume2, WandSparkles } from 'lucide-react';
 import React, { useSyncExternalStore } from 'react';
 
 import { useTranslation } from '@/i18n';
@@ -21,7 +21,7 @@ interface SettingsTabNavProps {
   onChange: (tab: SettingsTab) => void;
 }
 
-type LabelKey = 'tab.general' | 'tab.models' | 'tab.prompts' | 'tab.cardPrompts' | 'tab.consistencyPrompts' | 'tab.system' | 'tab.storage' | 'tab.embedding' | 'tab.plugins';
+type LabelKey = 'tab.general' | 'tab.models' | 'tab.prompts' | 'tab.cardPrompts' | 'tab.consistencyPrompts' | 'tab.system' | 'tab.storage' | 'tab.embedding' | 'tab.plugins' | 'tab.tts';
 
 interface TabItem {
   id: SettingsTab;
@@ -49,6 +49,7 @@ const TAB_GROUPS: TabGroup[] = [
     items: [
       { id: 'models', icon: Cpu, labelKey: 'tab.models' },
       { id: 'embedding', icon: Brain, labelKey: 'tab.embedding' },
+      { id: 'tts', icon: Volume2, labelKey: 'tab.tts' },
     ],
   },
   {

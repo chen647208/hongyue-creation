@@ -8,57 +8,26 @@
  */
 
 import { Square,Volume2 } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { isSpeechSynthesisSupported, speak, type SpeechHandle } from '@/shared/services/speechService';
+import { useSettingsStore } from '@/app/stores/settingsStore';
+import { useSpeechPlayback } from '@/shared/hooks/useSpeechPlayback';
 import { Button } from '@/shared/ui/Button';
-import { logger } from '@/shared/utils/logger';
 
 interface SpeakButtonProps {
   text: string;
+  /** 内容语言（系统语音按语言挑音色；云端引擎由配置决定）。 */
   lang?: string;
 }
 
-/** 朗读按钮：朗读消息并在结束时复位；环境不支持时渲染为空。 */
-const SpeakButton: React.FC<SpeakButtonProps> = ({ text, lang }) => {
+/** 朗读按钮：跟随设置里的合成引擎；环境不可用时渲染为空。 */
+const SpeakButton: React.FC<SpeakButtonProps> = ({ text }) => {
   const { t } = useTranslation('assistant');
-  const [speaking, setSpeaking] = useState(false);
-  const handleRef = useRef<SpeechHandle | null>(null);
-  const timerRef = useRef<number | null>(null);
+  const tts = useSettingsStore((s) => s.tts);
+  const { supported, speaking, toggle } = useSpeechPlayback(tts);
 
-  const stop = () => {
-    handleRef.current?.cancel();
-    if (timerRef.current !== null) {
-      window.clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setSpeaking(false);
-  };
-
-  useEffect(() => () => {
-    handleRef.current?.cancel();
-    if (timerRef.current !== null) window.clearInterval(timerRef.current);
-  }, []);
-
-  if (!isSpeechSynthesisSupported()) return null;
-
-  const toggle = () => {
-    if (speaking) {
-      stop();
-      return;
-    }
-    try {
-      handleRef.current = speak(text, lang);
-      setSpeaking(true);
-      timerRef.current = window.setInterval(() => {
-        if (!window.speechSynthesis.speaking) stop();
-      }, 300);
-    } catch (err) {
-      logger.error('speak failed', err);
-      setSpeaking(false);
-    }
-  };
+  if (!supported || !text.trim()) return null;
 
   return (
     <Button
@@ -67,7 +36,7 @@ const SpeakButton: React.FC<SpeakButtonProps> = ({ text, lang }) => {
       className="size-6 text-muted-foreground hover:text-foreground"
       title={t(speaking ? 'chat.speakStopTitle' : 'chat.speakTitle')}
       aria-pressed={speaking}
-      onClick={toggle}
+      onClick={() => toggle(text)}
     >
       {speaking ? <Square className="size-3.5" /> : <Volume2 className="size-3.5" />}
     </Button>

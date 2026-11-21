@@ -19,6 +19,7 @@ import type {
   ModelConfig,
   PromptTemplate,
   StorageConfig,
+  TtsConfig,
 } from '../../../shared/types';
 import type { ModelProviderInfo } from '../../constants/modelProviders';
 
@@ -28,11 +29,13 @@ export interface SettingsModalProps {
   prompts: PromptTemplate[];
   cardPrompts?: CardPromptTemplate[];
   consistencyPrompts?: ConsistencyCheckPromptTemplate[];
+  tts?: TtsConfig;
   consistencyCheckConfig?: ConsistencyCheckConfig;
   onSaveModels: (models: ModelConfig[], activeId: string) => void;
   onSavePrompts: (prompts: PromptTemplate[]) => void;
   onSaveCardPrompts?: (cardPrompts: CardPromptTemplate[]) => void;
   onSaveConsistencyPrompts?: (prompts: ConsistencyCheckPromptTemplate[]) => void;
+  onSaveTts?: (tts: TtsConfig) => void;
   onSaveConsistencyConfig?: (config: ConsistencyCheckConfig) => void;
   onClose: () => void;
   onClearData: () => void;
@@ -47,7 +50,7 @@ export interface SettingsModalProps {
 }
 
 /** 内置页签 + 注册表页签 id（后者任意字符串，保留内置字面量自动补全）。 */
-export type SettingsTab = 'models' | 'prompts' | 'card-prompts' | 'consistency-prompts' | 'system' | 'storage' | 'embedding' | 'general' | (string & {});
+export type SettingsTab = 'models' | 'prompts' | 'card-prompts' | 'consistency-prompts' | 'system' | 'storage' | 'embedding' | 'general' | 'tts' | (string & {});
 export type ImportExportMode = 'import' | 'export';
 
 export interface CardPromptTestResult {
@@ -158,6 +161,8 @@ export interface SettingsModalFooterProps {
 
 export interface SettingsTabContentProps {
   activeTab: SettingsTab;
+  tts: TtsConfig;
+  onTtsChange: (tts: TtsConfig) => void;
   localModels: ModelConfig[];
   activeId: string | null;
   setActiveId: React.Dispatch<React.SetStateAction<string | null>>;

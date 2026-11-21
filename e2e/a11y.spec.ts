@@ -49,6 +49,7 @@ const SETTINGS_TABS: Array<{ zh: string; en: string }> = [
   { zh: '通用', en: 'General' },
   { zh: '模型提供商', en: 'Model Providers' },
   { zh: '向量模型', en: 'Embedding Models' },
+  { zh: '朗读', en: 'Speech' },
   { zh: '提示词库', en: 'Prompt Library' },
   { zh: '卡片提示词', en: 'Card Prompts' },
   { zh: '一致性检查模板', en: 'Consistency Templates' },

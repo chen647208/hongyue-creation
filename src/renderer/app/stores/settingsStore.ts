@@ -16,7 +16,8 @@
 
 import { create } from 'zustand';
 
-import { type AppLanguage, type AppState, type AppTheme, type CardPromptTemplate, type ConsistencyCheckPromptTemplate, type CustomFontMeta, type EmbeddingModelConfig, type McpServerConfig, type ModelConfig, type PromptTemplate, type ProxyConfig } from '../../../shared/types';
+import { DEFAULT_TTS_CONFIG } from '../../../shared/constants/tts';
+import { type AppLanguage, type AppState, type AppTheme, type CardPromptTemplate, type ConsistencyCheckPromptTemplate, type CustomFontMeta, type EmbeddingModelConfig, type McpServerConfig, type ModelConfig, type PromptTemplate, type ProxyConfig, type TtsConfig } from '../../../shared/types';
 import { changeLanguage } from '../../i18n';
 import { applyTheme } from '../../shared/services/themeService';
 import { INITIAL_APP_STATE } from '../initialState';
@@ -38,6 +39,7 @@ interface SettingsState {
   editorFont: string | undefined;
   customFonts: CustomFontMeta[];
   mcpServers: McpServerConfig[];
+  tts: TtsConfig;
   uiFontSize: number | undefined;
   editorFontSize: number | undefined;
   editorLineHeight: number | undefined;
@@ -63,6 +65,7 @@ interface SettingsState {
   addCustomFont: (meta: CustomFontMeta) => void;
   removeCustomFont: (id: string) => void;
   setMcpServers: (servers: McpServerConfig[]) => void;
+  setTts: (tts: TtsConfig) => void;
   setProxy: (proxy: ProxyConfig | undefined) => void;
   setMinimizeToTray: (minimizeToTray: boolean) => void;
   setAutoLaunch: (autoLaunch: boolean) => void;
@@ -92,6 +95,7 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   editorFont: undefined,
   customFonts: [],
   mcpServers: [],
+  tts: DEFAULT_TTS_CONFIG,
   uiFontSize: undefined,
   editorFontSize: undefined,
   editorLineHeight: undefined,
@@ -104,6 +108,7 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   addCustomFont: (meta) => set((s) => ({ customFonts: [...s.customFonts, meta] })),
   removeCustomFont: (id) => set((s) => ({ customFonts: s.customFonts.filter((c) => c.id !== id) })),
   setMcpServers: (mcpServers) => set({ mcpServers }),
+  setTts: (tts) => set({ tts }),
   setProxy: (proxy) => set({ proxy }),
   setMinimizeToTray: (minimizeToTray) => set({ minimizeToTray }),
   setAutoLaunch: (autoLaunch) => set({ autoLaunch }),

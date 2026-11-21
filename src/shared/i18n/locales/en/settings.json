@@ -46,7 +46,8 @@
     "embedding": "Embedding Models",
     "general": "General",
     "plugins": "Plugins",
-    "sync": "Sync Transport"
+    "sync": "Sync Transport",
+    "tts": "Speech"
   },
   "general": {
     "title": "General Settings",
@@ -684,5 +685,38 @@
     "mergeHint": "Download a sync bundle from the configured transport and merge it into the local library; conflicts offer keep-copy / use-remote / defer.",
     "mergeOpen": "Open sync panel",
     "desktopOnly": "Folder selection and exit export are available on desktop only."
+  },
+  "tts": {
+    "title": "Speech (TTS)",
+    "hint": "Controls voice playback for assistant messages and the writing area. System voices work offline; cloud engines sound better and bill per character.",
+    "providerLabel": "Engine",
+    "provider": {
+      "system": "System voice (offline)",
+      "openai": "OpenAI-compatible",
+      "azure": "Azure Speech",
+      "elevenlabs": "ElevenLabs"
+    },
+    "providerHint": {
+      "system": "Uses voices installed on your OS. Offline and free; quality depends on the system.",
+      "openai": "Any service exposing POST /audio/speech works: OpenAI, gateways, local inference servers.",
+      "azure": "Microsoft Cognitive Services speech. Many voices, natural Chinese; needs region and key.",
+      "elevenlabs": "Best quality, billed per character; pick a voice ID from your account."
+    },
+    "voiceLabel": "Voice",
+    "voiceHint": "Pick an installed system voice, or enter the provider-side voice identifier.",
+    "voicePlaceholder": "Voice ID",
+    "refreshVoices": "Refresh voices",
+    "endpointLabel": "Endpoint",
+    "modelLabel": "Model",
+    "apiKeyLabel": "API key",
+    "regionLabel": "Region (e.g. eastasia)",
+    "rateLabel": "Speed {{value}}×",
+    "pitchLabel": "Pitch {{value}}×",
+    "sample": "This is a preview of the reading voice.",
+    "preview": "Preview",
+    "stop": "Stop",
+    "previewHint": "Plays the text above with current settings. No audio is saved.",
+    "unsupported": "This engine is unavailable here. Check your system voices or finish the settings above.",
+    "systemDefaultVoice": "System default voice"
   }
 }

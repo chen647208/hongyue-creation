@@ -46,7 +46,8 @@
     "embedding": "向量模型",
     "general": "通用",
     "plugins": "插件",
-    "sync": "同步传输"
+    "sync": "同步传输",
+    "tts": "朗读"
   },
   "general": {
     "title": "通用设置",
@@ -684,5 +685,38 @@
     "mergeHint": "从已配置的传输后端下载同步包并合并到本地库；冲突按保留副本 / 应用远端 / 待处理三选。",
     "mergeOpen": "打开同步面板",
     "desktopOnly": "本地目录选择与退出导出仅在桌面端可用。"
+  },
+  "tts": {
+    "title": "朗读（TTS）",
+    "hint": "控制助手消息与写作区的语音播报。系统语音离线可用；接入云端合成可获得更自然的音色，按字符计费。",
+    "providerLabel": "合成引擎",
+    "provider": {
+      "system": "系统语音（离线）",
+      "openai": "OpenAI 兼容接口",
+      "azure": "Azure 语音服务",
+      "elevenlabs": "ElevenLabs"
+    },
+    "providerHint": {
+      "system": "使用操作系统已安装的语音，离线、免费，音色取决于系统。",
+      "openai": "任何兼容 POST /audio/speech 的服务都可接入：OpenAI、中转网关、本地推理服务。",
+      "azure": "微软认知服务语音合成，音色多、中文自然，需要区域与订阅 Key。",
+      "elevenlabs": "音质最好，按字符计费；需选择账号里的 voice id。"
+    },
+    "voiceLabel": "音色",
+    "voiceHint": "系统语音从已安装的语音中选择；云端填服务侧的音色标识。",
+    "voicePlaceholder": "音色标识",
+    "refreshVoices": "刷新音色",
+    "endpointLabel": "接口地址",
+    "modelLabel": "模型",
+    "apiKeyLabel": "API Key",
+    "regionLabel": "区域（如 eastasia）",
+    "rateLabel": "语速 {{value}}×",
+    "pitchLabel": "音高 {{value}}×",
+    "sample": "这是朗读效果试听。",
+    "preview": "试听",
+    "stop": "停止",
+    "previewHint": "使用上面的文本按当前配置试听，不会保存任何音频。",
+    "unsupported": "当前环境不支持该引擎，请检查系统语音或完善上方配置。",
+    "systemDefaultVoice": "系统默认音色"
   }
 }

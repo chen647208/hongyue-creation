@@ -8,6 +8,7 @@
  */
 
 import { DEFAULT_PROMPTS, INITIAL_MODELS } from '../../shared/constants';
+import { DEFAULT_TTS_CONFIG, normalizeTtsConfig } from '../../shared/constants/tts';
 import { APP_STATE_VERSION } from '../../shared/constants/versions';
 import { type AppState } from '../../shared/types';
 import { getDefaultConsistencyPrompts } from '../constants/consistencyCheck';
@@ -82,6 +83,7 @@ export const normalizeImportedState = (imported: Partial<AppState> | null | unde
     editorFont: typeof src.editorFont === 'string' ? src.editorFont : INITIAL_APP_STATE.editorFont,
     customFonts: Array.isArray(src.customFonts) ? src.customFonts : [],
     mcpServers: Array.isArray(src.mcpServers) ? src.mcpServers : [],
+    tts: normalizeTtsConfig(src.tts ?? DEFAULT_TTS_CONFIG),
     uiFontSize: typeof src.uiFontSize === 'number' ? src.uiFontSize : INITIAL_APP_STATE.uiFontSize,
     editorFontSize: typeof src.editorFontSize === 'number' ? src.editorFontSize : INITIAL_APP_STATE.editorFontSize,
     editorLineHeight: typeof src.editorLineHeight === 'number' ? src.editorLineHeight : INITIAL_APP_STATE.editorLineHeight,
