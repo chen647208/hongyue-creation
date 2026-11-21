@@ -345,17 +345,46 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
         <div className="shrink-0 border-t border-border bg-card p-3">
           {!contextPanelOpen && (
           <>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
+          {input.startsWith('/') && cardPromptTemplates.length > 0 && (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="text-2xs uppercase tracking-wider text-muted-foreground">{t('chat.templateLabel')}</span>
+              <Select
+                className="h-7 w-48 text-xs"
+                value={selectedCardTemplateId || ''}
+                onChange={(event) => setSelectedCardTemplateId(event.target.value || null)}
+              >
+                <option value="">{t('chat.defaultTemplateOption')}</option>
+                {filterTemplatesByInput(cardPromptTemplates, input).map((template) => (
+                  <option key={template.id} value={template.id}>{templateDisplayName(template)}</option>
+                ))}
+              </Select>
+              {selectedCardTemplateId && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSelectedCardTemplateId(null)}
+                  className="size-7 text-muted-foreground hover:text-destructive"
+                  title={t('chat.resetTemplateTitle')}
+                >
+                  <X className="size-4" />
+                </Button>
+              )}
+            </div>
+          )}
+          </>
+          )}
+
+          <div className="flex items-end gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 gap-1 px-2 text-2xs font-normal text-muted-foreground hover:border-primary/40 hover:text-primary"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
                   title={t('chat.quickCreateLabel')}
+                  aria-label={t('chat.quickCreateLabel')}
                 >
-                  <Plus className="size-3.5" />
-                  {t('chat.quickCreateLabel')}
+                  <Plus className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-44">
@@ -377,38 +406,6 @@ const AssistantChatWorkspace: React.FC<AssistantChatWorkspaceProps> = ({
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {input.startsWith('/') && cardPromptTemplates.length > 0 && (
-              <>
-                <span className="text-2xs uppercase tracking-wider text-muted-foreground">{t('chat.templateLabel')}</span>
-                <Select
-                  className="h-7 w-48 text-xs"
-                  value={selectedCardTemplateId || ''}
-                  onChange={(event) => setSelectedCardTemplateId(event.target.value || null)}
-                >
-                  <option value="">{t('chat.defaultTemplateOption')}</option>
-                  {filterTemplatesByInput(cardPromptTemplates, input).map((template) => (
-                    <option key={template.id} value={template.id}>{templateDisplayName(template)}</option>
-                  ))}
-                </Select>
-                {selectedCardTemplateId && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedCardTemplateId(null)}
-                    className="size-7 text-muted-foreground hover:text-destructive"
-                    title={t('chat.resetTemplateTitle')}
-                  >
-                    <X className="size-4" />
-                  </Button>
-                )}
-              </>
-            )}
-          </div>
-          </>
-          )}
-
-          <div className="flex items-end gap-2">
             <AttachmentMenuButton
               bookId={bookId}
               refreshKey={attachmentsRefreshKey}

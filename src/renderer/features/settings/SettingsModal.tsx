@@ -33,6 +33,7 @@ import { isModelConfigured } from '../../shared/utils/modelReadiness';
 import SettingsModalFooter from './components/SettingsModalFooter';
 import SettingsModalHeader from './components/SettingsModalHeader';
 import SettingsTabContent from './components/SettingsTabContent';
+import SettingsTabNav from './components/SettingsTabNav';
 import { DEFAULT_IMPORT_EXPORT_MODE, DEFAULT_SETTINGS_TAB, DEFAULT_STORAGE_CONFIG } from './constants';
 import {
   createDefaultEmbeddingConfig,
@@ -509,13 +510,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         if (!open) void handleRequestClose();
       }}
     >
-      <DialogContent hideClose aria-label={i18n.t('settings:title')} className="flex h-[90vh] w-[94vw] max-w-6xl flex-col gap-0 overflow-hidden p-0">
-        <SettingsModalHeader
-          activeTab={activeTab}
-          onChange={setActiveTab}
-          onClose={() => void handleRequestClose()}
-        />
-        <div className=" flex-1 overflow-y-auto bg-background p-6">
+      <DialogContent hideClose aria-label={i18n.t('settings:title')} className="flex h-[90vh] w-[94vw] max-w-7xl flex-col gap-0 overflow-hidden p-0">
+        <SettingsModalHeader onClose={() => void handleRequestClose()} />
+        <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+          <SettingsTabNav activeTab={activeTab} onChange={setActiveTab} />
+          <div className="min-h-0 flex-1 overflow-y-auto bg-background p-6">
           <SettingsTabContent
             activeTab={activeTab}
             localModels={localModels}
@@ -574,6 +573,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             theme={theme}
             onThemeChange={onThemeChange}
           />
+          </div>
         </div>
 
         <SettingsModalFooter

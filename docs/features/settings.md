@@ -8,7 +8,7 @@
 ## 核心文件
 
 - `SettingsModal.tsx`：设置弹窗主编排器
-- `components/SettingsTabNav.tsx` + `SettingsTabContent.tsx`：标签导航与内容分发
+- `components/SettingsTabNav.tsx` + `SettingsTabContent.tsx`：分组导航与内容分发；宽屏左侧纵向列表，窄屏回落顶部横向换行，插件页签按声明分组并入
 - `components/SettingsModalHeader.tsx` + `SettingsModalFooter.tsx`：头尾（含暂存保存按钮）
 - `components/GeneralSettingsPanel.tsx`：语言/主题/字体/快捷键/系统/代理（直写 store 即时生效）
 - `components/SystemPanel.tsx`：最小化到托盘 + 开机自启（经 `shellSync.ts` 下发主进程）

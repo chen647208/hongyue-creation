@@ -11,6 +11,7 @@ import { PlusCircle } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { useTranslation } from '@/i18n';
+import { Select } from '@/shared/ui/Select';
 
 import { isModelConfigured } from '../../../shared/utils/modelReadiness';
 import type { ModelSettingsPanelProps } from '../types';
@@ -56,8 +57,20 @@ const ModelSettingsPanel: React.FC<ModelSettingsPanelProps> = ({
   const selected = localModels.find((m) => m.id === (selectedId ?? activeId ?? localModels[0]?.id)) ?? filtered[0] ?? localModels[0];
 
   return (
-    <div className="flex gap-5">
-      <ProviderSidebar
+    <div className="space-y-3">
+      {/* 窄屏收起侧栏：用下拉框选渠道，避免侧栏与编辑器挤成一团 */}
+      <div className="md:hidden">
+        <Select
+          aria-label={t('models.selectProviderLabel')}
+          value={selected?.id ?? ''}
+          onChange={(e) => setSelectedId(e.target.value)}
+        >
+          {localModels.length === 0 && <option value="">{t('models.emptyAll', '还没有渠道，先添加一个')}</option>}
+          {localModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </Select>
+      </div>
+      <div className="flex gap-5">
+        <ProviderSidebar
         models={filtered}
         selectedId={selected?.id ?? null}
         activeId={activeId}
@@ -95,6 +108,7 @@ const ModelSettingsPanel: React.FC<ModelSettingsPanelProps> = ({
           <span>{t('models.addProvider')}</span>
         </button>
         <UsageSummaryCard />
+      </div>
       </div>
     </div>
   );

@@ -64,8 +64,8 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
 
   return (
     <div className={cn('min-w-0 flex-1 rounded-lg border bg-card p-6', active ? 'border-primary/40' : 'border-border')}>
-      <div className="mb-6 flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3 sm:flex-1">
           <span
             role="radio"
             aria-checked={active}
@@ -78,7 +78,7 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
             {active && <span className="size-2 rounded-full bg-primary" />}
           </span>
           <input
-            className="w-64 min-w-0 border-none bg-transparent p-0 font-serif text-lg font-medium text-foreground outline-none placeholder:text-muted-foreground/40"
+            className="min-w-0 flex-1 border-none bg-transparent p-0 font-serif text-lg font-medium text-foreground outline-none placeholder:text-muted-foreground/40 sm:max-w-72"
             value={model.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
             placeholder={t('models.namePlaceholder')}
@@ -100,7 +100,7 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="space-y-4">
           <div>
             <label className={fieldLabel} htmlFor={`provider-channel-${model.id}`}>{t('models.channelLabel')}</label>
@@ -149,6 +149,7 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
                 placeholder={t('models.manualInputPlaceholder')}
               />
             )}
+            <p className={hintText}>{t('models.modelNameHint')}</p>
             <div className="mt-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {listLoading && <div className="flex items-center gap-1 text-xs text-primary"><Spinner className="size-4" /><span>{t('models.fetchingList')}</span></div>}
@@ -161,9 +162,6 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
                 {listLoading ? <Spinner className="size-3.5" /> : <RefreshCw className="size-3.5" />}
                 {t('models.refreshList')}
               </Button>
-            </div>
-            <div className="mt-2">
-              <Input className="font-mono text-xs" value={model.modelName} onChange={(e) => onUpdate({ modelName: e.target.value })} placeholder={t('models.manualInputPlaceholder')} />
             </div>
           </div>
         </div>
@@ -219,7 +217,7 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
           <SlidersHorizontal className="size-4 text-primary" />
           <h3 className="text-sm font-medium text-foreground">{t('models.advancedTitle')}</h3>
         </div>
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('models.temperatureLabel')}</label>

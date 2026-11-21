@@ -57,7 +57,7 @@ export const ProviderSidebar: React.FC<ProviderSidebarProps> = ({
 }) => {
   const { t } = useTranslation('settings');
   return (
-    <div className="flex w-64 shrink-0 flex-col gap-3">
+    <div className="hidden w-64 shrink-0 flex-col gap-3 md:flex">
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -97,6 +97,7 @@ export const ProviderSidebar: React.FC<ProviderSidebarProps> = ({
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {preset ? dt(preset.nameKey) : model.provider}
+                  {model.modelName ? ` · ${model.modelName}` : ''}
                   {!enabled && ` · ${t('models.disabled', '已停用')}`}
                   {model.id === activeId && ` · ${t('models.activeBadge')}`}
                 </span>

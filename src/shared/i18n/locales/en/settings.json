@@ -28,7 +28,9 @@
     "removeType": "Remove type",
     "removeField": "Remove field"
   },
+  "tabNavLabel": "Settings sections",
   "tabGroup": {
+    "basic": "General",
     "ai": "AI Models",
     "prompts": "Prompts",
     "system": "System",
@@ -189,15 +191,17 @@
     "custom": "Custom Endpoints"
   },
   "models": {
-    "namePlaceholder": "Name this model...",
+    "namePlaceholder": "Name this provider...",
     "activeBadge": "Active",
     "setActiveLabel": "Set as active model",
     "deploymentLocal": "Local",
     "deploymentCloud": "Cloud",
     "deleteTitle": "Delete this model",
     "connectionLog": "Connection log",
-    "channelLabel": "Select Channel",
-    "modelNameLabel": "Model Name",
+    "channelLabel": "Provider type",
+    "modelNameLabel": "Default model",
+    "modelNameHint": "The model ID sent to the provider's API; pick one from the list or enter it manually.",
+    "selectProviderLabel": "Select a model provider",
     "selectModelPlaceholder": "Select a model...",
     "fetchingList": "Fetching model list...",
     "loadedCount": "Loaded {{count}} available models",
@@ -238,7 +242,7 @@
     "testing": "Testing connection...",
     "testNow": "Test Connection Now",
     "addProvider": "Add AI Provider",
-    "searchPlaceholder": "Search providers / models…",
+    "searchPlaceholder": "Search providers…",
     "filter": {
       "all": "All",
       "enabled": "Enabled",

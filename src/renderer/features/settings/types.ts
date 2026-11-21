@@ -148,8 +148,6 @@ export interface ConsistencyPromptSettingsPanelProps {
 }
 
 export interface SettingsModalHeaderProps {
-  activeTab: SettingsTab;
-  onChange: (tab: SettingsTab) => void;
   onClose: () => void;
 }
 
