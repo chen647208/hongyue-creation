@@ -717,6 +717,7 @@
     "stop": "Stop",
     "previewHint": "Plays the text above with current settings. No audio is saved.",
     "unsupported": "This engine is unavailable here. Check your system voices or finish the settings above.",
+  "noVoices": "No system voices are installed. Install a voice pack in your OS, or switch to a cloud engine.",
     "systemDefaultVoice": "System default voice"
   }
 }
