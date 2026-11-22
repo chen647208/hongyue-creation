@@ -6,7 +6,7 @@
  * 本程序为自由软件：您可依据 GNU Affero 通用公共许可证第 3 版（AGPL-3.0-only）修改与分发；
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
-import { describe, expect,it } from 'vitest';
+import { describe, expect,it,vi } from 'vitest';
 
 import { MinimalMcpClient } from '../client.js';
 
@@ -66,12 +66,24 @@ describe('MinimalMcpClient', () => {
   });
 
   it('请求超时（server 不回包）reject，后续 close 正常', async () => {
-    const client = new MinimalMcpClient(process.execPath, ['-e', HANGING_SERVER], 300);
+    // 握手与请求共用 this.timeoutMs。握手要给真实子进程启动留足时间，
+    // 否则并行跑时 initialize 慢会被误判成请求超时；请求超时本身用
+    // fake timers 显式推进，不依赖真实等待。
+    const timeoutMs = 10_000;
+    const client = new MinimalMcpClient(process.execPath, ['-e', HANGING_SERVER], timeoutMs);
     try {
       await client.start();
-      await expect(client.callTool('echo', {})).rejects.toThrow('MCP 请求超时');
+      vi.useFakeTimers();
+      try {
+        const call = client.callTool('echo', {});
+        const timedOut = expect(call).rejects.toThrow('MCP 请求超时');
+        await vi.advanceTimersByTimeAsync(timeoutMs);
+        await timedOut;
+      } finally {
+        vi.useRealTimers();
+      }
     } finally {
-      await client.close();
+      await expect(client.close()).resolves.toBeUndefined();
     }
   });
 

@@ -70,7 +70,7 @@
     "loadFailed": "应用数据加载失败（{{message}}）。请到「设置 → 存储」检查数据目录，或从备份恢复。",
     "exportAllTitle": "导出项目数据",
     "importAllTitle": "导入项目数据",
-    "exportAllSuccess": "数据导出成功！",
+    "exportAllSuccess": "全部数据导出成功，已保存到：{{path}}",
     "jsonFilter": "JSON文件",
     "allFilesFilter": "所有文件"
   },
