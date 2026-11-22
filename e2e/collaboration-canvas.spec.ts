@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
-import { cleanupUserDataDir, createBook, enterWritingArea, flushPersistence, launchApp, waitCollaborationReady } from './helpers';
+import { cleanupUserDataDir, createBook, enterWritingArea, flushPersistence, launchApp, waitCollaborationReady, waitForBoot } from './helpers';
 
 /**
  * 画布协作双端 e2e：画布节点位置经同一份 Y.Doc 两端收敛。
@@ -193,6 +193,8 @@ async function openSecondWindow(app: import('@playwright/test').ElectronApplicat
   const opened = pages[pages.length - 1];
   if (!opened) throw new Error('新窗口未创建');
   await opened.waitForLoadState('domcontentloaded');
+  // 新窗口也在独立跑启动流程：没等载入完成就点书卡，会被随后灌入的状态顶回书籍库
+  await waitForBoot(opened);
   return opened;
 }
 
@@ -203,6 +205,8 @@ async function setupCanvasPair(app: import('@playwright/test').ElectronApplicati
   await flushPersistence(app);
   await page.evaluate(() => window.localStorage.setItem('collab.enabled', '1'));
   await page.reload();
+  // reload 后重新载入状态：等书卡投影出来再点，避免在载入完成前判成空书库
+  await waitForBoot(page);
   await enterWritingArea(page);
   await createSecondChapter(page);
 
