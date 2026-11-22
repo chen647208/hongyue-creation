@@ -297,6 +297,22 @@ for (const fixture of [nodeSqliteFixture, wasmFixture]) {
       expect(await repo.search('古城堡')).toHaveLength(0); // FTS 已随项目清除
     });
 
+    it('改章正文后 FTS 按映射更新：旧词查不到、新词查得到，无多余行', async () => {
+      await repo.saveAll(baseState([
+        project('a', { chapters: [chapter('c1', '第一章', '龙骑士闯入了古城堡')] }),
+      ]));
+      await repo.saveProject(project('a', {
+        chapters: [chapter('c1', '第一章', '法师走进了星空塔')],
+        lastModified: 2000,
+      }));
+
+      expect(await repo.search('古城堡')).toHaveLength(0);
+      expect((await repo.search('星空塔')).length).toBeGreaterThan(0);
+      const fts = rawGet<{ c: number }>('SELECT COUNT(*) AS c FROM nodes_fts')!;
+      const docs = rawGet<{ c: number }>('SELECT COUNT(*) AS c FROM fts_docs')!;
+      expect(docs.c).toBe(fts.c);
+    });
+
     it('saveSettings 只写给定切片，保留其它', async () => {
       await repo.saveAll(baseState([project('a')]));
       await repo.saveSettings({ activeModelId: 'm2', models: [{ id: 'm2', name: '新模型' } as never] });
