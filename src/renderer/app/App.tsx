@@ -308,6 +308,7 @@ const App: React.FC = () => {
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center">
         <DialogHost />
+        <ToastHost />
         <h1 className="text-lg font-semibold text-foreground">{t('storageBackendBlockTitle')}</h1>
         <p role="alert" className="max-w-md text-sm text-muted-foreground">{t('storageBackendBlockBody')}</p>
         <div className="flex gap-2">

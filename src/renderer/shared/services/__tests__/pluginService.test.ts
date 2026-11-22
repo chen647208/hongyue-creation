@@ -34,6 +34,7 @@ description: 社区黄金三章扩展写法。触发词：社区开篇
 vi.mock('@/shared/services/repository', () => ({}));
 
 import { runQuickJS } from '../../../../main/app/pluginSandbox/quickjsRunner.js';
+import { logger } from '../../utils/logger';
 import { commandRegistry } from '../commandRegistry';
 import { bootstrapPlugins, readPluginCatalog, runPluginLogic,setTrustedPluginKeys } from '../pluginService';
 import { uiSlotRegistry } from '../uiSlots';
@@ -629,9 +630,11 @@ describe('插件命令贡献（docs/design/04 §4.1）', () => {
       signed?: boolean;
       commands?: unknown;
       withLogic?: boolean;
+      permissions?: Record<string, string[]> | null;
     } = {},
   ): Record<string, string> {
     const base = `/data/plugins/${PLUGIN_ID}`;
+    const permissions = options.permissions === null ? undefined : (options.permissions ?? { write: ['ai'] });
     const files: Record<string, string> = {
       [`${base}/plugin.json`]: JSON.stringify({
         id: PLUGIN_ID,
@@ -643,7 +646,7 @@ describe('插件命令贡献（docs/design/04 §4.1）', () => {
           commands: ['./commands.json'],
           ...(options.withLogic === false ? {} : { logic: ['./logic/'] }),
         },
-        permissions: { write: ['ai'] },
+        ...(permissions ? { permissions } : {}),
       }),
       [`${base}/commands.json`]: typeof options.commands === 'string' ? options.commands : JSON.stringify(options.commands ?? []),
     };
@@ -656,12 +659,16 @@ describe('插件命令贡献（docs/design/04 §4.1）', () => {
     return files;
   }
 
-  function stubPluginFs(files: Record<string, string>, sandboxRun: (request: unknown) => Promise<unknown>): void {
+  function stubPluginFs(
+    files: Record<string, string>,
+    sandboxRun: (request: unknown) => Promise<unknown>,
+    pluginDirs: string[] = [PLUGIN_ID],
+  ): void {
     vi.stubGlobal('window', {
       electronAPI: {
         getAppDataPath: async () => '/data',
         listDirectory: async (dir: string) =>
-          dir === '/data/plugins' ? [{ name: PLUGIN_ID, type: 'directory' }] : [],
+          dir === '/data/plugins' ? pluginDirs.map((name) => ({ name, type: 'directory' })) : [],
         pluginListDirectory: async (rootDir: string, rel: string) => {
           const prefix = `${rootDir}/${rel}/`;
           return Object.keys(files)
@@ -810,6 +817,69 @@ describe('插件命令贡献（docs/design/04 §4.1）', () => {
     await bootstrapPlugins(deps(), '2.0.0', []);
     expect(commandRegistry.get('/p:空动作')).toBeUndefined();
     expect(sandboxRun).not.toHaveBeenCalled();
+  });
+
+  it('不同插件短名相同：后装配者跳过同名命令，不覆盖先注册者', async () => {
+    setTrustedPluginKeys(['k']);
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const files: Record<string, string> = {};
+    for (const [pluginId, title] of [
+      ['com.alpha.clash', '甲插件命令'],
+      ['com.beta.clash', '乙插件命令'],
+    ] as const) {
+      const base = `/data/plugins/${pluginId}`;
+      files[`${base}/plugin.json`] = JSON.stringify({
+        id: pluginId,
+        name: 'clash',
+        version: '1.0.0',
+        host: '^2.0.0',
+        license: 'MIT',
+        contributes: { commands: ['./commands.json'] },
+        permissions: { write: ['ai'] },
+      });
+      files[`${base}/commands.json`] = JSON.stringify([{ id: '写作.黄金三章', title, function: 'runClash' }]);
+      files[`${base}/plugin.sig`] = JSON.stringify({ algorithm: 'ed25519', signature: 's', publicKey: 'k' });
+    }
+    stubPluginFs(files, async () => ({ ok: true, output: null }), ['com.alpha.clash', 'com.beta.clash']);
+    try {
+      const host = await bootstrapPlugins(deps(), '2.0.0', []);
+      expect(host.list().map((status) => status.state)).toEqual(['active', 'active']);
+
+      // 两个插件短名都是 clash，命名空间化后 id 相同：先装配的 alpha 保留，beta 被跳过。
+      expect(commandRegistry.get('/clash:写作.黄金三章')?.title).toBe('甲插件命令');
+      const text = warn.mock.calls.map((args) => args.join(' ')).join('\n');
+      expect(text).toContain('/clash:写作.黄金三章');
+      expect(text).toContain('com.alpha.clash');
+
+      host.disable('com.alpha.clash');
+      host.disable('com.beta.clash');
+      expect(commandRegistry.get('/clash:写作.黄金三章')).toBeUndefined();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('未声明 write:ai：命令在注册阶段整批跳过并说明原因', async () => {
+    setTrustedPluginKeys(['k']);
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    stubPluginFs(
+      root({
+        permissions: { write: ['cards'] },
+        commands: [{ id: '写作.黄金三章', title: '黄金三章', function: 'runGolden' }],
+      }),
+      async () => ({ ok: true, output: null }),
+    );
+    try {
+      const host = await bootstrapPlugins(deps(), '2.0.0', []);
+      // 插件本身仍正常激活，只是命令不注册。
+      expect(host.list().find((status) => status.id === PLUGIN_ID)?.state).toBe('active');
+      expect(commandRegistry.get(COMMAND_ID)).toBeUndefined();
+      const text = warn.mock.calls.map((args) => args.join(' ')).join('\n');
+      expect(text).toContain('write:ai');
+      expect(text).toContain(PLUGIN_ID);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

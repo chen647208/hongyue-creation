@@ -26,6 +26,10 @@
   渲染进 `plugin.panel` 槽位；禁用插件即卸载界面。
 - **设置 schema**：manifest 声明 `settingsSchema` 的插件，设置面板按其 schema 渲染表单，
   值持久化在 `plugin.<id>.settings`。
+- **命令声明（commands）**：`contributes.commands` 指向插件根内的 `.json` 文件，内容是
+  `{ id, title, keywords?, function? }` 数组。声明先过路径门与结构校验（id 插件内唯一、title 必填），
+  带 `function` 的命令注册进命令面板；点击后按具名函数经 logic 沙箱执行，入参为空对象，失败以 toast 提示。
+  未签名插件与没有 `function` 的声明不注册（命令面板没有禁用态），插件停用或卸载时逆序撤销注册。
 - **WASM 逻辑轨**：`handler.wasm` 默认拒绝任何导入；SKILL.md frontmatter `hosts` 声明可用的受控宿主函数
   （`now`/`log`/`hash`），未授权导入或缺少实现即拒执行。
   - `types`：类型模板（强制 `短id.` 命名空间前缀，防抢占内置类型）
