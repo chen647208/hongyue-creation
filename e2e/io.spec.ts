@@ -35,11 +35,14 @@ test('导出书籍后能再导入，书籍标题出现', async () => {
     // 导出：卡片菜单 → 导出
     await page.locator('button:has(.lucide-ellipsis)').first().click();
     await page.getByRole('menuitem', { name: '导出', exact: true }).click();
+    // 成功提示是自动消失的 toast，带保存路径，不阻塞后续导入
+    const successToast = page.getByRole('status').filter({ hasText: /导出成功|exported successfully/ });
+    await expect(successToast).toBeVisible({ timeout: 15_000 });
+    await expect(successToast).toContainText(exportPath);
     await expect.poll(() => existsSync(exportPath), { timeout: 15_000 }).toBe(true);
     const exported = JSON.parse((await import('node:fs')).readFileSync(exportPath, 'utf8')) as { title: string };
     expect(exported.title).toBeTruthy();
-    // 关闭导出成功提示
-    await page.getByRole('button', { name: /知道了|Got it/ }).first().click();
+    await expect(successToast).toBeHidden({ timeout: 10_000 });
 
     // 导入：导入下拉 → 导入书籍
     await page.getByRole('button', { name: /导入|Import/ }).first().click();

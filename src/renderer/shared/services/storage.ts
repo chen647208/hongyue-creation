@@ -10,6 +10,7 @@
 import { i18n } from '@/i18n';
 import { dialogService } from '@/shared/services/dialogService';
 import { localStore } from '@/shared/services/localStore';
+import { toast } from '@/shared/services/toastService';
 
 import { type AppState, type ConsistencyCheckConfig, type ConsistencyCheckPromptTemplate,type Project, type StorageConfig } from "../../../shared/types";
 import { logger } from '../utils/logger';
@@ -350,7 +351,7 @@ export const storage = {
         
         if (!result.canceled && result.filePath) {
           await window.electronAPI.writeFile(result.filePath, JSON.stringify(project));
-          dialogService.alert(i18n.t('app:book.exportSuccess', { title: project.title }));
+          toast.success(i18n.t('app:book.exportSuccess', { title: project.title, path: result.filePath }));
         }
       } catch (error) {
         logger.error('Failed to export current book:', error);

@@ -154,7 +154,7 @@
     "trashDelete": "彻底删除",
     "trashEmpty": "回收站是空的",
     "exportTitle": "导出当前书籍",
-    "exportSuccess": "书籍《{{title}}》导出成功！",
+    "exportSuccess": "书籍《{{title}}》导出成功，已保存到：{{path}}",
     "invalidFile": "导入的文件不是有效的书籍数据",
     "exportFailed": "书籍导出失败：{{message}}"
   },

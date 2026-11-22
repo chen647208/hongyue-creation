@@ -154,7 +154,7 @@
     "trashDelete": "Delete forever",
     "trashEmpty": "Trash is empty",
     "exportTitle": "Export Current Book",
-    "exportSuccess": "Book \"{{title}}\" exported successfully!",
+    "exportSuccess": "Book \"{{title}}\" exported successfully to: {{path}}",
     "invalidFile": "The imported file is not valid book data",
     "exportFailed": "Failed to export book: {{message}}"
   },
