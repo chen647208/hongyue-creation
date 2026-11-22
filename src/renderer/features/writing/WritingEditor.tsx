@@ -65,7 +65,7 @@ import {
   getChapterContext,
 } from './utils';
 
-const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId, onBack, onNavigateToCharacters, onOpenSettings }) => {
+const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId, onBack, onOpenBookshelf, onNavigateToCharacters, onOpenSettings }) => {
   const { t } = useTranslation(['writing', 'steps']);
   // 窄视口侧栏改抽屉覆盖层：默认收起，避免挤压正文（docs/design/35 §2）
   const isNarrow = resolveWorkspaceChrome(useViewportTier()).writingSidebarOverlay;
@@ -682,6 +682,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
           canUndo={editorRef.current?.canUndo() ?? false}
           canRedo={editorRef.current?.canRedo() ?? false}
           onBack={onBack}
+          onOpenBookshelf={onOpenBookshelf}
           onTitleChange={updateActiveChapterTitle}
           onOpenExport={exporter.openModal}
           onOpenForeshadow={() => setIsForeshadowOpen(true)}

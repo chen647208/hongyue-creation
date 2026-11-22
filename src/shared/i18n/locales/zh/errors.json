@@ -70,6 +70,7 @@
   "plugins.notActive": "插件 {{pluginId}} 未激活，拒绝执行逻辑贡献",
   "plugins.noLogicContribution": "插件 {{pluginId}} 无逻辑贡献",
   "plugins.invalidFunctionName": "非法函数名：{{fn}}",
+  "plugins.commandFailed": "插件命令「{{title}}」执行失败：{{message}}",
   "plugins.sourceNotAllowed": "插件来源不在白名单：{{source}}",
   "plugins.sourceUndeclared": "未声明 source",
   "mcp.desktopRequired": "MCP 客户端需要 Electron 环境",

@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { AlignCenterVertical, ArrowLeft, Camera, ChevronsRight, Eraser, Expand, FileOutput, FileText, History, Lock, Maximize2, Merge, Minimize2, Redo2, RotateCcw, Scissors, Search, SpellCheck, Sprout, Undo2, Unlock, Wrench } from 'lucide-react';
+import { AlignCenterVertical, ArrowLeft, Camera, ChevronsRight, Eraser, Expand, FileOutput, FileText, History, Library, Lock, Maximize2, Merge, Minimize2, Redo2, RotateCcw, Scissors, Search, SpellCheck, Sprout, Undo2, Unlock, Wrench } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -46,6 +46,7 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
   canUndo,
   canRedo,
   onBack,
+  onOpenBookshelf,
   onTitleChange,
   onOpenExport,
   onOpenForeshadow,
@@ -73,6 +74,9 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
 }) => {
   const { t, i18n } = useTranslation('writing');
   const progress = targetWordCount > 0 ? Math.min(1, chapterStats.charCount / targetWordCount) : 0;
+  const chapterHistoryHint = hasActiveChapterHistory
+    ? t('toolbar.chapterHistoryTitle')
+    : t('toolbar.chapterHistoryEmptyTitle');
   const toggleFullscreen = () => {
     try {
       if (document.fullscreenElement) void document.exitFullscreen();
@@ -86,6 +90,17 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
       className={cn(isFocusMode && 'bg-background/80 backdrop-blur-sm')}
       left={
         <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 shrink-0 gap-1.5 px-2 text-xs text-muted-foreground"
+            onClick={onOpenBookshelf}
+            title={t('toolbar.bookshelfTitle')}
+            aria-label={t('toolbar.bookshelfTitle')}
+          >
+            <Library className="size-4" />
+            <span className="hidden md:inline">{t('toolbar.bookshelf')}</span>
+          </Button>
           {!isFocusMode ? (
             <Button variant="ghost" size="icon" className="size-8 shrink-0" onClick={onBack} title={t('toolbar.back')}>
               <ArrowLeft className="size-4" />
@@ -224,11 +239,19 @@ const WritingEditorToolbar: React.FC<WritingEditorToolbarProps> = ({
               >
                 <History className="size-4" /> <span className="hidden @3xl:inline">{t('toolbar.globalHistory')}</span>
               </Button>
-              {activeChapterId && hasActiveChapterHistory && (
-                <Button variant="ghost" size="icon" className={iconBtnSecondary} onClick={onOpenChapterHistory} title={t('toolbar.chapterHistoryTitle')}>
+              <span className="inline-flex" title={chapterHistoryHint}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={iconBtn}
+                  onClick={onOpenChapterHistory}
+                  disabled={!activeChapterId || !hasActiveChapterHistory}
+                  title={chapterHistoryHint}
+                  aria-label={chapterHistoryHint}
+                >
                   <FileText className="size-4" />
                 </Button>
-              )}
+              </span>
               <PageHeaderDivider />
             </>
           )}

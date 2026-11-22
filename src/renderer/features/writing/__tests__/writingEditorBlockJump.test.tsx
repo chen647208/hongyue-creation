@@ -137,7 +137,7 @@ describe('WritingEditor 跨章块跳转', () => {
   });
 
   it('跨章跳转：等编辑器就绪回调消费待跳请求，渲染远超 50ms 仍能定位', async () => {
-    render(<WritingEditor project={project} initialChapterId="c1" onBack={() => undefined} />);
+    render(<WritingEditor project={project} initialChapterId="c1" onBack={() => undefined} onOpenBookshelf={() => undefined} />);
     await settle();
 
     act(() => {
@@ -157,7 +157,7 @@ describe('WritingEditor 跨章块跳转', () => {
   });
 
   it('同章跳转：立即定位，不进待跳队列', async () => {
-    render(<WritingEditor project={project} initialChapterId="c1" onBack={() => undefined} />);
+    render(<WritingEditor project={project} initialChapterId="c1" onBack={() => undefined} onOpenBookshelf={() => undefined} />);
     await settle();
 
     act(() => {
@@ -172,7 +172,7 @@ describe('WritingEditor 跨章块跳转', () => {
 
   it('定位失败（正文晚到）时保留待跳，下一次就绪信号重试', async () => {
     canvasStub.jumpToBlock.mockReturnValueOnce(false).mockReturnValue(true);
-    render(<WritingEditor project={project} initialChapterId="c1" onBack={() => undefined} />);
+    render(<WritingEditor project={project} initialChapterId="c1" onBack={() => undefined} onOpenBookshelf={() => undefined} />);
     await settle();
 
     act(() => {

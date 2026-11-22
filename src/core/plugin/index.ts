@@ -59,6 +59,11 @@ export {
   verifyCatalogIndexSignature,
 } from './catalog.js';
 export {
+  type PluginCommandDeclaration,
+  type PluginCommandsReadResult,
+  readPluginCommands,
+} from './commands.js';
+export {
   createPluginContext,
   drainTasks,
   type PluginContext,

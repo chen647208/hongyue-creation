@@ -28,7 +28,7 @@ import type {
   PluginStatus,
 } from '@core/plugin';
 import { formulaId, installExecutableDescriptors, installFormulas, installHooks, installTypeTemplates, loadPluginCatalog, PermissionDenied, PluginHost, type RendererRegistry, type ScriptExecutionPort, type ScriptRegistry, typeTemplateId } from '@core/plugin';
-import { adjudicateHandlerResult, checkPluginFileName, checkPluginRelPath, type SandboxRunResult } from '@core/plugin';
+import { adjudicateHandlerResult, checkPluginFileName, checkPluginRelPath, readPluginCommands, type SandboxRunResult } from '@core/plugin';
 import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import { parseSignatureEnvelope } from '@shared/pluginSignature';
@@ -41,10 +41,12 @@ import { PluginFrame } from '@/shared/ui/PluginFrame';
 
 import { logger } from '../utils/logger';
 import { setBuildRendererHost } from './buildRendererPort';
+import { commandRegistry } from './commandRegistry';
 import { localStore } from './localStore';
 import { type CapabilityHostBindings, createPluginToolProposalPort } from './pluginCapabilityPort';
 import { bindPluginEventHost } from './pluginEventBus';
 import { createRendererExecutionPort } from './rendererExecutionPort';
+import { toast } from './toastService';
 import { uiSlotRegistry } from './uiSlots';
 
 function electron(): NonNullable<Window['electronAPI']> {
@@ -277,6 +279,28 @@ export async function discoverAndLoad(host: PluginHost): Promise<void> {
         }
         if (denied) break;
       }
+      // 命令声明（docs/design/04 §4.1）：contributes.commands 是相对 JSON 文件，不是目录。
+      if (!denied) {
+        for (const rel of contributes?.commands ?? []) {
+          const fileCheck = checkPluginRelPath(rel);
+          if (!fileCheck.ok) {
+            host.markFailed(pluginId, 'discover', new PermissionDenied(pluginId, 'fs:commands', 'read', [fileCheck.reason]));
+            denied = true;
+            break;
+          }
+          if (!fileCheck.rel.endsWith('.json')) {
+            host.markFailed(pluginId, 'discover', new PermissionDenied(pluginId, 'fs:commands', 'read', [`命令声明必须是 .json 文件：${fileCheck.rel}`]));
+            denied = true;
+            break;
+          }
+          // 缺文件不阻断插件：装配器读到缺席时写日志，与目录型贡献一致。
+          try {
+            files[fileCheck.rel] = await api.pluginReadFile(pluginRoot, fileCheck.rel);
+          } catch {
+            // 留给 readPluginCommands 报「不存在或未装载」
+          }
+        }
+      }
       if (denied) continue;
       host.loadRaw(pluginId, manifestJson, files, signed);
     } catch (error) {
@@ -420,6 +444,41 @@ export function createContributionInstaller(deps: PluginDeps): ContributionInsta
         const key = logicKey(manifest.id, file);
         logicHandlers.set(key, content);
         sink.add({ dispose: () => logicHandlers.delete(key) });
+      }
+    }
+
+    // 命令声明（docs/design/04 §4.1）：只注册带 function 的声明，动作经 runPluginLogic 进沙箱。
+    const commandDeclarations = readPluginCommands(manifest, plugin.files);
+    for (const issue of commandDeclarations.issues) {
+      logger.warn(`插件 ${manifest.id} 命令声明跳过：${issue}`);
+    }
+    if (commandDeclarations.commands.length > 0 && plugin.signed !== true) {
+      logger.warn(`未签名插件 ${manifest.id}：跳过 command 贡献（可执行动作需要签名）`);
+    } else {
+      for (const command of commandDeclarations.commands) {
+        const fn = command.fn;
+        if (!fn) {
+          logger.warn(`插件 ${manifest.id} 命令「${command.declaredId}」跳过：未声明 function，命令面板没有禁用态`);
+          continue;
+        }
+        const dispose = commandRegistry.register({
+          id: command.id,
+          title: command.title,
+          keywords: command.keywords,
+          run: () => {
+            const reportFailure = (message: string): void => {
+              const text = i18n.t('errors:plugins.commandFailed', { title: command.title, message });
+              logger.warn(`插件 ${manifest.id} 命令「${command.title}」执行失败：${message}`);
+              toast.error(text);
+            };
+            void runPluginLogic(manifest.id, fn, {})
+              .then((result) => {
+                if (!result.ok) reportFailure(result.error?.message ?? i18n.t('errors:plugins.installFailedGeneric'));
+              })
+              .catch((error: unknown) => reportFailure(error instanceof Error ? error.message : String(error)));
+          },
+        });
+        sink.add({ dispose });
       }
     }
 

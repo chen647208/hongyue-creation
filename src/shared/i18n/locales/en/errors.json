@@ -70,6 +70,7 @@
   "plugins.notActive": "Plugin {{pluginId}} is inactive; logic contribution execution denied.",
   "plugins.noLogicContribution": "Plugin {{pluginId}} has no logic contribution.",
   "plugins.invalidFunctionName": "Invalid function name: {{fn}}",
+  "plugins.commandFailed": "Plugin command \"{{title}}\" failed: {{message}}",
   "plugins.sourceNotAllowed": "Plugin source is not allowlisted: {{source}}",
   "plugins.sourceUndeclared": "source not declared",
   "mcp.desktopRequired": "The MCP client requires the Electron environment.",
