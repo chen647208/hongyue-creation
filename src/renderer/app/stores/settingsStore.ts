@@ -51,6 +51,8 @@ interface SettingsState {
   proxy: ProxyConfig | undefined;
   minimizeToTray: boolean | undefined;
   autoLaunch: boolean | undefined;
+  /** 用户主动选择过「先手写看看」：未配置模型时写作区不再整页拦截。 */
+  handwriteBypass: boolean;
   /** 从 repository 载入的初始状态整体灌入（首启动/全量导入）。 */
   hydrate: (patch: Partial<SettingsState>) => void;
   /** 保存供应商与模型：models 收运行时投影，落盘前由持久化桥剥离供应商字段。 */
@@ -75,6 +77,7 @@ interface SettingsState {
   setProxy: (proxy: ProxyConfig | undefined) => void;
   setMinimizeToTray: (minimizeToTray: boolean) => void;
   setAutoLaunch: (autoLaunch: boolean) => void;
+  setHandwriteBypass: (handwriteBypass: boolean) => void;
 }
 
 const {
@@ -110,6 +113,7 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   proxy: undefined,
   minimizeToTray: undefined,
   autoLaunch: undefined,
+  handwriteBypass: false,
   hydrate: (patch) => set(patch),
   setCatalog: (providers, models, activeModelId) => set({
     providers,
@@ -125,6 +129,7 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   setProxy: (proxy) => set({ proxy }),
   setMinimizeToTray: (minimizeToTray) => set({ minimizeToTray }),
   setAutoLaunch: (autoLaunch) => set({ autoLaunch }),
+  setHandwriteBypass: (handwriteBypass) => set({ handwriteBypass }),
   setPrompts: (prompts) => set({ prompts }),
   setCardPrompts: (cardPrompts) => set({ cardPrompts }),
   setConsistencyPrompts: (consistencyPrompts) => set({ consistencyPrompts }),

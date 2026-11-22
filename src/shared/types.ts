@@ -1123,6 +1123,8 @@ export interface AppState {
   minimizeToTray?: boolean;
   /** 开机自启；缺席表关闭。 */
   autoLaunch?: boolean;
+  /** 用户主动选择过「先手写看看」：未配置模型时不再整页拦截。按安装保存。 */
+  handwriteBypass?: boolean;
 }
 
 // 向量数据库相关类型

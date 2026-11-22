@@ -30,6 +30,7 @@ export const SETTING_KEYS = [
   'embeddingModels',
   'customFonts',
   'tts',
+  'handwriteBypass',
 ] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
