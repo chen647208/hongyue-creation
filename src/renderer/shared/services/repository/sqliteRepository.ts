@@ -665,6 +665,7 @@ export class SqliteRepository implements StorageRepository {
       await tx.run('views.deleteAll', []);
       await tx.run('changes.deleteAll', []);
       await tx.run('fts.deleteAll', []);
+      await tx.run('fts.docsDeleteAll', []);
       await tx.run('settings.deleteAll', []);
       await tx.run(
         'meta.deleteKnownKeys',
@@ -846,6 +847,7 @@ export class SqliteRepository implements StorageRepository {
       if (newNodeHash.has(r.id)) continue;
       await tx.run('nodes.deleteById', [r.id]);
       await tx.run('fts.deleteByNode', [r.id]);
+      await tx.run('fts.docsDeleteByNode', [r.id]);
       changes.push({ entityName: 'nodes', entityId: r.id, hash: '', isErased: true, instanceId, agentId, utcDateChanged: now });
     }
     for (const r of oldEdges) {
@@ -877,10 +879,14 @@ export class SqliteRepository implements StorageRepository {
       // FTS 投影随标题/正文变更刷新（先删后插，兼容不可检索类型）
       await tx.run('fts.deleteByNode', [node.id]);
       if (scopeOf(node.type)) {
+        // 先登记映射拿 rowid，再按 rowid 写 FTS；删除路径同样经映射命中。
+        await tx.run('fts.docsInsert', [node.id, bookId]);
         await tx.run(
           'fts.insert',
-          [bookId, node.id, node.type, node.title, node.body]
+          [bookId, node.id, node.type, node.title, node.body, node.id]
         );
+      } else {
+        await tx.run('fts.docsDeleteByNode', [node.id]);
       }
     }
     for (const edge of entities.edges) {
@@ -952,6 +958,7 @@ export class SqliteRepository implements StorageRepository {
     await tx.run('edges.deleteByBook', [bookId]);
     await tx.run('nodes.deleteByBook', [bookId]);
     await tx.run('fts.deleteByBook', [bookId]);
+    await tx.run('fts.docsDeleteByBook', [bookId]);
     await this.writeChangesTx(tx, changes);
   }
 

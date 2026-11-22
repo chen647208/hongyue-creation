@@ -158,6 +158,18 @@ export const SQL = {
          tokenize = 'trigram'
        )`,
 
+  // ── 迁移 v6（FTS 行号映射）──
+  // node_id 在 FTS 里是 UNINDEXED 列，按它删除会全表扫描；映射表记住每个节点的 FTS rowid，
+  // 删除改按 rowid 命中索引，首帧全量落盘不再随章数二次方增长。
+  'migration.v6.ftsDocs': `CREATE TABLE IF NOT EXISTS fts_docs (
+         rowid   INTEGER PRIMARY KEY,
+         node_id TEXT NOT NULL UNIQUE,
+         book_id TEXT NOT NULL
+       )`,
+  'migration.v6.idxFtsDocsBook': `CREATE INDEX IF NOT EXISTS idx_fts_docs_book ON fts_docs(book_id)`,
+  'migration.v6.ftsDocsBackfill': `INSERT OR REPLACE INTO fts_docs(rowid, node_id, book_id)
+         SELECT rowid, node_id, book_id FROM nodes_fts`,
+
   // ── 迁移 v3 ──
   'migration.v3.idxEdgesTo': `CREATE INDEX IF NOT EXISTS idx_edges_to ON edges(to_id)`,
 
@@ -289,10 +301,17 @@ export const SQL = {
   'views.deleteAll': `DELETE FROM views`,
 
   // ── 全文检索 ──
-  'fts.deleteByNode': `DELETE FROM nodes_fts WHERE node_id = ?`,
-  'fts.insert': `INSERT INTO nodes_fts(book_id, node_id, type, title, content) VALUES(?,?,?,?,?)`,
-  'fts.deleteByBook': `DELETE FROM nodes_fts WHERE book_id = ?`,
+  // 删除一律经 fts_docs 映射命中 rowid；book_id / node_id 在 FTS 里是 UNINDEXED 列，
+  // 直接按它们过滤会全表扫描，写入路径上逐节点执行时表现为随章数二次方增长。
+  'fts.docsInsert': `INSERT OR REPLACE INTO fts_docs(node_id, book_id) VALUES(?, ?)`,
+  'fts.deleteByNode': `DELETE FROM nodes_fts WHERE rowid IN (SELECT rowid FROM fts_docs WHERE node_id = ?)`,
+  'fts.docsDeleteByNode': `DELETE FROM fts_docs WHERE node_id = ?`,
+  'fts.insert': `INSERT INTO nodes_fts(rowid, book_id, node_id, type, title, content)
+         SELECT d.rowid, ?, ?, ?, ?, ? FROM fts_docs d WHERE d.node_id = ?`,
+  'fts.deleteByBook': `DELETE FROM nodes_fts WHERE rowid IN (SELECT rowid FROM fts_docs WHERE book_id = ?)`,
+  'fts.docsDeleteByBook': `DELETE FROM fts_docs WHERE book_id = ?`,
   'fts.deleteAll': `DELETE FROM nodes_fts`,
+  'fts.docsDeleteAll': `DELETE FROM fts_docs`,
   'fts.search': `SELECT book_id, node_id, type, title,
               snippet(nodes_fts, 4, '[', ']', '…', 16) AS snip, rank,
               EXISTS (SELECT 1 FROM attrs a
