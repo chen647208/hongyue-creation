@@ -32,10 +32,13 @@ export const launchApp = async (userDataDir: string): Promise<{ app: ElectronApp
     if (!page) await new Promise((r) => setTimeout(r, 500));
   }
   expect(page, '应用窗口未出现（仅有 DevTools）').toBeTruthy();
-  // 固定窗口尺寸：CI/无头环境默认窗口过窄会把写作区压成 0 宽，交互失败
+  // 固定窗口尺寸：CI/无头环境默认窗口过窄会把写作区压成 0 宽，交互失败。
+  // 开发模式主进程会停靠 DevTools，吃掉约 550px 视口宽度（1400 只剩 829），
+  // 先关掉它，让 1400 真正落到桌面档（≥1100）；窄视口用例自行改窗口尺寸。
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
+      win.webContents.closeDevTools();
       win.setSize(1400, 900);
       win.center();
     }
@@ -123,9 +126,9 @@ export const createBook = async (page: Page): Promise<void> => {
  * 进入工作区写作区：若在书籍库则点开书、关掉助手侧栏、进写作区并保证有章节、等编辑器就绪。
  *
  * 与 e2e/collaboration.spec.ts 长期共用的一套逻辑。三处易错点：
- * - reload 后 `view` 回到书籍库，`handwriteBypass` 重置；
- * - 分区快捷键 `Ctrl+5` 只受 view 门控、不受模型拦截影响；未配置模型时写作区被
- *   「先手写看看」整体挡住，先点掉它首章按钮才出现；
+ * - reload 后 `view` 回到书籍库；`handwriteBypass` 按安装持久化，上次点过就不再拦截；
+ * - 分区快捷键 `Ctrl+5` 只受 view 门控、不受模型拦截影响；未配置模型且没点过豁免时，
+ *   写作区被「先手写看看」整体挡住，先点掉它首章按钮才出现；
  * - `.catch(() => undefined)` 会吞掉点击失败，最终只表现为编辑器不出现——全部改为显式等待。
  */
 export const enterWritingArea = async (page: Page): Promise<void> => {
@@ -144,13 +147,16 @@ export const enterWritingArea = async (page: Page): Promise<void> => {
       .click({ timeout: 10_000 });
   }
 
+  // 工作台已进入的标志：顶栏助手开关。拦截页与已豁免时都渲染；
+  // 不再拿「先手写看看」当标志——豁免按安装持久化，重启后它不会出现。
+  await expect(
+    page.getByRole('button', { name: /开关 AI 侧边栏|Toggle AI sidebar/ }).first(),
+  ).toBeVisible({ timeout: 30_000 });
+
   // 关闭助手侧栏
   await page.keyboard.press('Control+j').catch(() => undefined);
 
-  // 工作台已进入的标志：手写豁免按钮（未配置模型）或首章创建按钮（已豁免）
-  await expect(handwrite.or(createChapter).first()).toBeVisible({ timeout: 30_000 });
-
-  // 模型未配置时写作区被整体拦截：先解除豁免，再切到写作区
+  // 模型未配置且没点过豁免时写作区被整体拦截：先解除豁免，再切回写作区
   await page.keyboard.press('Control+5').catch(() => undefined);
   if (await handwrite.isVisible().catch(() => false)) {
     await handwrite.click({ timeout: 10_000 });

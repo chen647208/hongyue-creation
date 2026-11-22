@@ -86,8 +86,6 @@ const App: React.FC = () => {
   const [view, setView] = useState<'bookshelf' | 'workspace'>('bookshelf');
   const [section, setSection] = useState<SectionId>('inspiration');
   const [structureSub, setStructureSub] = useState<'outline' | 'chapters' | undefined>(undefined);
-  // 手写豁免（D1）：App 层持有，重挂切分区不丢；仅重置/删书时清除
-  const [handwriteBypass, setHandwriteBypass] = useState(false);
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
   const [focusCharacterId, setFocusCharacterId] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
@@ -118,6 +116,9 @@ const App: React.FC = () => {
   const prompts = useSettingsStore(s => s.prompts);
   const theme = useSettingsStore(s => s.theme);
   const activeModel = useUsableModel();
+  // 手写豁免（D1）：用户主动选择过「先手写看看」，按安装持久化；仅重置/删书时清除。
+  // 配好模型后 modelBlocked 自然为 false，AI 入口恢复，不依赖本标记。
+  const handwriteBypass = useSettingsStore(s => s.handwriteBypass);
 
   // 字体应用单点：界面字体写 body，正文字体挂 --font-reading 供画布/预览消费
   const uiFont = useSettingsStore(s => s.uiFont);
@@ -158,7 +159,9 @@ const App: React.FC = () => {
     setSection('inspiration'); setEditingChapterId(null); setView('workspace');
   }, []);
   const bumpReset = useCallback(() => {
-    setSection('inspiration'); setEditingChapterId(null); setHandwriteBypass(false); setResetKey(k => k + 1);
+    setSection('inspiration'); setEditingChapterId(null);
+    useSettingsStore.getState().setHandwriteBypass(false);
+    setResetKey(k => k + 1);
   }, []);
   const actions = useBookActions(enterWorkspace);
   const handleExportCover = useCallback((book: Project) => {
@@ -355,7 +358,7 @@ const App: React.FC = () => {
             section={section}
             structureSub={structureSub}
             handwriteBypass={handwriteBypass}
-            onHandwriteBypass={() => setHandwriteBypass(true)}
+            onHandwriteBypass={() => useSettingsStore.getState().setHandwriteBypass(true)}
             activeProject={activeProject}
             activeModel={activeModel}
             prompts={prompts}
