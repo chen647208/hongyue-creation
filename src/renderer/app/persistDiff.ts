@@ -13,7 +13,7 @@ import type { CommitOptions } from '../shared/services/repository/types';
 
 /** 非项目配置切片键（settings + meta），用于差分持久化。 */
 const NON_PROJECT_KEYS = [
-  'models', 'prompts', 'cardPrompts', 'consistencyPrompts', 'consistencyCheckConfig',
+  'providers', 'models', 'prompts', 'cardPrompts', 'consistencyPrompts', 'consistencyCheckConfig',
   'embeddingModels', 'activeProjectId', 'activeModelId', 'activeEmbeddingModelId', 'language', 'theme',
   'uiFont', 'editorFont', 'customFonts', 'mcpServers', 'tts',
   'uiFontSize', 'editorFontSize', 'editorLineHeight',

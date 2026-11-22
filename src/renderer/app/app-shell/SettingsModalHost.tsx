@@ -25,6 +25,7 @@ interface SettingsModalHostProps {
 }
 
 const SettingsModalHost: React.FC<SettingsModalHostProps> = ({ onClose, onClearData }) => {
+  const providers = useSettingsStore(s => s.providers);
   const models = useSettingsStore(s => s.models);
   const activeModelId = useSettingsStore(s => s.activeModelId);
   const prompts = useSettingsStore(s => s.prompts);
@@ -47,6 +48,7 @@ const SettingsModalHost: React.FC<SettingsModalHostProps> = ({ onClose, onClearD
 
   return (
     <SettingsModal
+      providers={providers}
       models={models}
       activeModelId={activeModelId}
       prompts={prompts}
@@ -59,7 +61,7 @@ const SettingsModalHost: React.FC<SettingsModalHostProps> = ({ onClose, onClearD
       onThemeChange={actions.setTheme}
       onClose={handleClose}
       onClearData={onClearData}
-      onSaveModels={actions.setModels}
+      onSaveCatalog={actions.setCatalog}
       onSavePrompts={actions.setPrompts}
       onSaveCardPrompts={actions.setCardPrompts}
       onSaveConsistencyPrompts={actions.setConsistencyPrompts}

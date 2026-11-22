@@ -11,17 +11,24 @@ import { uuidv7 } from '@core/entities';
 
 import { dt, i18n, templateDisplayName } from '@/i18n';
 
-import type { CardPromptTemplate, EmbeddingModelConfig, ModelConfig, PromptTemplate } from '../../../shared/types';
+import type { CardPromptTemplate, EmbeddingModelConfig, ModelConfig, PromptTemplate, ProviderConfig } from '../../../shared/types';
 import { embeddingProviders, getDefaultEmbeddingParams } from '../../constants/embeddingProviders';
 import type { CardPromptImportResult, EmbeddingQuickAddTemplate } from './types';
 
-export const createNewModelConfig = (): ModelConfig => ({
-  id: Date.now().toString(),
-  name: i18n.t('settings:factories.newModel'),
+export const createNewProviderConfig = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({
+  id: `provider-${Date.now().toString(36)}`,
+  name: i18n.t('settings:factories.newProvider'),
   provider: 'openai-chat',
-  isEnabled: true,
   endpoint: '',
-  modelName: '',
+  ...over,
+});
+
+export const createNewModelConfig = (providerId: string, modelName = ''): ModelConfig => ({
+  id: `model-${Date.now().toString(36)}`,
+  name: modelName || i18n.t('settings:factories.newModel'),
+  providerId,
+  isEnabled: true,
+  modelName,
 });
 
 export const createNewPromptTemplate = (): PromptTemplate => ({

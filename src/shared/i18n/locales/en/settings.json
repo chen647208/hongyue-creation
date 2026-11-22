@@ -473,6 +473,7 @@
   },
   "factories": {
     "newModel": "New Model",
+    "newProvider": "New Provider",
     "newPolishTemplate": "New Polish Template",
     "newEmbeddingModel": "New Embedding Model",
     "newCharacterTemplate": "New Character Template",

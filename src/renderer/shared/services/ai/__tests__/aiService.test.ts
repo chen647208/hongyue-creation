@@ -25,6 +25,7 @@ import { AIService } from '../aiService';
 const model: ModelConfig = {
   id: 'm1',
   name: 'Test Model',
+  providerId: 'p1',
   provider: 'openai-chat',
   endpoint: 'https://example.com/v1',
   modelName: 'test-model',

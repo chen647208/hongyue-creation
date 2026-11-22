@@ -13,8 +13,9 @@
 - `components/GeneralSettingsPanel.tsx`：语言/主题/字体/快捷键/系统/代理（直写 store 即时生效）
 - `components/SystemPanel.tsx`：最小化到托盘 + 开机自启（经 `shellSync.ts` 下发主进程）
 - `components/ProxyPanel.tsx`：代理地址 + 连通测试（经 `shellSync.ts` 下发，网关与 Chromium 双覆盖）
-- `components/ModelSettingsPanel.tsx`：模型配置面板（`ModelSettings.tsx` 为入口组件）
-- `components/ProviderSidebar.tsx` + `ProviderEditor.tsx`：渠道侧栏与参数编辑
+- `components/ModelSettingsPanel.tsx`：模型设置面板（`ModelSettings.tsx` 为入口组件），左侧选供应商、右侧编辑该供应商下的模型
+- `components/ProviderSidebar.tsx`：供应商列表，每行显示协议/预设与模型数量
+- `components/ProviderEditor.tsx`：单个供应商的编辑区，含供应商名、渠道、地址、共享 Key 与模型行（名称/模型名/启用/删除），底部拉取列表与连通测试
 - `components/EmbeddingSettingsPanel.tsx` + `EmbeddingSidebar.tsx` + `EmbeddingEditor.tsx`：Embedding 配置
 - `components/TtsSettingsPanel.tsx`：朗读引擎（系统语音 / OpenAI 兼容 / Azure / ElevenLabs）、音色、语速音高与试听
 - `components/PromptTemplatesPanel.tsx`：提示词模板管理
@@ -35,6 +36,24 @@
 - `SettingsModal.tsx` 负责标签页切换、设置项收集和整体保存流程
 - 各 `Panel` 组件分别管理单一设置主题，降低设置弹窗复杂度
 - 服务层负责模型列表拉取、Embedding 配置读写和相关辅助逻辑
+
+## 模型与供应商
+
+模型设置按「供应商 → 模型」两层组织：一个供应商配一次地址和 Key，下面挂任意多个模型。
+
+1. **供应商**存 `AppState.providers`（SQLite settings 键 `providers`），字段有 `id`、显示名、协议
+   `provider`、预设 `presetId`、`endpoint`、`apiKey`（仅存 `vault:` 引用）、`availableModels`
+   及拉表时间/错误。地址和凭证只在这一层存一份。
+2. **模型**存 `AppState.models`（SQLite settings 键 `models`），字段有 `id`、显示名、`providerId`、
+   `modelName` 与采样参数；模型通过 `providerId` 归属供应商，不重复存地址和 Key。
+3. `shared/providers.ts` 负责两件事：`resolveModels` 在运行时把供应商的协议、地址、凭证和模型列表
+   贴到每个模型上，供设置页、网关与适配器直接使用；`stripResolvedModel` 在落盘前剥掉这些投影字段，
+   保证磁盘上只有一份凭证。
+4. `normalizeProvidersAndModels` 统一读取磁盘与导入的两类数据：带 `providers` 的按 `providerId`
+   归属；模型自带协议、预设、地址与凭证的扁平数据按「协议 + 预设 + 地址」聚合出供应商，凭证取组内
+   首个非空值；结构损坏（模型指向不存在的供应商）时补一个占位供应商，不丢模型。
+5. 编辑语义：删除供应商会一并删除其下模型并回收对应 Key 引用；修改供应商的协议、地址或 Key 会重算
+   其所有模型的投影；模型启用开关独立，只影响该模型在选择器里是否可选。
 
 ## 朗读（TTS）
 

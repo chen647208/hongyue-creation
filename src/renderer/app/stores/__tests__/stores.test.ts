@@ -136,6 +136,30 @@ describe('settingsStore + persistenceBridge', () => {
     expect(ops[0]).toMatchObject({ kind: 'deleteProject', id: 'b1' });
   });
 
+  it('setCatalog：按本次保存的供应商重新投影模型字段，并替换激活项', () => {
+    const providers = [
+      { id: 'p1', name: 'P', provider: 'anthropic' as const, endpoint: 'https://a', apiKey: 'vault:p1' },
+    ];
+    // 传入的模型仍带着上一次的投影字段：保存路径以供应商为准覆盖
+    useSettingsStore.getState().setCatalog(
+      providers,
+      [{ id: 'm1', name: 'M', providerId: 'p1', modelName: 'x', provider: 'openai-chat', apiKey: 'stale' }],
+      'm1',
+    );
+    const s = useSettingsStore.getState();
+    expect(s.providers).toEqual(providers);
+    expect(s.models[0]).toMatchObject({
+      id: 'm1', providerId: 'p1', provider: 'anthropic', endpoint: 'https://a', apiKey: 'vault:p1',
+    });
+    expect(s.activeModelId).toBe('m1');
+  });
+
+  it('composeAppState：模型未变时复用同一份落盘数组（退出刷盘不产生空写）', () => {
+    const first = composeAppState();
+    const second = composeAppState();
+    expect(second.models).toBe(first.models);
+  });
+
   it('startPersistenceBridge 幂等：重复启动只叠一组订阅，解绑可安全重复调用', async () => {
     const { startPersistenceBridge } = await import('../persistenceBridge');
     const un1 = startPersistenceBridge();

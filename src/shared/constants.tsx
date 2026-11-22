@@ -8,7 +8,7 @@
  */
 
 
-import { type ModelConfig, type PromptTemplate } from './types';
+import { type ModelConfig, type PromptTemplate, type ProviderConfig } from './types';
 
 export const DEFAULT_PROMPTS: PromptTemplate[] = [
   {
@@ -110,104 +110,25 @@ export const DEFAULT_PROMPTS: PromptTemplate[] = [
  * 默认激活 DeepSeek V4 Pro；未填 Key 前 isModelConfigured 判为未配置，触发首启引导。
  * 小说创作偏发散，统一给出显式温度 1.0（Anthropic 适配器会收敛到其 0–1 上限）。
  */
+export const INITIAL_PROVIDERS: ProviderConfig[] = [
+  { id: 'provider-deepseek', name: 'DeepSeek', provider: 'openai-chat', presetId: 'deepseek', endpoint: 'https://api.deepseek.com/v1', availableModels: ['deepseek-v4-pro', 'deepseek-v4-flash'] },
+  { id: 'provider-kimi', name: 'Kimi', provider: 'openai-chat', presetId: 'kimi', endpoint: 'https://api.moonshot.cn/v1', availableModels: ['kimi-k3', 'kimi-k2.6', 'kimi-k2.5'] },
+  { id: 'provider-zhipu', name: 'GLM', provider: 'openai-chat', presetId: 'zhipu', endpoint: 'https://open.bigmodel.cn/api/paas/v4', availableModels: ['glm-5.3', 'glm-5.2', 'glm-4.7'] },
+  { id: 'provider-qwen', name: '通义千问', provider: 'openai-chat', presetId: 'qwen', endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1', availableModels: ['qwen3.8-max', 'qwen3.8-flash', 'qwen3.7-plus'] },
+  { id: 'provider-minimax', name: 'MiniMax', provider: 'anthropic', presetId: 'minimax', endpoint: 'https://api.minimaxi.com/anthropic/v1', availableModels: ['MiniMax-M3', 'MiniMax-M2.7'] },
+  { id: 'provider-gemini', name: 'Gemini', provider: 'gemini', presetId: 'gemini', endpoint: '', availableModels: ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash'] },
+  { id: 'provider-anthropic', name: 'Anthropic', provider: 'anthropic', presetId: 'anthropic', endpoint: 'https://api.anthropic.com', availableModels: ['claude-sonnet-5', 'claude-opus-5', 'claude-sonnet-4-6'] },
+  { id: 'provider-openai', name: 'OpenAI', provider: 'openai-chat', presetId: 'openai', endpoint: 'https://api.openai.com/v1', availableModels: ['gpt-5.6', 'gpt-5.5', 'gpt-5.4-mini'] },
+];
+
 export const INITIAL_MODELS: ModelConfig[] = [
-  {
-    id: 'default-deepseek',
-    name: 'DeepSeek V4 Pro',
-    provider: 'openai-chat',
-    presetId: 'deepseek',
-    endpoint: 'https://api.deepseek.com/v1',
-    modelName: 'deepseek-v4-pro',
-    availableModels: ['deepseek-v4-pro', 'deepseek-v4-flash'],
-    temperature: 1.0,
-    supportsStreaming: true,
-  },
-  {
-    id: 'deepseek-flash',
-    name: 'DeepSeek V4 Flash',
-    provider: 'openai-chat',
-    presetId: 'deepseek',
-    endpoint: 'https://api.deepseek.com/v1',
-    modelName: 'deepseek-v4-flash',
-    availableModels: ['deepseek-v4-pro', 'deepseek-v4-flash'],
-    temperature: 1.0,
-    supportsStreaming: true,
-  },
-  {
-    id: 'kimi-k3',
-    name: 'Kimi K3',
-    provider: 'openai-chat',
-    presetId: 'kimi',
-    endpoint: 'https://api.moonshot.cn/v1',
-    modelName: 'kimi-k3',
-    availableModels: ['kimi-k3', 'kimi-k2.6', 'kimi-k2.5'],
-    temperature: 1.0,
-    supportsStreaming: true,
-  },
-  {
-    id: 'glm-5.3',
-    name: 'GLM-5.3',
-    provider: 'openai-chat',
-    presetId: 'zhipu',
-    endpoint: 'https://open.bigmodel.cn/api/paas/v4',
-    modelName: 'glm-5.3',
-    availableModels: ['glm-5.3', 'glm-5.2', 'glm-4.7'],
-    temperature: 1.0,
-    supportsStreaming: true,
-  },
-  {
-    id: 'qwen3.8-max',
-    name: '通义千问 Qwen3.8 Max',
-    provider: 'openai-chat',
-    presetId: 'qwen',
-    endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    modelName: 'qwen3.8-max',
-    availableModels: ['qwen3.8-max', 'qwen3.8-flash', 'qwen3.7-plus'],
-    temperature: 1.0,
-    supportsStreaming: true,
-  },
-  {
-    id: 'minimax-m3',
-    name: 'MiniMax M3',
-    provider: 'anthropic',
-    presetId: 'minimax',
-    endpoint: 'https://api.minimaxi.com/anthropic/v1',
-    modelName: 'MiniMax-M3',
-    availableModels: ['MiniMax-M3', 'MiniMax-M2.7'],
-    temperature: 1.0,
-    supportsStreaming: true,
-  },
-  {
-    id: 'gemini-3.7-flash',
-    name: 'Gemini 3.7 Flash',
-    provider: 'gemini',
-    presetId: 'gemini',
-    endpoint: '',
-    modelName: 'gemini-3.7-flash',
-    availableModels: ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash'],
-    temperature: 1.0,
-    supportsStreaming: true,
-  },
-  {
-    id: 'claude-sonnet-5',
-    name: 'Claude Sonnet 5',
-    provider: 'anthropic',
-    presetId: 'anthropic',
-    endpoint: 'https://api.anthropic.com',
-    modelName: 'claude-sonnet-5',
-    availableModels: ['claude-sonnet-5', 'claude-opus-5', 'claude-sonnet-4-6'],
-    temperature: 1.0,
-    supportsStreaming: true,
-  },
-  {
-    id: 'gpt-5.6',
-    name: 'GPT-5.6',
-    provider: 'openai-chat',
-    presetId: 'openai',
-    endpoint: 'https://api.openai.com/v1',
-    modelName: 'gpt-5.6',
-    availableModels: ['gpt-5.6', 'gpt-5.5', 'gpt-5.4-mini'],
-    temperature: 1.0,
-    supportsStreaming: true,
-  },
+  { id: 'default-deepseek', name: 'DeepSeek V4 Pro', providerId: 'provider-deepseek', modelName: 'deepseek-v4-pro', temperature: 1.0, supportsStreaming: true },
+  { id: 'deepseek-flash', name: 'DeepSeek V4 Flash', providerId: 'provider-deepseek', modelName: 'deepseek-v4-flash', temperature: 1.0, supportsStreaming: true },
+  { id: 'kimi-k3', name: 'Kimi K3', providerId: 'provider-kimi', modelName: 'kimi-k3', temperature: 1.0, supportsStreaming: true },
+  { id: 'glm-5.3', name: 'GLM-5.3', providerId: 'provider-zhipu', modelName: 'glm-5.3', temperature: 1.0, supportsStreaming: true },
+  { id: 'qwen3.8-max', name: '通义千问 Qwen3.8 Max', providerId: 'provider-qwen', modelName: 'qwen3.8-max', temperature: 1.0, supportsStreaming: true },
+  { id: 'minimax-m3', name: 'MiniMax M3', providerId: 'provider-minimax', modelName: 'MiniMax-M3', temperature: 1.0, supportsStreaming: true },
+  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', providerId: 'provider-gemini', modelName: 'gemini-3.7-flash', temperature: 1.0, supportsStreaming: true },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', providerId: 'provider-anthropic', modelName: 'claude-sonnet-5', temperature: 1.0, supportsStreaming: true },
+  { id: 'gpt-5.6', name: 'GPT-5.6', providerId: 'provider-openai', modelName: 'gpt-5.6', temperature: 1.0, supportsStreaming: true },
 ];

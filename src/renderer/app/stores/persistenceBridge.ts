@@ -20,6 +20,7 @@ import { canonicalHash } from '@core/sync';
 import { dt } from '@/i18n';
 
 import { APP_STATE_VERSION } from '../../../shared/constants/versions';
+import { stripResolvedModel } from '../../../shared/providers';
 import { type AppState, type Chapter, type StorageConfig } from '../../../shared/types';
 import { autoBackupService } from '../../shared/services/autoBackupService';
 import { emitPluginEvent, hasPluginScriptSubscribers } from '../../shared/services/pluginEventBus';
@@ -32,6 +33,21 @@ import { persistDiff,type PersistOp } from '../persistDiff';
 import { commitMetaOf,useProjectStore } from './projectStore';
 import { useSettingsStore } from './settingsStore';
 
+/**
+ * 落盘模型条目的引用缓存：模型数组未变时复用同一个剥离结果。
+ *
+ * 每次都在这里新建数组会让差分比较永远判定 models 变化，退出刷盘也要写一次设置，
+ * 页签卸载时这笔写可能停在 BEGIN 之后，主进程连接卡在未提交事务里。
+ */
+let strippedModelsCache: { source: ReturnType<typeof useSettingsStore.getState>['models']; value: AppState['models'] } | null = null;
+
+function composeModels(s: ReturnType<typeof useSettingsStore.getState>): AppState['models'] {
+  if (strippedModelsCache?.source === s.models) return strippedModelsCache.value;
+  const value = s.models.map((model) => stripResolvedModel(model));
+  strippedModelsCache = { source: s.models, value };
+  return value;
+}
+
 /** 把两个 store 的当前值组合为逻辑 AppState（供导出/一致性哨兵使用）。 */
 export function composeAppState(): AppState {
   const p = useProjectStore.getState();
@@ -40,7 +56,9 @@ export function composeAppState(): AppState {
     schemaVersion: APP_STATE_VERSION,
     projects: p.projects,
     activeProjectId: p.activeProjectId,
-    models: s.models,
+    providers: s.providers,
+    // 运行时投影只存在于内存：落盘只写模型条目，供应商字段由 providers 单一持有
+    models: composeModels(s),
     prompts: s.prompts,
     activeModelId: s.activeModelId,
     embeddingModels: s.embeddingModels,

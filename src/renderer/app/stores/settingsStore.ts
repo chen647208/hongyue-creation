@@ -17,15 +17,20 @@
 import { create } from 'zustand';
 
 import { DEFAULT_TTS_CONFIG } from '../../../shared/constants/tts';
-import { type AppLanguage, type AppState, type AppTheme, type CardPromptTemplate, type ConsistencyCheckPromptTemplate, type CustomFontMeta, type EmbeddingModelConfig, type McpServerConfig, type ModelConfig, type PromptTemplate, type ProxyConfig, type TtsConfig } from '../../../shared/types';
+import { resolveModels, stripResolvedModel } from '../../../shared/providers';
+import { type AppLanguage, type AppState, type AppTheme, type CardPromptTemplate, type ConsistencyCheckPromptTemplate, type CustomFontMeta, type EmbeddingModelConfig, type McpServerConfig, type PromptTemplate, type ProviderConfig, type ProxyConfig, type ResolvedModelConfig, type TtsConfig } from '../../../shared/types';
 import { changeLanguage } from '../../i18n';
 import { applyTheme } from '../../shared/services/themeService';
 import { INITIAL_APP_STATE } from '../initialState';
 
 type ConsistencyConfig = NonNullable<AppState['consistencyCheckConfig']>;
 
+
 interface SettingsState {
-  models: ModelConfig[];
+  /** 供应商（地址与凭证的唯一真源）。 */
+  providers: ProviderConfig[];
+  /** 运行时投影：每个模型已贴上所属供应商的协议/地址/凭证。 */
+  models: ResolvedModelConfig[];
   activeModelId: string | null;
   prompts: PromptTemplate[];
   cardPrompts: CardPromptTemplate[];
@@ -48,7 +53,8 @@ interface SettingsState {
   autoLaunch: boolean | undefined;
   /** 从 repository 载入的初始状态整体灌入（首启动/全量导入）。 */
   hydrate: (patch: Partial<SettingsState>) => void;
-  setModels: (models: ModelConfig[], activeModelId: string | null) => void;
+  /** 保存供应商与模型：models 收运行时投影，落盘前由持久化桥剥离供应商字段。 */
+  setCatalog: (providers: ProviderConfig[], models: ResolvedModelConfig[], activeModelId: string | null) => void;
   /** 全局助手/顶栏切换模型时直写，消除 GlobalAssistant 私设 currentModelId 分叉。 */
   setActiveModelId: (activeModelId: string | null) => void;
   setPrompts: (prompts: PromptTemplate[]) => void;
@@ -72,6 +78,7 @@ interface SettingsState {
 }
 
 const {
+  providers: INIT_PROVIDERS,
   models: INIT_MODELS,
   activeModelId: INIT_ACTIVE_MODEL_ID,
   prompts: INIT_PROMPTS,
@@ -81,7 +88,8 @@ const {
 } = INITIAL_APP_STATE;
 
 export const useSettingsStore = create<SettingsState>()((set) => ({
-  models: INIT_MODELS,
+  providers: INIT_PROVIDERS,
+  models: resolveModels(INIT_PROVIDERS, INIT_MODELS),
   activeModelId: INIT_ACTIVE_MODEL_ID,
   prompts: INIT_PROMPTS,
   cardPrompts: INIT_CARD_PROMPTS,
@@ -103,7 +111,12 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   minimizeToTray: undefined,
   autoLaunch: undefined,
   hydrate: (patch) => set(patch),
-  setModels: (models, activeModelId) => set({ models, activeModelId }),
+  setCatalog: (providers, models, activeModelId) => set({
+    providers,
+    // 供应商字段是投影：以本次保存的供应商为准重新贴一遍，避免调用方漏带
+    models: resolveModels(providers, models.map(stripResolvedModel)),
+    activeModelId,
+  }),
   setActiveModelId: (activeModelId) => set({ activeModelId }),
   addCustomFont: (meta) => set((s) => ({ customFonts: [...s.customFonts, meta] })),
   removeCustomFont: (id) => set((s) => ({ customFonts: s.customFonts.filter((c) => c.id !== id) })),
@@ -137,7 +150,7 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
  * 可用模型单源选择器：已启用 && 已配置，跳过停用项。
  * 各 Step/弹窗直读它，不再经 App→View→Step 层层透传 activeModel。
  */
-export function useUsableModel(): ModelConfig | undefined {
+export function useUsableModel(): ResolvedModelConfig | undefined {
   const models = useSettingsStore((s) => s.models);
   const activeModelId = useSettingsStore((s) => s.activeModelId);
   return (

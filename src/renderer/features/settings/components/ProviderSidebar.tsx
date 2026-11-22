@@ -16,15 +16,15 @@ import { Input } from '@/shared/ui/Input';
 import { SegmentedControl } from '@/shared/ui/ViewModeToggle';
 import { cn } from '@/shared/utils/cn';
 
-import type { ModelConfig } from '../../../../shared/types';
+import type { ProviderConfig, ResolvedModelConfig } from '../../../../shared/types';
 import { findProviderPreset } from '../../../constants/modelProviders';
 import { channelValueFor } from '../utils/channelPreset';
-import { isProviderEnabled } from '../utils/providerHealth';
 
 export type ProviderFilter = 'all' | 'enabled' | 'disabled' | 'unconfigured';
 
 interface ProviderSidebarProps {
-  models: ModelConfig[];
+  providers: ProviderConfig[];
+  models: ResolvedModelConfig[];
   selectedId: string | null;
   activeId: string | null;
   query: string;
@@ -35,27 +35,32 @@ interface ProviderSidebarProps {
   testResults: Record<string, string>;
 }
 
-function statusDot(model: ModelConfig, testResult: string | undefined): React.ReactNode {
+function statusDot(testResult: string | undefined): React.ReactNode {
   if (testResult?.startsWith('[ERROR]')) return <AlertCircle className="size-3.5 shrink-0 text-destructive" />;
   if (testResult && !testResult.startsWith('[ERROR]')) return <CheckCircle2 className="size-3.5 shrink-0 text-success" />;
-  return (
-    <span
-      className={cn(
-        'size-2 shrink-0 rounded-full',
-        isProviderEnabled(model) ? 'bg-success' : 'bg-muted-foreground/30'
-      )}
-    />
-  );
+  return <span className="size-2 shrink-0 rounded-full bg-muted-foreground/30" />;
 }
 
 /**
- * 左侧 Provider 列表（对标 Cherry Studio ProviderList）：
- * 搜索 + 启用/未启用/未配置过滤 + 状态点 + 渠道名，一次只选一个在右侧编辑。
+ * 左侧供应商列表：搜索 + 过滤 + 状态点 + 供应商名与模型数，一次只选一个在右侧编辑。
+ * 过滤的「启用/未启用」按该供应商下是否存在已启用模型判定。
  */
 export const ProviderSidebar: React.FC<ProviderSidebarProps> = ({
-  models, selectedId, activeId, query, filter, onQuery, onFilter, onSelect, testResults,
+  providers, models, selectedId, activeId, query, filter, onQuery, onFilter, onSelect, testResults,
 }) => {
   const { t } = useTranslation('settings');
+
+  const filtered = providers.filter((provider) => {
+    const own = models.filter((m) => m.providerId === provider.id);
+    const anyEnabled = own.some((m) => m.isEnabled !== false);
+    if (filter === 'enabled' && !anyEnabled) return false;
+    if (filter === 'disabled' && anyEnabled) return false;
+    if (filter === 'unconfigured' && own.some((m) => m.modelName.trim())) return false;
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return `${provider.name} ${provider.endpoint ?? ''} ${own.map((m) => m.modelName).join(' ')}`.toLowerCase().includes(q);
+  });
+
   return (
     <div className="hidden w-64 shrink-0 flex-col gap-3 md:flex">
       <div className="relative">
@@ -64,7 +69,7 @@ export const ProviderSidebar: React.FC<ProviderSidebarProps> = ({
           className="pl-8 text-xs"
           value={query}
           onChange={(e) => onQuery(e.target.value)}
-          placeholder={t('models.searchPlaceholder', '搜索渠道 / 模型…')}
+          placeholder={t('models.searchPlaceholder', '搜索供应商 / 模型…')}
         />
       </div>
       <SegmentedControl
@@ -76,38 +81,38 @@ export const ProviderSidebar: React.FC<ProviderSidebarProps> = ({
           label: t(`models.filter.${f}`, f),
         }))}
       />
-      <div className=" -mx-1 flex-1 space-y-1 overflow-y-auto px-1 pb-1">
-        {models.map((model) => {
-          const preset = findProviderPreset(channelValueFor(model));
-          const selected = selectedId === model.id;
-          const enabled = isProviderEnabled(model);
+      <div className="-mx-1 flex-1 space-y-1 overflow-y-auto px-1 pb-1">
+        {filtered.map((provider) => {
+          const preset = findProviderPreset(channelValueFor(provider));
+          const selected = selectedId === provider.id;
+          const own = models.filter((m) => m.providerId === provider.id);
+          const activeHere = own.some((m) => m.id === activeId);
           return (
             <button
-              key={model.id}
-              onClick={() => onSelect(model.id)}
+              key={provider.id}
+              onClick={() => onSelect(provider.id)}
               className={cn(
                 'flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors',
                 selected ? 'border-primary/40 bg-primary/5' : 'border-transparent hover:bg-accent/50'
               )}
             >
-              {statusDot(model, testResults[model.id])}
+              {statusDot(testResults[provider.id])}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-foreground">
-                  {model.name || t('models.namePlaceholder')}
+                  {provider.name || t('models.namePlaceholder')}
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
-                  {preset ? dt(preset.nameKey) : model.provider}
-                  {model.modelName ? ` · ${model.modelName}` : ''}
-                  {!enabled && ` · ${t('models.disabled', '已停用')}`}
-                  {model.id === activeId && ` · ${t('models.activeBadge')}`}
+                  {preset ? dt(preset.nameKey) : provider.provider}
+                  {` · ${t('models.modelCount', '{{count}} 个模型', { count: own.length })}`}
+                  {activeHere && ` · ${t('models.activeBadge')}`}
                 </span>
               </span>
             </button>
           );
         })}
-        {models.length === 0 && (
+        {filtered.length === 0 && (
           <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-            {t('models.emptyFilter', '没有匹配的渠道，换个关键词试试')}
+            {t('models.emptyFilter', '没有匹配的供应商，换个关键词试试')}
           </div>
         )}
       </div>

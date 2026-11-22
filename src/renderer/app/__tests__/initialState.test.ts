@@ -10,6 +10,7 @@
 import { describe, expect,it } from 'vitest';
 
 import { APP_STATE_VERSION } from '../../../shared/constants/versions';
+import { resolveModels } from '../../../shared/providers';
 import type { AppState, Project } from '../../../shared/types';
 import { checkImportVersion,INITIAL_APP_STATE, normalizeImportedState } from '../initialState';
 
@@ -22,7 +23,8 @@ describe('normalizeImportedState', () => {
       const s = normalizeImportedState(input);
       expect(s.projects).toEqual([]);
       expect(s.activeProjectId).toBeNull();
-      expect(s.models).toBe(INITIAL_APP_STATE.models);
+      expect(s.models).toEqual(INITIAL_APP_STATE.models);
+      expect(s.providers).toEqual(INITIAL_APP_STATE.providers);
       expect(s.prompts).toBe(INITIAL_APP_STATE.prompts);
       expect(s.activeModelId).toBe('default-deepseek');
       expect(s.embeddingModels).toEqual([]);
@@ -32,7 +34,7 @@ describe('normalizeImportedState', () => {
   it('非数组字段回退到默认值', () => {
     const s = normalizeImportedState({ projects: 'nope', models: 42 } as unknown as Partial<AppState>);
     expect(s.projects).toEqual([]);
-    expect(s.models).toBe(INITIAL_APP_STATE.models);
+    expect(s.models).toEqual(INITIAL_APP_STATE.models);
   });
 
   it('有项目但缺少有效 activeProjectId 时选中第一个', () => {
@@ -89,36 +91,39 @@ describe('INITIAL_APP_STATE 内置模型种子', () => {
   it('内置 9 个模型，默认激活 DeepSeek V4 Pro', () => {
     expect(INITIAL_APP_STATE.models).toHaveLength(9);
     expect(INITIAL_APP_STATE.activeModelId).toBe('default-deepseek');
-    const active = INITIAL_APP_STATE.models.find((m) => m.id === INITIAL_APP_STATE.activeModelId);
+    const active = resolveModels(INITIAL_APP_STATE.providers, INITIAL_APP_STATE.models)
+      .find((m) => m.id === INITIAL_APP_STATE.activeModelId);
     expect(active?.modelName).toBe('deepseek-v4-pro');
     expect(active?.provider).toBe('openai-chat');
   });
 
-  it('每个模型 provider 合法、modelName 非空、id 唯一', () => {
+  it('每个模型都归属一个合法供应商，modelName 非空、id 唯一', () => {
     const ids = new Set<string>();
+    const providerById = new Map(INITIAL_APP_STATE.providers.map((p) => [p.id, p]));
     for (const m of INITIAL_APP_STATE.models) {
-      expect(VALID_PROVIDERS.has(m.provider)).toBe(true);
+      expect(providerById.has(m.providerId)).toBe(true);
+      expect(VALID_PROVIDERS.has(providerById.get(m.providerId)!.provider)).toBe(true);
       expect(m.modelName.length).toBeGreaterThan(0);
       expect(ids.has(m.id)).toBe(false);
       ids.add(m.id);
     }
   });
 
-  it('官方渠道均预置 presetId；除 gemini 外均预置 endpoint', () => {
-    for (const m of INITIAL_APP_STATE.models) {
-      expect(m.presetId).toBeTruthy();
-      if (m.provider !== 'gemini') {
-        expect(m.endpoint && m.endpoint.length).toBeGreaterThan(0);
+  it('内置供应商均预置 presetId；除 gemini 外均预置 endpoint', () => {
+    for (const p of INITIAL_APP_STATE.providers) {
+      expect(p.presetId).toBeTruthy();
+      if (p.provider !== 'gemini') {
+        expect(p.endpoint && p.endpoint.length).toBeGreaterThan(0);
       }
     }
   });
 
   it('覆盖四种协议 + 五家国内渠道', () => {
-    const providers = new Set(INITIAL_APP_STATE.models.map((m) => m.provider));
-    expect(providers.has('openai-chat')).toBe(true);
-    expect(providers.has('anthropic')).toBe(true);
-    expect(providers.has('gemini')).toBe(true);
-    const presetIds = new Set(INITIAL_APP_STATE.models.map((m) => m.presetId));
+    const protocols = new Set(INITIAL_APP_STATE.providers.map((p) => p.provider));
+    expect(protocols.has('openai-chat')).toBe(true);
+    expect(protocols.has('anthropic')).toBe(true);
+    expect(protocols.has('gemini')).toBe(true);
+    const presetIds = new Set(INITIAL_APP_STATE.providers.map((p) => p.presetId));
     for (const cn of ['deepseek', 'kimi', 'zhipu', 'qwen', 'minimax']) {
       expect(presetIds.has(cn)).toBe(true);
     }

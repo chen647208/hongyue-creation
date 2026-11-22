@@ -50,6 +50,7 @@ const baseState = (projects: Project[]): AppState => ({
   schemaVersion: APP_STATE_VERSION,
   projects,
   activeProjectId: projects[0]?.id ?? null,
+  providers: [],
   models: [{ id: 'm1', name: '模型1' } as never],
   prompts: [],
   activeModelId: 'm1',

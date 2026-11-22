@@ -238,6 +238,7 @@ export class SqliteRepository implements StorageRepository {
       schemaVersion: APP_STATE_VERSION,
       projects,
       activeProjectId: meta.get('activeProjectId') ?? null,
+      providers: parse('providers') ?? [],
       models: parse('models') ?? [],
       prompts: parse('prompts') ?? [],
       activeModelId: meta.get('activeModelId') ?? null,

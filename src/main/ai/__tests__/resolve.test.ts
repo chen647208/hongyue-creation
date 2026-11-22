@@ -17,7 +17,7 @@ import { openAIResponsesAdapter } from '../adapters/openai-responses.js';
 import { resolveAdapter } from '../resolve.js';
 
 const model = (provider: ModelProvider): ModelConfig =>
-  ({ id: 'm', name: 'M', provider, modelName: 'x' });
+  ({ id: 'm', name: 'M', providerId: 'p', provider, modelName: 'x' });
 
 describe('resolveAdapter 协议映射', () => {
   it('gemini 走原生适配器', () => {

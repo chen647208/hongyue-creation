@@ -7,7 +7,7 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import type { ModelConfig } from '../../../shared/types';
+import type { ProviderConfig, ResolvedModelConfig } from '../../../shared/types';
 import { findProviderPreset } from '../../constants/modelProviders';
 
 /**
@@ -21,7 +21,7 @@ import { findProviderPreset } from '../../constants/modelProviders';
  * 用于首启引导：默认模型对象虽存在，但未填凭证时不应放行到生成流程，
  * 而应引导用户去设置，避免直接吃到生硬的接口报错。
  */
-export function isModelConfigured(model: ModelConfig | null | undefined): boolean {
+export function isModelConfigured(model: ResolvedModelConfig | null | undefined): boolean {
   if (!model) return false;
   const hasEndpoint = Boolean(model.endpoint && model.endpoint.trim());
   const hasKey = Boolean(model.apiKey && model.apiKey.trim());
@@ -47,8 +47,29 @@ export function isModelConfigured(model: ModelConfig | null | undefined): boolea
  * 与 Cherry Studio 的 provider.isEnabled 语义一致。
  * 类型谓词：返回 true 时调用方可直接把模型当 ModelConfig 用。
  */
-export function isModelUsable(model: ModelConfig | null | undefined): model is ModelConfig {
+export function isModelUsable(model: ResolvedModelConfig | null | undefined): model is ResolvedModelConfig {
   if (!model) return false;
   if (model.isEnabled === false) return false;
   return isModelConfigured(model);
+}
+
+/** 供应商是否已具备调用条件（地址/Key 按协议判定），用于测试连通与拉取模型列表。 */
+export function isProviderConfigured(provider: ProviderConfig | null | undefined): boolean {
+  if (!provider) return false;
+  const hasEndpoint = Boolean(provider.endpoint && provider.endpoint.trim());
+  const hasKey = Boolean(provider.apiKey && provider.apiKey.trim());
+  const preset = provider.presetId ? findProviderPreset(provider.presetId) : undefined;
+  const isOfficial = preset ? preset.official : Boolean(provider.presetId);
+  switch (provider.provider) {
+    case 'gemini':
+      return hasKey;
+    case 'ollama':
+      return hasEndpoint;
+    case 'openai-chat':
+    case 'openai-responses':
+    case 'anthropic':
+      return hasEndpoint && (isOfficial ? hasKey : true);
+    default:
+      return false;
+  }
 }

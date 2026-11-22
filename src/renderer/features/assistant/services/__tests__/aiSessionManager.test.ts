@@ -27,7 +27,7 @@ vi.mock('@/shared/services/knowledge/vectorIntegrationService.js', () => ({
 import type { ModelConfig, Project } from '../../../../../shared/types';
 import { AiSessionManager } from '../aiSessionManager';
 
-const model: ModelConfig = { id: 'm', name: 'M', provider: 'openai-chat', modelName: 'test' };
+const model: ModelConfig = { id: 'm', name: 'M', providerId: 'p', provider: 'openai-chat', modelName: 'test' };
 const project = { title: '测试书' } as unknown as Project;
 
 describe('AiSessionManager', () => {

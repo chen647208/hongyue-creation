@@ -18,20 +18,23 @@ import type {
   EmbeddingModelConfig,
   ModelConfig,
   PromptTemplate,
+  ProviderConfig,
+  ResolvedModelConfig,
   StorageConfig,
   TtsConfig,
 } from '../../../shared/types';
 import type { ModelProviderInfo } from '../../constants/modelProviders';
 
 export interface SettingsModalProps {
-  models: ModelConfig[];
+  providers: ProviderConfig[];
+  models: ResolvedModelConfig[];
   activeModelId: string | null;
   prompts: PromptTemplate[];
   cardPrompts?: CardPromptTemplate[];
   consistencyPrompts?: ConsistencyCheckPromptTemplate[];
   tts?: TtsConfig;
   consistencyCheckConfig?: ConsistencyCheckConfig;
-  onSaveModels: (models: ModelConfig[], activeId: string) => void;
+  onSaveCatalog: (providers: ProviderConfig[], models: ResolvedModelConfig[], activeId: string) => void;
   onSavePrompts: (prompts: PromptTemplate[]) => void;
   onSaveCardPrompts?: (cardPrompts: CardPromptTemplate[]) => void;
   onSaveConsistencyPrompts?: (prompts: ConsistencyCheckPromptTemplate[]) => void;
@@ -93,17 +96,21 @@ export interface EmbeddingSettingsPanelProps {
 }
 
 export interface ModelSettingsPanelProps {
-  localModels: ModelConfig[];
+  localProviders: ProviderConfig[];
+  localModels: ResolvedModelConfig[];
   activeId: string | null;
   setActiveId: React.Dispatch<React.SetStateAction<string | null>>;
   testingId: string | null;
   testResults: Record<string, string>;
   modelListLoading: Record<string, boolean>;
+  addProvider: () => void;
+  removeProvider: (id: string) => void;
+  updateProvider: (id: string, updates: Partial<ProviderConfig>) => void;
+  addModel: (providerId: string) => void;
   removeModel: (id: string) => void;
   updateModel: (id: string, updates: Partial<ModelConfig>) => void;
-  testModel: (model: ModelConfig) => void | Promise<void>;
-  fetchModelList: (model: ModelConfig) => void | Promise<void>;
-  addModel: () => void;
+  testProvider: (provider: ProviderConfig) => void | Promise<void>;
+  fetchModelList: (provider: ProviderConfig) => void | Promise<void>;
 }
 
 export interface PromptTemplatesPanelProps {
@@ -163,17 +170,21 @@ export interface SettingsTabContentProps {
   activeTab: SettingsTab;
   tts: TtsConfig;
   onTtsChange: (tts: TtsConfig) => void;
-  localModels: ModelConfig[];
+  localProviders: ProviderConfig[];
+  localModels: ResolvedModelConfig[];
   activeId: string | null;
   setActiveId: React.Dispatch<React.SetStateAction<string | null>>;
   testingId: string | null;
   testResults: Record<string, string>;
   modelListLoading: Record<string, boolean>;
+  addProvider: () => void;
+  removeProvider: (id: string) => void;
+  updateProvider: (id: string, updates: Partial<ProviderConfig>) => void;
+  addModel: (providerId: string) => void;
   removeModel: (id: string) => void;
   updateModel: (id: string, updates: Partial<ModelConfig>) => void;
-  testModel: (model: ModelConfig) => void | Promise<void>;
-  fetchModelList: (model: ModelConfig) => void | Promise<void>;
-  addModel: () => void;
+  testProvider: (provider: ProviderConfig) => void | Promise<void>;
+  fetchModelList: (provider: ProviderConfig) => void | Promise<void>;
   localPrompts: PromptTemplate[];
   setLocalPrompts: React.Dispatch<React.SetStateAction<PromptTemplate[]>>;
   updatePrompt: (id: string, updates: Partial<PromptTemplate>) => void;

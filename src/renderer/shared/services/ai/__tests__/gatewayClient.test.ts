@@ -22,7 +22,7 @@ import { gatewayComplete,gatewayStream } from '../gatewayClient';
 type Listener = (event: AiStreamEvent) => void;
 
 const model = (over: Partial<ModelConfig> = {}): ModelConfig =>
-  ({ id: 'm', name: 'M', provider: 'openai-chat', modelName: 'x', ...over });
+  ({ id: 'm', name: 'M', providerId: 'p', provider: 'openai-chat', modelName: 'x', ...over });
 
 let listener: Listener | null = null;
 const gateway = {
