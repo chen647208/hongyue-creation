@@ -153,7 +153,7 @@
 | crelt | 1.0.7 | MIT |
 | css-select | 5.2.2 | BSD-2-Clause |
 | css-what | 6.2.2 | BSD-2-Clause |
-| csstype | 3.2.3 | MIT |
+| csstype | 3.2.4 | MIT |
 | data-uri-to-buffer | 4.0.1 | MIT |
 | debug | 4.4.3 | MIT |
 | decode-named-character-reference | 1.3.0 | MIT |
