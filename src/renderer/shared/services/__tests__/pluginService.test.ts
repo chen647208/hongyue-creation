@@ -8,7 +8,8 @@
  */
 
 import { SkillCatalog } from '@core/ai';
-import { BuildProfileRegistry, EventBus, FormulaRegistry, type RendererDescriptor, RendererRegistry, type ScriptDescriptor, ScriptRegistry } from '@core/plugin';
+import { BuildProfileRegistry, EventBus, FormulaRegistry, type RendererDescriptor, RendererRegistry, type SandboxRunResult, type ScriptDescriptor, ScriptRegistry } from '@core/plugin';
+import type { SandboxRunRequest } from '@shared/sandbox';
 import { afterEach,beforeEach, describe, expect, it, vi } from 'vitest';
 
 const files: Record<string, string> = {
@@ -32,6 +33,7 @@ description: 社区黄金三章扩展写法。触发词：社区开篇
 
 vi.mock('@/shared/services/repository', () => ({}));
 
+import { runQuickJS } from '../../../../main/app/pluginSandbox/quickjsRunner.js';
 import { commandRegistry } from '../commandRegistry';
 import { bootstrapPlugins, readPluginCatalog, runPluginLogic,setTrustedPluginKeys } from '../pluginService';
 import { uiSlotRegistry } from '../uiSlots';
@@ -715,6 +717,53 @@ describe('插件命令贡献（docs/design/04 §4.1）', () => {
     expect(request.code).toContain('runGolden');
 
     host.disable(PLUGIN_ID);
+    expect(commandRegistry.get(COMMAND_ID)).toBeUndefined();
+  });
+
+  it('点击命令：真实 QuickJS 执行 logic 具名函数并回传结构化结果', async () => {
+    setTrustedPluginKeys(['k']);
+    const pluginFiles = root({
+      commands: [{ id: '写作.黄金三章', title: '黄金三章', keywords: '开篇 三章', function: 'runGolden' }],
+    });
+    // 具名函数返回结构化对象，验证 QuickJS 内的真实计算与 JSON 回传。
+    pluginFiles[`/data/plugins/${PLUGIN_ID}/logic/handler.js`] =
+      'function runGolden(input) { return { title: "黄金三章", count: 3, received: input }; }';
+
+    let lastRequest: SandboxRunRequest | undefined;
+    let lastResult: SandboxRunResult | undefined;
+    // 测试替身只把 IPC/utilityProcess 换成同进程的真实执行器，其余门与装配保持真实。
+    stubPluginFs(pluginFiles, async (request) => {
+      lastRequest = request as SandboxRunRequest;
+      lastResult = await runQuickJS(lastRequest);
+      return lastResult;
+    });
+
+    const host = await bootstrapPlugins(deps(), '2.0.0', []);
+    try {
+      expect(host.list().find((status) => status.id === PLUGIN_ID)?.state).toBe('active');
+      const command = commandRegistry.get(COMMAND_ID);
+      expect(command?.title).toBe('黄金三章');
+
+      command?.run();
+      await vi.waitFor(() => expect(lastResult).toBeDefined(), { timeout: 10_000 });
+
+      // 命令点击走空对象入参；QuickJS 按 function 字段挑出具名函数并返回结构化结果。
+      expect(lastRequest?.input).toEqual({});
+      expect(lastRequest?.code).toContain('runGolden');
+      expect(lastResult).toMatchObject({
+        ok: true,
+        output: { title: '黄金三章', count: 3, received: {} },
+      });
+
+      // runPluginLogic 的返回路径（命令 run 内部调用的同一函数）：结果经能力裁决原样回传。
+      const direct = await runPluginLogic(PLUGIN_ID, 'runGolden', { volume: 1 });
+      expect(direct).toMatchObject({
+        ok: true,
+        output: { title: '黄金三章', count: 3, received: { volume: 1 } },
+      });
+    } finally {
+      host.disable(PLUGIN_ID);
+    }
     expect(commandRegistry.get(COMMAND_ID)).toBeUndefined();
   });
 
