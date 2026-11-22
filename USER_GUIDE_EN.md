@@ -57,7 +57,7 @@
    - Without a model you can still handwrite; AI buttons explain the missing model
 
 2. **Create your first book**:
-   - On first launch a wizard pops up; click "Skip" to create a blank book (stay in the library, click the card to enter; picking a persona also opens model settings)
+   - On first launch a wizard pops up; click "Skip" to create a blank book (stay in the library, click the card to enter; without a model, click "Write by hand" in the writing area to start)
    - Afterwards, click "New Book" in the library (creates a blank book straight into the workspace)
    - Or "From Template" (blank / duplicate / sample)
    - Type your initial idea in the inspiration section, click "Generate Title & Synopsis"
@@ -280,7 +280,8 @@ Hongyue Creation uses five sections guiding you through a complete novel (switch
 
 **Options**:
 1. **Channel & keys**:
-   - Add official channels with Keys, or OpenAI-compatible gateways / local Ollama models
+   - One provider stores its endpoint and Key once and can hold several models (e.g. DeepSeek Pro and Flash share one Key)
+   - Add official channels, or OpenAI-compatible gateways / local Ollama models; fetch the provider's model list in one click
    - Test connection status
 
 2. **Parameters**:
@@ -296,7 +297,7 @@ Hongyue Creation uses five sections guiding you through a complete novel (switch
 **What**: browse all AI generations.
 
 **Access**:
-1. Once history exists, a "History" button appears in the top bar (hidden when empty)
+1. Click "History" in the top bar (always present; the sidebar shows an empty state when there are no records); the current chapter's history button sits in the toolbar and is greyed out when empty
 2. Browse records by time, or switch to the session event stream for Agent runs
 3. Filter by step or chapter
 4. Reuse past generations
