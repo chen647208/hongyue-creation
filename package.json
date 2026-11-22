@@ -83,7 +83,9 @@
     "eslint-plugin-jsx-a11y": {
       "eslint": "$eslint"
     },
-    "minimatch": "^11.0.9"
+    "electron-builder": {
+      "minimatch": "^11.0.9"
+    }
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
