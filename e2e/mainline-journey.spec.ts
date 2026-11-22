@@ -41,3 +41,21 @@ test('先手写看看跨重启保留：再次进写作区不再被模型拦截',
     cleanupUserDataDir(userDataDir);
   }
 });
+
+test('首启向导点「开始写」直接进工作台，不自动弹设置', async () => {
+  const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-e2e-journey-'));
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    const start = page.getByRole('button', { name: /^开始写$|^Start writing$/ });
+    await expect(start).toBeVisible({ timeout: 30_000 });
+    await start.click();
+
+    const settingsDialog = page.getByRole('dialog', { name: /控制台配置|Console Settings/ });
+    // 建书后直接落到工作台：未配置模型时是拦截页，首章入口在写作区；设置弹窗不自动出现
+    await expect(page.getByRole('button', { name: /先手写看看|Write by hand/ })).toBeVisible({ timeout: 30_000 });
+    await expect(settingsDialog).toHaveCount(0);
+  } finally {
+    await app.close();
+    cleanupUserDataDir(userDataDir);
+  }
+});

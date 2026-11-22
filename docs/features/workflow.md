@@ -19,6 +19,13 @@
 - `src/renderer/app/app-shell/Bookshelf.tsx`：书籍库（列表/搜索/新建/导入），卡片点进工作台
 - `src/renderer/features/books/NewBookModal.tsx`：新建、复制模板等创建方式
 
+## 首启向导
+
+- 无书且没走过向导时弹出 `src/renderer/app/app-shell/OnboardingModal.tsx`：一屏选人群（手写 / AI 辅助 / 全 AI）并填书名。
+- 「跳过」按手写人群建书；「开始写」按所选人群建书后直接进工作台，不自动打开设置。
+  未配置模型时由写作区拦截页的「去设置」进入配置。
+- 是否走过向导记在 `localStore`；建书结果进项目 store。
+
 ## 流程分段
 
 ### 1. 书籍管理

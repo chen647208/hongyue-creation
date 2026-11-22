@@ -280,12 +280,8 @@ const App: React.FC = () => {
   const handleOnboardingDone = useCallback((persona: OnboardingPersona, title: string) => {
     markOnboardingDone(persona);
     setShowOnboarding(false);
-    if (persona === 'hand') {
-      actions.createBook(title);
-    } else {
-      actions.createBook(title);
-      setIsSettingsOpen(true);
-    }
+    // 各人群都直接进工作台；配模型走拦截页的「去设置」，不在建书后自动弹整座设置。
+    actions.createBook(title);
   }, [actions]);
 
   const assistantNode = availableFeatures.has(ASSISTANT_FEATURE_ID) ? (
