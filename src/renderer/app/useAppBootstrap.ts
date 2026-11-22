@@ -65,6 +65,7 @@ export function hydrateStoresFromState(state: typeof INITIAL_APP_STATE): void {
     proxy: state.proxy,
     minimizeToTray: state.minimizeToTray,
     autoLaunch: state.autoLaunch,
+    handwriteBypass: state.handwriteBypass ?? false,
   });
 }
 

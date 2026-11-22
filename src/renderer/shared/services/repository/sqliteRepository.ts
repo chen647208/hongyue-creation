@@ -263,6 +263,8 @@ export class SqliteRepository implements StorageRepository {
     if (Array.isArray(customFonts)) state.customFonts = customFonts;
     const tts = parse<AppState['tts']>('tts');
     if (tts) state.tts = tts;
+    const handwriteBypass = parse<boolean>('handwriteBypass');
+    if (typeof handwriteBypass === 'boolean') state.handwriteBypass = handwriteBypass;
 
     // 惰性载入：仅活动书当场 hydrate，其余保持骨架（打开时再载入）。
     if (state.activeProjectId) {

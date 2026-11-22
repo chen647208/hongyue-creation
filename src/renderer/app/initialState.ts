@@ -30,6 +30,7 @@ export const INITIAL_APP_STATE: AppState = {
     mode: 'rule',
     selectedPromptTemplates: {},
   },
+  handwriteBypass: false,
 };
 
 export type ResetModalState = {
@@ -99,6 +100,7 @@ export const normalizeImportedState = (imported: Partial<AppState> | null | unde
     proxy: src.proxy && typeof src.proxy.url === 'string' ? { url: src.proxy.url } : undefined,
     minimizeToTray: typeof src.minimizeToTray === 'boolean' ? src.minimizeToTray : undefined,
     autoLaunch: typeof src.autoLaunch === 'boolean' ? src.autoLaunch : undefined,
+    handwriteBypass: typeof src.handwriteBypass === 'boolean' ? src.handwriteBypass : false,
   };
 };
 

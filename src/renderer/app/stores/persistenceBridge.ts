@@ -79,6 +79,7 @@ export function composeAppState(): AppState {
     proxy: s.proxy,
     minimizeToTray: s.minimizeToTray,
     autoLaunch: s.autoLaunch,
+    handwriteBypass: s.handwriteBypass,
   };
 }
 

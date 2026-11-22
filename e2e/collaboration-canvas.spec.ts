@@ -74,10 +74,15 @@ async function enterWorkspaceFromBookshelf(page: Page): Promise<void> {
       .first()
       .click({ timeout: 15_000 });
   }
+  // 工作台就绪信号用顶栏助手开关：豁免按安装持久化，第二个窗口不会再出现「先手写看看」。
+  await expect(
+    page.getByRole('button', { name: /开关 AI 侧边栏|Toggle AI sidebar/ }).first(),
+  ).toBeVisible({ timeout: 30_000 });
   const handwrite = page.getByRole('button', { name: /先手写看看|Write by hand/ }).first();
-  await expect(handwrite).toBeVisible({ timeout: 30_000 });
-  await handwrite.click({ timeout: 10_000 });
-  await expect(handwrite).toBeHidden({ timeout: 10_000 });
+  if (await handwrite.isVisible({ timeout: 10_000 }).catch(() => false)) {
+    await handwrite.click({ timeout: 10_000 });
+    await expect(handwrite).toBeHidden({ timeout: 10_000 });
+  }
   // 写作区常驻「创作参考面板」侧栏会占宽并把画布挤出可视区，先收起（Ctrl+J 只是全局助手开关，
   // 对常驻侧栏无效；快捷键写作区也无对应项，故点击其标题栏的收起按钮）。
   const collapseSidebar = page.getByRole('button', { name: /收起参考面板|Collapse reference panel/ }).first();

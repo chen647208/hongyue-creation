@@ -14,9 +14,13 @@
 
 import { useEffect, useState } from 'react';
 
-import { MOBILE_MAX_WIDTH, resolveViewportTier, type ViewportTier } from '@/shared/utils/layout';
+import { MOBILE_MAX_WIDTH, resolveViewportTier, TABLET_MAX_WIDTH, type ViewportTier } from '@/shared/utils/layout';
 
-const MOBILE_QUERY = `(max-width: ${MOBILE_MAX_WIDTH}px)`;
+/** 两个档位边界都要订阅：宽度在手机档以上变化时也要重算（例如 1024 → 1200）。 */
+const TIER_QUERIES = [
+  `(max-width: ${MOBILE_MAX_WIDTH}px)`,
+  `(max-width: ${TABLET_MAX_WIDTH}px)`,
+];
 
 function readTier(): ViewportTier {
   if (typeof window === 'undefined') return 'desktop';
@@ -31,9 +35,9 @@ export function useViewportTier(): ViewportTier {
     const update = () => setTier(readTier());
     update();
     if (typeof window.matchMedia === 'function') {
-      const query = window.matchMedia(MOBILE_QUERY);
-      query.addEventListener('change', update);
-      return () => query.removeEventListener('change', update);
+      const queries = TIER_QUERIES.map((q) => window.matchMedia(q));
+      queries.forEach((query) => query.addEventListener('change', update));
+      return () => queries.forEach((query) => query.removeEventListener('change', update));
     }
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
