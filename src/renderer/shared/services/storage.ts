@@ -8,7 +8,6 @@
  */
 
 import { i18n } from '@/i18n';
-import { dialogService } from '@/shared/services/dialogService';
 import { localStore } from '@/shared/services/localStore';
 import { toast } from '@/shared/services/toastService';
 
@@ -198,7 +197,7 @@ export const storage = {
         
         if (!result.canceled && result.filePath) {
           await window.electronAPI.writeFile(result.filePath, JSON.stringify(state));
-          dialogService.alert(i18n.t('app:storage.exportAllSuccess'));
+          toast.success(i18n.t('app:storage.exportAllSuccess', { path: result.filePath }));
         }
       } catch (error) {
         logger.error('Failed to export data:', error);

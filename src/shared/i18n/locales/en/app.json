@@ -70,7 +70,7 @@
     "loadFailed": "Failed to load app data ({{message}}). Check the data directory in Settings → Storage, or restore from a backup.",
     "exportAllTitle": "Export Project Data",
     "importAllTitle": "Import Project Data",
-    "exportAllSuccess": "Data exported successfully!",
+    "exportAllSuccess": "All data exported successfully to: {{path}}",
     "jsonFilter": "JSON Files",
     "allFilesFilter": "All Files"
   },

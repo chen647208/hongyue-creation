@@ -163,4 +163,27 @@ describe('storage 往返（Electron 模式）', () => {
     expect(message).toContain('导出成功');
     expect(message).toContain(filePath);
   });
+
+  it('exportData 成功时发带保存路径的 toast，不弹阻塞确认框', async () => {
+    const state = sampleState();
+    const filePath = '/tmp/novalist-backup-2026-11-22.json';
+    (globalThis as any).window = {
+      electronAPI: {
+        ...electron.api,
+        saveFileDialog: async () => ({ canceled: false, filePath }),
+      },
+    };
+    const successSpy = vi.spyOn(toast, 'success').mockReturnValue(1);
+    const alertSpy = vi.spyOn(dialogService, 'alert').mockImplementation(() => {});
+
+    const { storage } = await import('../storage');
+    await storage.exportData(state);
+
+    expect(electron.files.get(filePath)).toBe(JSON.stringify(state));
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(successSpy).toHaveBeenCalledTimes(1);
+    const message = successSpy.mock.calls[0]![0];
+    expect(message).toContain('全部数据导出成功');
+    expect(message).toContain(filePath);
+  });
 });
