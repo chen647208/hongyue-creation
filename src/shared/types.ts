@@ -24,23 +24,46 @@ export type AppLanguage = 'zh' | 'en';
 /** 界面主题：浅色 / 深色 / 跟随系统。 */
 export type AppTheme = 'light' | 'dark' | 'system';
 
+/** 供应商：一家服务的地址与凭证，一个供应商下挂多个模型。 */
+export interface ProviderConfig {
+  id: string;
+  /** 展示名，默认取渠道预设名，用户可改。 */
+  name: string;
+  provider: ModelProvider;
+  /** 渠道预设 id：官方（deepseek/kimi/…）与自定义兼容协议（custom-openai/…）通用。 */
+  presetId?: string;
+  endpoint?: string;
+  /** Key 的 vault 引用或明文（仅主进程解引用）。 */
+  apiKey?: string;
+  /** 拉取到的模型列表与缓存时间；同一个供应商只请求一次。 */
+  availableModels?: string[];
+  modelsLastFetched?: number;
+  modelsFetchError?: string;
+}
+
 export interface ModelConfig {
   id: string;
   name: string;
-  provider: ModelProvider;
-  /** 渠道预设 id：官方（deepseek/kimi/…）与自定义兼容协议（custom-openai/…）通用，决定下拉选中与官方性判定 */
-  presetId?: string;
-  /** 是否在选择器/生成流程中启用。缺省视为启用，保证老数据兼容。 */
+  /** 所属供应商；供应商删除时连同其模型一并删除。 */
+  providerId: string;
+  /** 是否在选择器/生成流程中启用。缺省视为启用。 */
   isEnabled?: boolean;
+  modelName: string;
+
+  // ── 运行时投影字段（由所属供应商注入，落盘只写 providers）──
+  provider?: ModelProvider;
+  presetId?: string;
   endpoint?: string;
   apiKey?: string;
-  modelName: string;
-  
+  availableModels?: string[];
+  modelsLastFetched?: number;
+  modelsFetchError?: string;
+
   // AI模型参数配置（新增可选字段）
   temperature?: number;      // 温度控制：0.0-2.0，默认0.7
   maxTokens?: number;       // 最大输出令牌数，默认由模型决定
   systemPrompt?: string;    // 系统提示词，用于指导模型行为
-  
+
   // 流式支持标志
   supportsStreaming?: boolean;
   /** 视觉支持：false 显式关闭；缺席按支持处理（主流对话模型均支持） */
@@ -49,16 +72,13 @@ export interface ModelConfig {
   priceInPerM?: number;
   /** 自定义输出单价（美元 / 100 万 token）；缺省不参与费用估算。 */
   priceOutPerM?: number;
-  
+
   // 默认输出模式（新增）
   defaultOutputMode?: OutputMode;
-  
-  // 模型列表自动获取相关字段
-  availableModels?: string[];          // 可用的模型列表
-  modelsLastFetched?: number;          // 上次获取模型列表的时间戳
-  modelsFetchError?: string;           // 获取模型列表时的错误信息
-  isFetchingModels?: boolean;          // 是否正在获取模型列表
 }
+
+/** 运行时投影：模型 + 所属供应商的协议、地址与凭证。渲染层内存态与网关请求使用该形状。 */
+export type ResolvedModelConfig = ModelConfig;
 
 // AI响应类型
 export interface AIResponse {
@@ -1063,6 +1083,8 @@ export interface AppState {
   schemaVersion: number;
   projects: Project[];
   activeProjectId: string | null;
+  /** 供应商（地址 + 凭证 + 模型列表缓存）。 */
+  providers: ProviderConfig[];
   models: ModelConfig[];
   prompts: PromptTemplate[];
   activeModelId: string | null;

@@ -25,13 +25,15 @@ import {
   type EmbeddingModelConfig,
   type ModelConfig,
   type PromptTemplate,
+  type ProviderConfig,
+  type ResolvedModelConfig,
   type StorageConfig,
   type TtsConfig,
 } from '../../../shared/types';
 import type { ModelProviderInfo } from '../../constants/modelProviders';
 import { repository } from '../../shared/services/repository';
 import { logger } from '../../shared/utils/logger';
-import { isModelConfigured } from '../../shared/utils/modelReadiness';
+import { isProviderConfigured } from '../../shared/utils/modelReadiness';
 import SettingsModalFooter from './components/SettingsModalFooter';
 import SettingsModalHeader from './components/SettingsModalHeader';
 import SettingsTabContent from './components/SettingsTabContent';
@@ -42,6 +44,7 @@ import {
   createNewCardPromptTemplate,
   createNewModelConfig,
   createNewPromptTemplate,
+  createNewProviderConfig,
   createQuickAddEmbeddingConfig,
   duplicateCardPromptTemplate,
   importCardPromptTemplates,
@@ -55,14 +58,15 @@ import type {
   SettingsTab,
 } from './types';
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ 
-  models, 
-  activeModelId, 
+const SettingsModal: React.FC<SettingsModalProps> = ({
+  providers,
+  models,
+  activeModelId,
   prompts, 
   cardPrompts = [],
   consistencyPrompts = [],
   tts,
-  onSaveModels, 
+  onSaveCatalog,
   onSavePrompts,
   onSaveCardPrompts,
   onSaveConsistencyPrompts,
@@ -75,7 +79,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onThemeChange
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>(DEFAULT_SETTINGS_TAB);
-  const [localModels, setLocalModels] = useState<ModelConfig[]>(models);
+  const [localProviders, setLocalProviders] = useState<ProviderConfig[]>(providers);
+  const [localModels, setLocalModels] = useState<ResolvedModelConfig[]>(models);
   const [activeId, setActiveId] = useState<string | null>(activeModelId);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, string>>({});
@@ -85,7 +90,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [modelListLoading, setModelListLoading] = useState<Record<string, boolean>>({});
 
   // 填好凭证后自动拉取实时模型列表所需的去抖定时器与「已尝试签名」记录
-  const localModelsRef = useRef<ModelConfig[]>(models);
+  const localProvidersRef = useRef<ProviderConfig[]>(providers);
+  const localModelsRef = useRef<ResolvedModelConfig[]>(models);
   const autoFetchTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const lastAutoFetchSig = useRef<Record<string, string>>({});
 
@@ -153,16 +159,42 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     void loadEmbeddingConfigs();
   }, []);
 
-  const addModel = () => {
-    const newModel = createNewModelConfig();
-    setLocalModels([...localModels, newModel]);
+  const addProvider = () => {
+    setLocalProviders([...localProviders, createNewProviderConfig()]);
+  };
+
+  const removeProvider = (id: string) => {
+    const removedModels = localModels.filter((m) => m.providerId === id);
+    setLocalProviders(localProviders.filter((p) => p.id !== id));
+    setLocalModels(localModels.filter((m) => m.providerId !== id));
+    if (removedModels.some((m) => m.id === activeId)) {
+      const next = localModels.find((m) => m.providerId !== id);
+      setActiveId(next?.id ?? null);
+    }
+    // vault 引用以供应商 id 为键：删供应商即删密钥，不留孤儿
+    void removeApiKey(id);
+  };
+
+  const updateProvider = (id: string, updates: Partial<ProviderConfig>) => {
+    const current = localProviders.find((p) => p.id === id);
+    if (!current) return;
+    const next = { ...current, ...updates };
+    setLocalProviders(localProviders.map((p) => (p.id === id ? next : p)));
+    // 供应商字段是投影：同组模型立即跟上新的协议/地址/Key/模型列表
+    setLocalModels(localModels.map((m) => (m.providerId === id
+      ? { ...m, provider: next.provider, presetId: next.presetId, endpoint: next.endpoint, apiKey: next.apiKey, availableModels: next.availableModels }
+      : m)));
+  };
+
+  const addModel = (providerId: string) => {
+    const provider = localProviders.find((p) => p.id === providerId);
+    const suggested = provider?.availableModels?.[0] ?? '';
+    setLocalModels([...localModels, createNewModelConfig(providerId, suggested)]);
   };
 
   const removeModel = (id: string) => {
     setLocalModels(localModels.filter(m => m.id !== id));
-    if (activeId === id) setActiveId(localModels[0]?.id || null);
-    // vault 引用以模型 id 为键：删配置即删密钥，不留孤儿
-    void removeApiKey(id);
+    if (activeId === id) setActiveId(localModels.find(m => m.id !== id)?.id || null);
   };
 
   const updateModel = (id: string, updates: Partial<ModelConfig>) => {
@@ -170,11 +202,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setLocalModels(updatedModels);
   };
 
-  const testModel = async (model: ModelConfig) => {
-    setTestingId(model.id);
-    setTestResults(prev => ({ ...prev, [model.id]: i18n.t('settings:models.connecting') }));
-    const result = await AIService.testConnection(model);
-    setTestResults(prev => ({ ...prev, [model.id]: result }));
+  const testProvider = async (provider: ProviderConfig) => {
+    const model = localModels.find((m) => m.providerId === provider.id);
+    if (!model) return;
+    setTestingId(provider.id);
+    setTestResults(prev => ({ ...prev, [provider.id]: i18n.t('settings:models.connecting') }));
+    const result = await AIService.testConnection({
+      ...model,
+      provider: provider.provider,
+      endpoint: provider.endpoint,
+      apiKey: provider.apiKey,
+    });
+    setTestResults(prev => ({ ...prev, [provider.id]: result }));
     setTestingId(null);
   };
 
@@ -182,24 +221,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // 不打扰用户；手动点「刷新/获取模型列表」时才回显错误。
   // 传入克隆对象给 ModelListService（它会就地改写 availableModels/modelsLastFetched/
   // modelsFetchError），避免污染 React 状态对象——错误是否回显完全由本函数决定。
-  const fetchModelList = async (model: ModelConfig, opts?: { silentOnError?: boolean }) => {
-    setModelListLoading(prev => ({ ...prev, [model.id]: true }));
+  const fetchModelList = async (provider: ProviderConfig, opts?: { silentOnError?: boolean }) => {
+    setModelListLoading(prev => ({ ...prev, [provider.id]: true }));
     try {
-      const probe = { ...model };
+      const probe = { ...provider };
       const models = await ModelListService.fetchModels(probe);
-      updateModel(model.id, {
+      updateProvider(provider.id, {
         availableModels: probe.availableModels ?? models,
         modelsLastFetched: probe.modelsLastFetched,
         modelsFetchError: undefined
       });
     } catch (error) {
       if (!opts?.silentOnError) {
-        updateModel(model.id, {
+        updateProvider(provider.id, {
           modelsFetchError: error instanceof Error ? error.message : i18n.t('settings:models.fetchListFailed')
         });
       }
     } finally {
-      setModelListLoading(prev => ({ ...prev, [model.id]: false }));
+      setModelListLoading(prev => ({ ...prev, [provider.id]: false }));
     }
   };
 
@@ -209,35 +248,36 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     fetchModelListRef.current = fetchModelList;
   });
 
-  // 保持 localModelsRef 指向最新模型数组，供定时器回调读取用户此刻的真实输入
+  // 保持 ref 指向最新输入，供定时器回调读取用户此刻的真实输入
   useEffect(() => {
+    localProvidersRef.current = localProviders;
     localModelsRef.current = localModels;
-  }, [localModels]);
+  }, [localProviders, localModels]);
 
-  // 填好 Key/端点后自动拉取官方或第三方实时模型列表；失败则静默保留内置推荐兜底。
-  // 以「协议|端点|Key」为签名去抖：输入停顿 900ms 后触发一次，同签名不重复请求。
+  // 填好 Key/端点后自动拉取实时模型列表；失败则静默保留内置推荐兜底。
+  // 以「协议|端点|Key」为签名去抖：输入停顿 900ms 后触发一次，同一供应商不重复请求。
   useEffect(() => {
-    for (const model of localModels) {
-      if (!isModelConfigured(model)) continue;
-      const sig = `${model.provider}|${model.endpoint ?? ''}|${model.apiKey ?? ''}`;
-      if (lastAutoFetchSig.current[model.id] === sig) continue;
+    for (const provider of localProviders) {
+      if (!isProviderConfigured(provider)) continue;
+      const sig = `${provider.provider}|${provider.endpoint ?? ''}|${provider.apiKey ?? ''}`;
+      if (lastAutoFetchSig.current[provider.id] === sig) continue;
       // 缓存仍有效：视为已处理，避免重复请求
-      if (model.modelsLastFetched && model.availableModels && Date.now() - model.modelsLastFetched < 60 * 60 * 1000) {
-        lastAutoFetchSig.current[model.id] = sig;
+      if (provider.modelsLastFetched && provider.availableModels && Date.now() - provider.modelsLastFetched < 60 * 60 * 1000) {
+        lastAutoFetchSig.current[provider.id] = sig;
         continue;
       }
-      if (autoFetchTimers.current[model.id]) clearTimeout(autoFetchTimers.current[model.id]);
-      autoFetchTimers.current[model.id] = setTimeout(() => {
-        delete autoFetchTimers.current[model.id];
-        const current = localModelsRef.current.find((m) => m.id === model.id);
-        if (!current || !isModelConfigured(current)) return;
+      if (autoFetchTimers.current[provider.id]) clearTimeout(autoFetchTimers.current[provider.id]);
+      autoFetchTimers.current[provider.id] = setTimeout(() => {
+        delete autoFetchTimers.current[provider.id];
+        const current = localProvidersRef.current.find((p) => p.id === provider.id);
+        if (!current || !isProviderConfigured(current)) return;
         const curSig = `${current.provider}|${current.endpoint ?? ''}|${current.apiKey ?? ''}`;
         if (lastAutoFetchSig.current[current.id] === curSig) return;
         lastAutoFetchSig.current[current.id] = curSig;
         void fetchModelListRef.current(current, { silentOnError: true });
       }, 900);
     }
-  }, [localModels]);
+  }, [localProviders]);
 
   // 卸载时清理所有待触发的自动获取定时器
   useEffect(() => () => {
@@ -325,17 +365,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleGlobalSave = async () => {
     // Key 入 vault：内存明文→引用，落盘只存引用；vault 不可用则明文回落并一次性提示
     let plainFallback = 0;
-    const vaultedModels = await Promise.all(
-      localModels.map(async (m) => {
-        if (!m.apiKey) {
+    const vaultedProviders = await Promise.all(
+      localProviders.map(async (provider) => {
+        if (!provider.apiKey) {
           // 清空即删密钥，不留孤儿
-          void removeApiKey(m.id);
-          return m;
+          void removeApiKey(provider.id);
+          return provider;
         }
-        if (isVaultRef(m.apiKey)) return m;
-        const { stored, encrypted } = await persistApiKey(m.id, m.apiKey);
+        if (isVaultRef(provider.apiKey)) return provider;
+        const { stored, encrypted } = await persistApiKey(provider.id, provider.apiKey);
         if (!encrypted) plainFallback += 1;
-        return { ...m, apiKey: stored };
+        return { ...provider, apiKey: stored };
       })
     );
     const vaultedEmbeddings = await Promise.all(
@@ -353,8 +393,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     if (plainFallback > 0) {
       dialogService.alert(i18n.t('settings:models.vaultUnavailable', { count: plainFallback }));
     }
-    // 保存模型配置
-    onSaveModels(vaultedModels, activeId || '');
+    // 保存供应商与模型
+    onSaveCatalog(vaultedProviders, localModels, activeId || '');
     
     // 保存提示词配置
     onSavePrompts(localPrompts);
@@ -479,17 +519,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
 
   const quickAddProviderModel = (provider: ModelProviderInfo) => {
-    const newModel: ModelConfig = {
-      id: Date.now().toString(),
-      name: i18n.t('settings:models.newModelName', { name: dt(provider.nameKey) }),
+    const newProvider = createNewProviderConfig({
+      name: dt(provider.nameKey),
       provider: provider.protocol,
-      isEnabled: true,
       presetId: provider.official ? provider.id : undefined,
       endpoint: provider.endpoint,
-      modelName: provider.recommendedModels[0] ?? '',
       availableModels: provider.recommendedModels.length ? [...provider.recommendedModels] : undefined,
-    };
+    });
+    const newModel = createNewModelConfig(newProvider.id, provider.recommendedModels[0] ?? '');
+    if (!newModel.name) newModel.name = i18n.t('settings:models.newModelName', { name: dt(provider.nameKey) });
 
+    setLocalProviders((current) => [...current, newProvider]);
     setLocalModels((currentModels) => [...currentModels, newModel]);
     setActiveId(newModel.id);
     setActiveTab('models');
@@ -501,6 +541,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const isDirty = (): boolean => {
     if (savedRef.current) return false;
     const cardsBaseline = cardPrompts.length > 0 ? cardPrompts : getDefaultCardPrompts();
+    if (JSON.stringify(localProviders) !== JSON.stringify(providers)) return true;
     if (JSON.stringify(localModels) !== JSON.stringify(models)) return true;
     if (activeId !== activeModelId) return true;
     if (JSON.stringify(localPrompts) !== JSON.stringify(prompts)) return true;
@@ -536,17 +577,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="min-h-0 flex-1 overflow-y-auto bg-background p-6">
           <SettingsTabContent
             activeTab={activeTab}
+            localProviders={localProviders}
             localModels={localModels}
             activeId={activeId}
             setActiveId={setActiveId}
             testingId={testingId}
             testResults={testResults}
             modelListLoading={modelListLoading}
+            addProvider={addProvider}
+            removeProvider={removeProvider}
+            updateProvider={updateProvider}
+            addModel={addModel}
             removeModel={removeModel}
             updateModel={updateModel}
-            testModel={testModel}
+            testProvider={testProvider}
             fetchModelList={fetchModelList}
-            addModel={addModel}
             localPrompts={localPrompts}
             setLocalPrompts={setLocalPrompts}
             updatePrompt={updatePrompt}

@@ -24,6 +24,7 @@ import { DEFAULT_TEMPERATURE } from '../types.js';
 const baseModel: ModelConfig = {
   id: 'm1',
   name: 'test',
+  providerId: 'p1',
   provider: 'openai-chat',
   endpoint: 'https://api.example.com/v1',
   apiKey: 'sk-test',

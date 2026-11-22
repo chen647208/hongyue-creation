@@ -9,71 +9,62 @@
 
 import { describe, expect,it } from 'vitest';
 
-import type { ModelConfig } from '../../../../../shared/types';
+import type { ProviderConfig } from '../../../../../shared/types';
 import { findProviderPreset,modelProviders } from '../../../../constants/modelProviders';
 import { channelGroups,channelPatch, channelValueFor } from '../channelPreset';
 
-const model = (over: Partial<ModelConfig>): ModelConfig =>
-  ({ id: 'm', name: 'M', provider: 'openai-chat', modelName: 'x', ...over });
+const provider = (over: Partial<ProviderConfig> = {}): ProviderConfig =>
+  ({ id: 'p', name: 'P', provider: 'openai-chat', ...over });
 
 describe('channelValueFor', () => {
   it('有效 presetId 直接命中', () => {
-    expect(channelValueFor(model({ provider: 'openai-chat', presetId: 'deepseek' }))).toBe('deepseek');
+    expect(channelValueFor(provider({ provider: 'openai-chat', presetId: 'deepseek' }))).toBe('deepseek');
   });
 
   it('未知 presetId 按协议回落', () => {
-    expect(channelValueFor(model({ provider: 'anthropic', presetId: 'ghost' }))).toBe('custom-anthropic');
+    expect(channelValueFor(provider({ provider: 'anthropic', presetId: 'ghost' }))).toBe('custom-anthropic');
   });
 
   it('无 presetId 时按协议映射到语义渠道', () => {
-    expect(channelValueFor(model({ provider: 'gemini' }))).toBe('gemini');
-    expect(channelValueFor(model({ provider: 'gemini', endpoint: 'https://proxy.example.com' }))).toBe('custom-gemini');
-    expect(channelValueFor(model({ provider: 'ollama' }))).toBe('ollama');
-    expect(channelValueFor(model({ provider: 'anthropic' }))).toBe('custom-anthropic');
-    expect(channelValueFor(model({ provider: 'openai-responses' }))).toBe('openai-responses');
-    expect(channelValueFor(model({ provider: 'openai-chat' }))).toBe('custom-openai');
+    expect(channelValueFor(provider({ provider: 'gemini' }))).toBe('gemini');
+    expect(channelValueFor(provider({ provider: 'gemini', endpoint: 'https://proxy.example.com' }))).toBe('custom-gemini');
+    expect(channelValueFor(provider({ provider: 'ollama' }))).toBe('ollama');
+    expect(channelValueFor(provider({ provider: 'anthropic' }))).toBe('custom-anthropic');
+    expect(channelValueFor(provider({ provider: 'openai-responses' }))).toBe('openai-responses');
+    expect(channelValueFor(provider({ provider: 'openai-chat' }))).toBe('custom-openai');
   });
 
   it('自定义 presetId 直接命中（含网关与 Gemini 自定义）', () => {
-    expect(channelValueFor(model({ provider: 'openai-chat', presetId: 'gateway-openai' }))).toBe('gateway-openai');
-    expect(channelValueFor(model({ provider: 'gemini', presetId: 'custom-gemini' }))).toBe('custom-gemini');
+    expect(channelValueFor(provider({ provider: 'openai-chat', presetId: 'gateway-openai' }))).toBe('gateway-openai');
+    expect(channelValueFor(provider({ provider: 'gemini', presetId: 'custom-gemini' }))).toBe('custom-gemini');
   });
 });
 
 describe('channelPatch', () => {
-  it('切到官方渠道：写入协议/presetId/端点/推荐模型，模型名不在列表则重置为首个推荐', () => {
+  it('切到官方渠道：写入协议/presetId/端点/推荐模型', () => {
     const preset = findProviderPreset('deepseek')!;
-    const patch = channelPatch(preset, model({ modelName: 'stale-model' }));
+    const patch = channelPatch(preset, provider({ name: '深度求索' }));
     expect(patch.provider).toBe('openai-chat');
     expect(patch.presetId).toBe('deepseek');
     expect(patch.endpoint).toBe('https://api.deepseek.com/v1');
     expect(patch.availableModels).toEqual(['deepseek-v4-pro', 'deepseek-v4-flash']);
-    expect(patch.modelName).toBe('deepseek-v4-pro');
+    // 用户改过名：保留
+    expect(patch.name).toBe('深度求索');
   });
 
-  it('当前模型名已在推荐列表时保留用户选择', () => {
-    const preset = findProviderPreset('deepseek')!;
-    const patch = channelPatch(preset, model({ modelName: 'deepseek-v4-flash' }));
-    expect(patch.modelName).toBeUndefined();
-  });
-
-  it('切到自定义渠道：保留 presetId 身份、清端点/availableModels，保留模型名', () => {
+  it('切到自定义渠道：保留 presetId 身份、清端点/availableModels', () => {
     const preset = findProviderPreset('custom-openai')!;
-    const patch = channelPatch(preset, model({ modelName: 'my-model', presetId: 'deepseek' }));
+    const patch = channelPatch(preset, provider({ presetId: 'deepseek' }));
     expect(patch.provider).toBe('openai-chat');
     expect(patch.presetId).toBe('custom-openai');
     expect(patch.endpoint).toBe('');
     expect(patch.availableModels).toBeUndefined();
-    expect(patch.modelName).toBeUndefined();
   });
 
-  it('不触碰 apiKey / temperature / maxTokens / systemPrompt', () => {
+  it('不触碰 apiKey', () => {
     const preset = findProviderPreset('anthropic')!;
-    const patch = channelPatch(preset, model({}));
+    const patch = channelPatch(preset, provider({ apiKey: 'vault:x' }));
     expect('apiKey' in patch).toBe(false);
-    expect('temperature' in patch).toBe(false);
-    expect('maxTokens' in patch).toBe(false);
-    expect('systemPrompt' in patch).toBe(false);
   });
 });
 

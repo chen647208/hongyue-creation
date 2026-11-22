@@ -7,9 +7,10 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { DEFAULT_PROMPTS, INITIAL_MODELS } from '../../shared/constants';
+import { DEFAULT_PROMPTS, INITIAL_MODELS, INITIAL_PROVIDERS } from '../../shared/constants';
 import { DEFAULT_TTS_CONFIG, normalizeTtsConfig } from '../../shared/constants/tts';
 import { APP_STATE_VERSION } from '../../shared/constants/versions';
+import { normalizeProvidersAndModels } from '../../shared/providers';
 import { type AppState } from '../../shared/types';
 import { getDefaultConsistencyPrompts } from '../constants/consistencyCheck';
 
@@ -17,6 +18,7 @@ export const INITIAL_APP_STATE: AppState = {
   schemaVersion: APP_STATE_VERSION,
   projects: [],
   activeProjectId: null,
+  providers: INITIAL_PROVIDERS,
   models: INITIAL_MODELS,
   prompts: DEFAULT_PROMPTS,
   activeModelId: 'default-deepseek',
@@ -65,11 +67,18 @@ export const normalizeImportedState = (imported: Partial<AppState> | null | unde
     activeProjectId = projects[0]?.id ?? null;
   }
 
+  const hasModels = Array.isArray(src.models);
+  const { providers, models } = normalizeProvidersAndModels(
+    Array.isArray(src.providers) ? src.providers : (hasModels ? undefined : INITIAL_APP_STATE.providers),
+    hasModels ? src.models : INITIAL_APP_STATE.models,
+  );
+
   return {
     schemaVersion: APP_STATE_VERSION,
     projects,
     activeProjectId,
-    models: Array.isArray(src.models) ? src.models : INITIAL_APP_STATE.models,
+    providers,
+    models,
     prompts: Array.isArray(src.prompts) ? src.prompts : INITIAL_APP_STATE.prompts,
     activeModelId: src.activeModelId || 'default-deepseek',
     embeddingModels: Array.isArray(src.embeddingModels) ? src.embeddingModels : [],

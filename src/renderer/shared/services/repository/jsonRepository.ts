@@ -22,6 +22,7 @@ const INITIAL_FALLBACK: AppState = {
   schemaVersion: APP_STATE_VERSION,
   projects: [],
   activeProjectId: null,
+  providers: [],
   models: [],
   prompts: [],
   activeModelId: null,

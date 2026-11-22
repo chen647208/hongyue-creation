@@ -10,132 +10,127 @@
 import { i18n } from '@/i18n';
 import { gatewayHttp } from '@/shared/services/ai/gatewayClient';
 
-import { type ModelConfig } from '../../../../shared/types';
+import { type ProviderConfig } from '../../../../shared/types';
 import { asRecord, asRecords, asStr } from '../../../shared/utils/loose';
 
 export class ModelListService {
   // 缓存时间：1小时
   private static readonly CACHE_DURATION = 60 * 60 * 1000;
-  
-  // 从模型提供商API获取模型列表
-  static async fetchModels(model: ModelConfig): Promise<string[]> {
+
+  // 从供应商 API 获取模型列表（同一供应商只请求一次，结果挂在供应商上）
+  static async fetchModels(provider: ProviderConfig): Promise<string[]> {
     // 检查缓存是否有效
-    if (this.isCacheValid(model)) {
-      return model.availableModels || [];
+    if (this.isCacheValid(provider)) {
+      return provider.availableModels || [];
     }
-    
-    // 标记为正在获取
-    model.isFetchingModels = true;
-    
+
     try {
       let models: string[] = [];
-      
+
       // Key 由主进程网关解引用注入，渲染端不持有明文
-      switch (model.provider) {
+      switch (provider.provider) {
         case 'openai-chat':
         case 'openai-responses':
-          models = await this.fetchFromOpenAICompatible(model);
+          models = await this.fetchFromOpenAICompatible(provider);
           break;
         case 'ollama':
-          models = await this.fetchFromOllama(model);
+          models = await this.fetchFromOllama(provider);
           break;
         case 'anthropic':
-          models = await this.fetchFromAnthropic(model);
+          models = await this.fetchFromAnthropic(provider);
           break;
         case 'gemini':
-          models = await this.fetchFromGemini(model);
+          models = await this.fetchFromGemini(provider);
           break;
         default:
           models = [];
       }
-      
+
       // 更新缓存：仅当拿到非空列表才覆盖既有（内置推荐）并写入缓存时间；
       // 空结果保留内置兜底，且不写时间以便下次重试。
       if (models.length > 0) {
-        model.availableModels = models;
-        model.modelsLastFetched = Date.now();
+        provider.availableModels = models;
+        provider.modelsLastFetched = Date.now();
       }
-      model.modelsFetchError = undefined;
+      provider.modelsFetchError = undefined;
 
-      return model.availableModels ?? models;
+      return provider.availableModels ?? models;
     } catch (error) {
-      model.modelsFetchError = error instanceof Error ? error.message : i18n.t('settings:models.fetchListFailed');
+      provider.modelsFetchError = error instanceof Error ? error.message : i18n.t('settings:models.fetchListFailed');
       throw error;
-    } finally {
-      model.isFetchingModels = false;
     }
   }
-  
-  // 从OpenAI兼容API获取模型列表
-  private static async fetchFromOpenAICompatible(model: ModelConfig): Promise<string[]> {
-    const endpoint = model.endpoint?.replace(/\/+$/, '') || '';
+
+  // 从 OpenAI 兼容 API 获取模型列表
+  private static async fetchFromOpenAICompatible(provider: ProviderConfig): Promise<string[]> {
+    const endpoint = provider.endpoint?.replace(/\/+$/, '') || '';
     if (!endpoint) {
       throw new Error(i18n.t('errors:endpointMissingGeneric'));
     }
-    
+
     const url = `${endpoint}/models`;
 
     const response = await gatewayHttp({
       url,
       headers: { 'Content-Type': 'application/json' },
-      apiKeyRef: model.apiKey,
+      apiKeyRef: provider.apiKey,
       apiKeyHost: new URL(url).host,
     });
-    
+
     if (!response.ok) {
       throw new Error(i18n.t('errors:requestFailedStatus', { status: response.status, detail: response.statusText }));
     }
     const data = asRecord(JSON.parse(response.text) as unknown);
-    return asRecords(data.data).map((m) => asStr(m.id)).filter((id) => id !== "");
+    return asRecords(data.data).map((m) => asStr(m.id)).filter((id) => id !== '');
   }
-  
+
   // 从 Anthropic Messages API 获取模型列表（x-api-key 鉴权，非 Bearer）
-  private static async fetchFromAnthropic(model: ModelConfig): Promise<string[]> {
-    const base = (model.endpoint?.replace(/\/+$/, '') || '');
+  private static async fetchFromAnthropic(provider: ProviderConfig): Promise<string[]> {
+    const base = (provider.endpoint?.replace(/\/+$/, '') || '');
     if (!base) {
       throw new Error(i18n.t('errors:endpointMissingGeneric'));
     }
     const url = base.endsWith('/v1') ? `${base}/models` : `${base}/v1/models`;
-    
+
     const response = await gatewayHttp({
       url,
       headers: {
         'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
-      apiKeyRef: model.apiKey,
+      apiKeyRef: provider.apiKey,
       apiKeyHeader: 'x-api-key',
       apiKeyScheme: 'raw',
       apiKeyHost: new URL(url).host,
     });
-    
+
     if (!response.ok) {
       throw new Error(i18n.t('errors:requestFailedStatus', { status: response.status, detail: response.statusText }));
     }
     const data = asRecord(JSON.parse(response.text) as unknown);
-    return asRecords(data.data).map((m) => asStr(m.id)).filter((id) => id !== "");
+    return asRecords(data.data).map((m) => asStr(m.id)).filter((id) => id !== '');
   }
-  
-  // 从Ollama获取模型列表
-  private static async fetchFromOllama(model: ModelConfig): Promise<string[]> {
-    const endpoint = model.endpoint?.replace(/\/+$/, '') || 'http://localhost:11434';
+
+  // 从 Ollama 获取模型列表
+  private static async fetchFromOllama(provider: ProviderConfig): Promise<string[]> {
+    const endpoint = provider.endpoint?.replace(/\/+$/, '') || 'http://localhost:11434';
     const url = `${endpoint}/api/tags`;
-    
+
     const response = await gatewayHttp({ url });
-    
+
     if (!response.ok) {
       throw new Error(i18n.t('errors:requestFailed', { provider: 'Ollama', message: `${response.status} ${response.statusText}` }));
     }
     const data = asRecord(JSON.parse(response.text) as unknown);
-    return asRecords(data.models).map((m) => asStr(m.name)).filter((n) => n !== "");
+    return asRecords(data.models).map((m) => asStr(m.name)).filter((n) => n !== '');
   }
-  
+
   // 从 Gemini 获取模型列表：官方走原生 generativelanguage 列表端点（只需 Key），
   // 显式 OpenAI 兼容代理端点则委托通用 /models。
-  private static async fetchFromGemini(model: ModelConfig): Promise<string[]> {
-    const ep = model.endpoint?.replace(/\/+$/, '') || '';
+  private static async fetchFromGemini(provider: ProviderConfig): Promise<string[]> {
+    const ep = provider.endpoint?.replace(/\/+$/, '') || '';
     if (ep.includes('/openai')) {
-      return this.fetchFromOpenAICompatible(model);
+      return this.fetchFromOpenAICompatible(provider);
     }
     const base = ep || 'https://generativelanguage.googleapis.com/v1beta';
     const url = `${base}/models`;
@@ -143,7 +138,7 @@ export class ModelListService {
     const response = await gatewayHttp({
       url,
       headers: { 'Content-Type': 'application/json' },
-      apiKeyRef: model.apiKey,
+      apiKeyRef: provider.apiKey,
       // Gemini 支持 x-goog-api-key 头：Key 走头不经 query（51 篇，query 会进访问日志）
       apiKeyHeader: 'x-goog-api-key',
       apiKeyScheme: 'raw',
@@ -158,27 +153,21 @@ export class ModelListService {
       .map((m) => asStr(m.name).replace(/^models\//, ''))
       .filter((id) => id !== '');
   }
-  
+
   // 检查缓存是否有效
-  private static isCacheValid(model: ModelConfig): boolean {
-    if (!model.modelsLastFetched || !model.availableModels) {
+  private static isCacheValid(provider: ProviderConfig): boolean {
+    if (!provider.modelsLastFetched || !provider.availableModels) {
       return false;
     }
-    
+
     const now = Date.now();
-    return (now - model.modelsLastFetched) < this.CACHE_DURATION;
+    return (now - provider.modelsLastFetched) < this.CACHE_DURATION;
   }
-  
+
   // 清除缓存
-  static clearCache(model: ModelConfig): void {
-    model.availableModels = undefined;
-    model.modelsLastFetched = undefined;
-    model.modelsFetchError = undefined;
+  static clearCache(provider: ProviderConfig): void {
+    provider.availableModels = undefined;
+    provider.modelsLastFetched = undefined;
+    provider.modelsFetchError = undefined;
   }
-  
 }
-
-
-
-
-

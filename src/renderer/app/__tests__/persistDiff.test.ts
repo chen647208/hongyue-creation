@@ -23,6 +23,7 @@ const base: AppState = {
   schemaVersion: APP_STATE_VERSION,
   projects: [project('a')],
   activeProjectId: 'a',
+  providers: [],
   models: [{ id: 'm1' } as never],
   prompts: [],
   activeModelId: 'm1',

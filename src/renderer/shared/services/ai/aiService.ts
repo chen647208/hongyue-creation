@@ -40,7 +40,7 @@ export class AIService {
       generatedContent,
       modelConfig: {
         modelName: model.modelName,
-        provider: model.provider,
+        provider: model.provider ?? 'openai-chat',
         temperature: model.temperature,
         maxTokens: model.maxTokens
       },

@@ -18,6 +18,7 @@ import { vectorIntegrationService } from '@/shared/services/knowledge/vectorInte
 import { normalizeProjectKinds } from '@/shared/utils/characterKinds';
 
 import { DEFAULT_TTS_CONFIG, normalizeTtsConfig } from '../../shared/constants/tts';
+import { normalizeProvidersAndModels, resolveModels } from '../../shared/providers';
 import { loadUserSkills } from '../features/assistant/services/userSkillsService';
 import { bootCustomFonts } from '../features/settings/services/customFontService';
 import { changeLanguage } from '../i18n';
@@ -41,7 +42,8 @@ export function hydrateStoresFromState(state: typeof INITIAL_APP_STATE): void {
   const projects = (state.projects ?? []).map(normalizeProjectKinds);
   useProjectStore.getState().hydrate(projects, state.activeProjectId);
   useSettingsStore.getState().hydrate({
-    models: state.models,
+    providers: state.providers,
+    models: resolveModels(state.providers, state.models),
     activeModelId: state.activeModelId,
     prompts: state.prompts,
     cardPrompts: state.cardPrompts ?? [],
@@ -108,7 +110,10 @@ export function useAppBootstrap(): void {
         let persisted: typeof INITIAL_APP_STATE | null = null;
         if (saved) {
           logger.debug('成功加载应用状态，应用数据迁移');
+          const catalog = normalizeProvidersAndModels(saved.providers, saved.models ?? INITIAL_APP_STATE.models);
           persisted = { ...INITIAL_APP_STATE, ...saved,
+            providers: catalog.providers,
+            models: catalog.models,
             tts: normalizeTtsConfig(saved.tts),
             embeddingModels: saved.embeddingModels || [],
             activeEmbeddingModelId: saved.activeEmbeddingModelId || null,

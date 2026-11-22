@@ -17,7 +17,7 @@ import { PromptAssembler } from '../promptAssembler.js';
 import { AiSession } from '../session.js';
 import { ToolRegistry, type ToolSpec } from '../tools.js';
 
-const model: ModelConfig = { id: 'm', name: 'M', provider: 'openai-chat', modelName: 'test' };
+const model: ModelConfig = { id: 'm', name: 'M', providerId: 'p', provider: 'openai-chat', modelName: 'test' };
 
 const readTool: ToolSpec = {
   id: 'core.index.query',

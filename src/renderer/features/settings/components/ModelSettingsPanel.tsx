@@ -8,107 +8,108 @@
  */
 
 import { PlusCircle } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 
 import { useTranslation } from '@/i18n';
 import { Select } from '@/shared/ui/Select';
 
-import { isModelConfigured } from '../../../shared/utils/modelReadiness';
 import type { ModelSettingsPanelProps } from '../types';
-import { isProviderEnabled } from '../utils/providerHealth';
 import ProviderEditor from './ProviderEditor';
 import ProviderSidebar, { type ProviderFilter } from './ProviderSidebar';
 import UsageSummaryCard from './UsageSummaryCard';
 
 /**
- * 模型渠道设置：左侧列表 + 右侧单渠道编辑（Cherry Studio 式）。
- * 原来堆叠全部卡片的写法一次暴露 N 个 endpoint/key/高级参数，认知负荷高；
- * 现在一次只编辑一个，列表负责搜索/过滤/状态，编辑器负责三步连通。
+ * 模型设置：左侧供应商列表 + 右侧单供应商编辑（Cherry Studio 式）。
+ * 一个供应商只填一次地址与 Key，下面可挂多个模型；模型各自启停、参数与价格独立。
  */
 const ModelSettingsPanel: React.FC<ModelSettingsPanelProps> = ({
+  localProviders,
   localModels,
   activeId,
   setActiveId,
   testingId,
   testResults,
   modelListLoading,
+  addProvider,
+  removeProvider,
+  updateProvider,
+  addModel,
   removeModel,
   updateModel,
-  testModel,
+  testProvider,
   fetchModelList,
-  addModel,
 }) => {
   const { t } = useTranslation('settings');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ProviderFilter>('all');
-  const [selectedId, setSelectedId] = useState<string | null>(activeId ?? localModels[0]?.id ?? null);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(localProviders[0]?.id ?? null);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return localModels.filter((m) => {
-      if (filter === 'enabled' && !isProviderEnabled(m)) return false;
-      if (filter === 'disabled' && isProviderEnabled(m)) return false;
-      if (filter === 'unconfigured' && isModelConfigured(m)) return false;
-      if (!q) return true;
-      return `${m.name} ${m.modelName} ${m.endpoint ?? ''}`.toLowerCase().includes(q);
-    });
-  }, [localModels, query, filter]);
-
-  const selected = localModels.find((m) => m.id === (selectedId ?? activeId ?? localModels[0]?.id)) ?? filtered[0] ?? localModels[0];
+  const selectedProvider = localProviders.find((p) => p.id === selectedProviderId) ?? localProviders[0];
+  const providerModels = selectedProvider ? localModels.filter((m) => m.providerId === selectedProvider.id) : [];
 
   return (
     <div className="space-y-3">
-      {/* 窄屏收起侧栏：用下拉框选渠道，避免侧栏与编辑器挤成一团 */}
       <div className="md:hidden">
         <Select
           aria-label={t('models.selectProviderLabel')}
-          value={selected?.id ?? ''}
-          onChange={(e) => setSelectedId(e.target.value)}
+          value={selectedProvider?.id ?? ''}
+          onChange={(e) => setSelectedProviderId(e.target.value)}
         >
-          {localModels.length === 0 && <option value="">{t('models.emptyAll', '还没有渠道，先添加一个')}</option>}
-          {localModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          {localProviders.length === 0 && <option value="">{t('models.emptyAll', '还没有供应商，先添加一个')}</option>}
+          {localProviders.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </Select>
       </div>
       <div className="flex gap-5">
         <ProviderSidebar
-        models={filtered}
-        selectedId={selected?.id ?? null}
-        activeId={activeId}
-        query={query}
-        filter={filter}
-        onQuery={setQuery}
-        onFilter={setFilter}
-        onSelect={setSelectedId}
-        testResults={testResults}
-      />
-      <div className="min-w-0 flex-1 space-y-5">
-        {selected ? (
-          <ProviderEditor
-            model={selected}
-            active={activeId === selected.id}
-            testing={testingId === selected.id}
-            testResult={testResults[selected.id]}
-            listLoading={Boolean(modelListLoading[selected.id])}
-            onSetActive={() => { setActiveId(selected.id); setSelectedId(selected.id); }}
-            onRemove={() => removeModel(selected.id)}
-            onUpdate={(updates) => updateModel(selected.id, updates)}
-            onTest={() => testModel(selected)}
-            onFetchList={() => fetchModelList(selected)}
-          />
-        ) : (
-          <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-            {t('models.emptyAll', '还没有渠道，先添加一个')}
-          </div>
-        )}
-        <button
-          onClick={() => { addModel(); }}
-          className="group flex w-full flex-col items-center gap-2 rounded-lg border-2 border-dashed border-border py-6 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent/30 hover:text-primary"
-        >
-          <PlusCircle className="size-5 transition-transform group-hover:scale-110" />
-          <span>{t('models.addProvider')}</span>
-        </button>
-        <UsageSummaryCard />
-      </div>
+          providers={localProviders}
+          models={localModels}
+          selectedId={selectedProvider?.id ?? null}
+          activeId={activeId}
+          query={query}
+          filter={filter}
+          onQuery={setQuery}
+          onFilter={setFilter}
+          onSelect={setSelectedProviderId}
+          testResults={testResults}
+        />
+        <div className="min-w-0 flex-1 space-y-5">
+          {selectedProvider ? (
+            <ProviderEditor
+              provider={selectedProvider}
+              models={providerModels}
+              activeId={activeId}
+              selectedModelId={selectedModelId}
+              testing={testingId === selectedProvider.id}
+              testResult={testResults[selectedProvider.id]}
+              listLoading={Boolean(modelListLoading[selectedProvider.id])}
+              onSelectModel={setSelectedModelId}
+              onSetActive={(id) => { setActiveId(id); setSelectedModelId(id); }}
+              onUpdateProvider={(updates) => updateProvider(selectedProvider.id, updates)}
+              onAddModel={() => addModel(selectedProvider.id)}
+              onRemoveModel={removeModel}
+              onUpdateModel={updateModel}
+              onRemoveProvider={() => {
+                removeProvider(selectedProvider.id);
+                setSelectedProviderId(null);
+              }}
+              onTest={() => void testProvider(selectedProvider)}
+              onFetchList={() => void fetchModelList(selectedProvider)}
+            />
+          ) : (
+            <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+              {t('models.emptyAll', '还没有供应商，先添加一个')}
+            </div>
+          )}
+          <button
+            onClick={() => { addProvider(); }}
+            className="group flex w-full flex-col items-center gap-2 rounded-lg border-2 border-dashed border-border py-6 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent/30 hover:text-primary"
+          >
+            <PlusCircle className="size-5 transition-transform group-hover:scale-110" />
+            <span>{t('models.addProvider')}</span>
+          </button>
+          <UsageSummaryCard />
+        </div>
       </div>
     </div>
   );

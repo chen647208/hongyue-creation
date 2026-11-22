@@ -45,6 +45,7 @@ const state = (projects: Project[]): AppState => ({
   schemaVersion: APP_STATE_VERSION,
   projects,
   activeProjectId: 'book-1',
+  providers: EMPTY,
   models: EMPTY,
   prompts: EMPTY,
   activeModelId: null,

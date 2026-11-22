@@ -54,7 +54,7 @@ if (!state.userData) {
 }
 
 const model = (over: Partial<ModelConfig> = {}): ModelConfig =>
-  ({ id: 'm1', name: 'M', provider: 'openai-chat', endpoint: 'https://x/v1', modelName: 'm', ...over });
+  ({ id: 'm1', name: 'M', providerId: 'p1', provider: 'openai-chat', endpoint: 'https://x/v1', modelName: 'm', ...over });
 
 describe('vault 引用', () => {
   it('isVaultRef/vaultIdFor', () => {

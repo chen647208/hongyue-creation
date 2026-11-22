@@ -21,6 +21,7 @@ import { anthropicAdapter, anthropicMessagesUrl, clampAnthropicTemperature } fro
 const baseModel: ModelConfig = {
   id: 'a1',
   name: 'claude',
+  providerId: 'p1',
   provider: 'anthropic',
   presetId: 'anthropic',
   endpoint: 'https://api.anthropic.com',

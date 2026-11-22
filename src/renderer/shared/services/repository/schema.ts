@@ -21,6 +21,7 @@ export const SCHEMA_VERSION = 5;
 
 /** settings 表里以 JSON 存储的非项目配置切片键 */
 export const SETTING_KEYS = [
+  'providers',
   'models',
   'prompts',
   'cardPrompts',

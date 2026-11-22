@@ -46,6 +46,7 @@ async function load() {
 const model = (over: Partial<ModelConfig> = {}): ModelConfig => ({
   id: 'm1',
   name: 'T',
+  providerId: 'p1',
   provider: 'openai-chat',
   endpoint: 'https://x/v1',
   modelName: 'm',

@@ -7,10 +7,10 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { AlertCircle, CheckCircle2, Clock, Eye, EyeOff, FlaskConical, List, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Eye, EyeOff, FlaskConical, List, PlusCircle, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-react';
 import React, { useState } from 'react';
 
-import { dt,useTranslation } from '@/i18n';
+import { dt, useTranslation } from '@/i18n';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Checkbox } from '@/shared/ui/Checkbox';
@@ -21,176 +21,119 @@ import { Switch } from '@/shared/ui/Switch';
 import { Textarea } from '@/shared/ui/Textarea';
 import { cn } from '@/shared/utils/cn';
 
-import type { ModelConfig } from '../../../../shared/types';
-import { findProviderPreset,modelProviders } from '../../../constants/modelProviders';
-import { isModelConfigured } from '../../../shared/utils/modelReadiness';
-import { channelGroups,channelPatch, channelValueFor } from '../utils/channelPreset';
-import { classifyProviderError, isErrorResult, isProviderEnabled, maskApiKey } from '../utils/providerHealth';
+import type { ModelConfig, ProviderConfig, ResolvedModelConfig } from '../../../../shared/types';
+import { findProviderPreset, modelProviders } from '../../../constants/modelProviders';
+import { isProviderConfigured } from '../../../shared/utils/modelReadiness';
+import { channelGroups, channelPatch, channelValueFor } from '../utils/channelPreset';
+import { classifyProviderError, isErrorResult, maskApiKey } from '../utils/providerHealth';
 
 const CHANNEL_GROUPS = channelGroups(modelProviders);
 const fieldLabel = 'mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground';
 const hintText = 'mt-1.5 text-xs text-muted-foreground';
 
 interface ProviderEditorProps {
-  model: ModelConfig;
-  active: boolean;
+  provider: ProviderConfig;
+  /** 该供应商下的模型（已完成运行时投影）。 */
+  models: ResolvedModelConfig[];
+  activeId: string | null;
+  selectedModelId: string | null;
   testing: boolean;
   testResult: string | undefined;
   listLoading: boolean;
-  onSetActive: () => void;
-  onRemove: () => void;
-  onUpdate: (updates: Partial<ModelConfig>) => void;
+  onSelectModel: (id: string) => void;
+  onSetActive: (id: string) => void;
+  onUpdateProvider: (updates: Partial<ProviderConfig>) => void;
+  onAddModel: () => void;
+  onRemoveModel: (id: string) => void;
+  onUpdateModel: (id: string, updates: Partial<ModelConfig>) => void;
+  onRemoveProvider: () => void;
   onTest: () => void;
   onFetchList: () => void;
 }
 
 /**
- * 右侧单渠道编辑器：三步式（选渠道 → 填凭证 → 拉模型/测连通），高级参数折叠在下方。
- * 凭证 Key 默认掩码显示，错误结果走 classifyProviderError 给修复建议。
+ * 单个供应商编辑：凭证只填一次（渠道 → 地址 → Key），下面挂该供应商的模型列表。
+ * 运行时的协议、地址与凭证由供应商投影到每个模型，落盘只有供应商一份。
  */
 export const ProviderEditor: React.FC<ProviderEditorProps> = ({
-  model, active, testing, testResult, listLoading, onSetActive, onRemove, onUpdate, onTest, onFetchList,
+  provider, models, activeId, selectedModelId, testing, testResult, listLoading,
+  onSelectModel, onSetActive, onUpdateProvider, onAddModel, onRemoveModel, onUpdateModel,
+  onRemoveProvider, onTest, onFetchList,
 }) => {
   const { t, i18n } = useTranslation('settings');
   const [showKey, setShowKey] = useState(false);
-  // 有模型列表时默认下拉选择；自定义名称（聚合网关常见）切到手动输入
-  const [manualModel, setManualModel] = useState(false);
-  const availableModels = model.availableModels ?? [];
-  const hasModelList = availableModels.length > 0;
-  const showModelSelect = hasModelList && !manualModel;
-  const errorDiag = isErrorResult(testResult) ? classifyProviderError(testResult ?? '') : null;
-  const preset = findProviderPreset(channelValueFor(model));
+  const preset = findProviderPreset(channelValueFor(provider));
   const isGateway = preset?.id === 'gateway-openai' || preset?.id === 'custom-openai';
+  const errorDiag = isErrorResult(testResult) ? classifyProviderError(testResult ?? '') : null;
+  const selectedModel = models.find((m) => m.id === selectedModelId) ?? models[0];
+  const availableModels = provider.availableModels ?? [];
+  const datalistId = `provider-models-${provider.id}`;
 
   return (
-    <div className={cn('min-w-0 flex-1 rounded-lg border bg-card p-6', active ? 'border-primary/40' : 'border-border')}>
+    <div className="min-w-0 flex-1 rounded-lg border border-border bg-card p-6">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3 sm:flex-1">
-          <span
-            role="radio"
-            aria-checked={active}
-            aria-label={t('models.setActiveLabel')}
-            tabIndex={0}
-            onClick={onSetActive}
-            onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onSetActive(); } }}
-            className={cn('flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-2', active ? 'border-primary' : 'border-input')}
-          >
-            {active && <span className="size-2 rounded-full bg-primary" />}
-          </span>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <input
             className="min-w-0 flex-1 border-none bg-transparent p-0 font-serif text-lg font-medium text-foreground outline-none placeholder:text-muted-foreground/40 sm:max-w-72"
-            value={model.name}
-            onChange={(e) => onUpdate({ name: e.target.value })}
+            value={provider.name}
+            onChange={(e) => onUpdateProvider({ name: e.target.value })}
             placeholder={t('models.namePlaceholder')}
           />
-          {active && (
-            <span className="shrink-0 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-2xs font-medium uppercase tracking-wide text-primary">
-              {t('models.activeBadge')}
-            </span>
-          )}
+          <span className="shrink-0 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-2xs text-muted-foreground">
+            {t('models.modelCount', '{{count}} 个模型', { count: models.length })}
+          </span>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-            <Switch checked={isProviderEnabled(model)} onCheckedChange={(checked) => onUpdate({ isEnabled: checked })} />
-            {t('models.enableLabel', '启用')}
-          </label>
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={onRemove} title={t('models.deleteTitle')}>
-            <Trash2 className="size-4" />
-          </Button>
-        </div>
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={onRemoveProvider} title={t('models.deleteTitle')}>
+          <Trash2 className="size-4" />
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="space-y-4">
           <div>
-            <label className={fieldLabel} htmlFor={`provider-channel-${model.id}`}>{t('models.channelLabel')}</label>
+            <label className={fieldLabel} htmlFor={`provider-channel-${provider.id}`}>{t('models.channelLabel')}</label>
             <Select
-              id={`provider-channel-${model.id}`}
-              value={channelValueFor(model)}
-              onChange={(e) => { const preset = findProviderPreset(e.target.value); if (preset) onUpdate(channelPatch(preset, model)); }}
+              id={`provider-channel-${provider.id}`}
+              value={channelValueFor(provider)}
+              onChange={(e) => { const next = findProviderPreset(e.target.value); if (next) onUpdateProvider(channelPatch(next, provider)); }}
             >
               {CHANNEL_GROUPS.map((group) => (
                 <optgroup key={group.id} label={t(group.labelKey)}>
-                  {group.items.map((preset) => (
-                    <option key={preset.id} value={preset.id}>{dt(preset.nameKey)}</option>
+                  {group.items.map((item) => (
+                    <option key={item.id} value={item.id}>{dt(item.nameKey)}</option>
                   ))}
                 </optgroup>
               ))}
             </Select>
-            <p className={hintText}>{(() => { const p = findProviderPreset(channelValueFor(model)); return p ? dt(p.descriptionKey) : ''; })()}</p>
+            <p className={hintText}>{preset ? dt(preset.descriptionKey) : ''}</p>
           </div>
-          <div>
-            <div className="flex items-center justify-between">
-              <label className={fieldLabel} htmlFor={`provider-model-name-${model.id}`}>{t('models.modelNameLabel')}</label>
-              {hasModelList && (
-                <button
-                  type="button"
-                  className="mb-1.5 text-xs text-primary hover:underline"
-                  onClick={() => setManualModel((v) => !v)}
-                >
-                  {showModelSelect ? t('models.manualToggle') : t('models.listToggle')}
-                </button>
-              )}
-            </div>
-            {showModelSelect ? (
-              <Select id={`provider-model-name-${model.id}`} value={model.modelName} onChange={(e) => onUpdate({ modelName: e.target.value })} disabled={listLoading} className="font-mono">
-                <option value="">{t('models.selectModelPlaceholder')}</option>
-                {model.modelName && !availableModels.includes(model.modelName) && (
-                  <option value={model.modelName}>{model.modelName}</option>
-                )}
-                {availableModels.map((n) => <option key={n} value={n}>{n}</option>)}
-              </Select>
-            ) : (
-              <Input
-                id={`provider-model-name-${model.id}`}
-                className="font-mono text-xs"
-                value={model.modelName}
-                onChange={(e) => onUpdate({ modelName: e.target.value })}
-                placeholder={t('models.manualInputPlaceholder')}
-              />
-            )}
-            <p className={hintText}>{t('models.modelNameHint')}</p>
-            <div className="mt-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {listLoading && <div className="flex items-center gap-1 text-xs text-primary"><Spinner className="size-4" /><span>{t('models.fetchingList')}</span></div>}
-                {model.modelsFetchError && !listLoading && <div className="flex items-center gap-1 text-xs text-destructive"><AlertCircle className="size-4" /><span>{model.modelsFetchError}</span></div>}
-                {model.availableModels && model.availableModels.length > 0 && !listLoading && (
-                  <div className="flex items-center gap-1 text-xs text-success"><CheckCircle2 className="size-4" /><span>{t('models.loadedCount', { count: model.availableModels.length })}</span></div>
-                )}
-              </div>
-              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={onFetchList} disabled={listLoading || !isModelConfigured(model)}>
-                {listLoading ? <Spinner className="size-3.5" /> : <RefreshCw className="size-3.5" />}
-                {t('models.refreshList')}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4">
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('models.endpointLabel')}</label>
+              <label className={fieldLabel}>{t('models.endpointLabel')}</label>
               {preset?.apiApplyUrl && (
-                <a href={preset.apiApplyUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                <a href={preset.apiApplyUrl} target="_blank" rel="noopener noreferrer" className="mb-1.5 text-xs text-primary hover:underline">
                   {t('models.getKey')}
                 </a>
               )}
             </div>
             <Input
               className="font-mono"
-              value={model.endpoint || ''}
-              onChange={(e) => onUpdate({ endpoint: e.target.value })}
-              placeholder={model.provider === 'gemini' ? t('models.endpointPlaceholderGemini') : model.provider === 'anthropic' ? t('models.endpointPlaceholderAnthropic') : 'https://api.example.com/v1'}
+              value={provider.endpoint || ''}
+              onChange={(e) => onUpdateProvider({ endpoint: e.target.value })}
+              placeholder={provider.provider === 'gemini' ? t('models.endpointPlaceholderGemini') : provider.provider === 'anthropic' ? t('models.endpointPlaceholderAnthropic') : 'https://api.example.com/v1'}
             />
             {isGateway && <p className={hintText}>{t('models.gatewayHint')}</p>}
           </div>
+        </div>
+
+        <div className="space-y-4">
           <div>
             <label className={fieldLabel}>{t('models.apiKeyLabel')}</label>
             <div className="relative">
               <Input
                 type={showKey ? 'text' : 'password'}
-                value={model.apiKey || ''}
-                onChange={(e) => onUpdate({ apiKey: e.target.value })}
+                value={provider.apiKey || ''}
+                onChange={(e) => onUpdateProvider({ apiKey: e.target.value })}
                 placeholder="••••••••••••••••"
                 className="pr-9 font-mono"
               />
@@ -206,74 +149,178 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
             </div>
             <p className={hintText}>
               {t('models.apiKeyHint')}
-              {model.apiKey ? ` · ${t('models.currentKeyMasked', '当前：{{mask}}', { mask: maskApiKey(model.apiKey) })}` : ''}
+              {provider.apiKey ? ` · ${t('models.currentKeyMasked', '当前：{{mask}}', { mask: maskApiKey(provider.apiKey) })}` : ''}
             </p>
+            <p className={hintText}>{t('models.apiKeySharedHint', '同一供应商下的所有模型共用这份 Key。')}</p>
+          </div>
+          <div>
+            <div className="flex items-center justify-between">
+              <span className={hintText}>{t('models.fetchListHint', '从服务商拉取可用模型，填入下方面的建议列表。')}</span>
+              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={onFetchList} disabled={listLoading || !isProviderConfigured(provider)}>
+                {listLoading ? <Spinner className="size-3.5" /> : <RefreshCw className="size-3.5" />}
+                {t('models.refreshList')}
+              </Button>
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              {listLoading && <div className="flex items-center gap-1 text-xs text-primary"><Spinner className="size-4" /><span>{t('models.fetchingList')}</span></div>}
+              {provider.modelsFetchError && !listLoading && <div className="flex items-center gap-1 text-xs text-destructive"><AlertCircle className="size-4" /><span>{provider.modelsFetchError}</span></div>}
+              {availableModels.length > 0 && !listLoading && (
+                <div className="flex items-center gap-1 text-xs text-success"><CheckCircle2 className="size-4" /><span>{t('models.loadedCount', { count: availableModels.length })}</span></div>
+              )}
+              {provider.modelsLastFetched && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="size-3.5" />
+                  {t('models.lastUpdated', { time: new Date(provider.modelsLastFetched).toLocaleTimeString(i18n.language) })}
+                </span>
+              )}
+            </div>
+            <datalist id={datalistId}>
+              {availableModels.map((name) => <option key={name} value={name} />)}
+            </datalist>
           </div>
         </div>
       </div>
 
       <div className="mt-6 border-t border-border pt-5">
-        <div className="mb-5 flex items-center gap-2">
-          <SlidersHorizontal className="size-4 text-primary" />
-          <h3 className="text-sm font-medium text-foreground">{t('models.advancedTitle')}</h3>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-medium text-foreground">{t('models.modelsTitle', '模型')}</h3>
+          <Button variant="secondary" size="sm" onClick={onAddModel}>
+            <PlusCircle className="size-3.5" />
+            {t('models.addModel', '添加模型')}
+          </Button>
         </div>
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('models.temperatureLabel')}</label>
-              <span className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-xs tabular-nums text-foreground">
-                {model.temperature !== undefined ? model.temperature.toFixed(1) : '0.7'}
-              </span>
+        <div className="space-y-2">
+          {models.map((model) => {
+            const isActive = activeId === model.id;
+            return (
+              <div
+                key={model.id}
+                onClick={() => onSelectModel(model.id)}
+                className={cn(
+                  'grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors sm:grid-cols-[auto_1fr_1fr_auto]',
+                  selectedModel?.id === model.id ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-accent/30',
+                )}
+              >
+                <span
+                  role="radio"
+                  aria-checked={isActive}
+                  aria-label={t('models.setActiveLabel')}
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onSetActive(model.id); }}
+                  onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onSetActive(model.id); } }}
+                  className={cn('flex size-5 shrink-0 items-center justify-center rounded-full border-2', isActive ? 'border-primary' : 'border-input')}
+                >
+                  {isActive && <span className="size-2 rounded-full bg-primary" />}
+                </span>
+                <Input
+                  className="h-8 text-sm"
+                  value={model.name}
+                  onChange={(e) => onUpdateModel(model.id, { name: e.target.value })}
+                  placeholder={t('models.namePlaceholder')}
+                />
+                <Input
+                  className="col-span-2 h-8 font-mono text-xs sm:col-span-1"
+                  list={datalistId}
+                  value={model.modelName}
+                  onChange={(e) => onUpdateModel(model.id, { modelName: e.target.value })}
+                  placeholder={t('models.manualInputPlaceholder')}
+                />
+                <div className="flex items-center gap-1">
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Switch
+                      aria-label={`${t('models.enableLabel', '启用')} ${model.name}`}
+                      checked={model.isEnabled !== false}
+                      onCheckedChange={(checked) => onUpdateModel(model.id, { isEnabled: checked })}
+                    />
+                    {t('models.enableLabel', '启用')}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    title={t('models.deleteTitle')}
+                    onClick={(e) => { e.stopPropagation(); onRemoveModel(model.id); }}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {models.length === 0 && (
+            <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
+              {t('models.noModels', '还没有模型，先添加一个，填上模型名即可使用。')}
             </div>
-            <input type="range" min="0.0" max="2.0" step="0.1" className="w-full accent-primary" value={model.temperature ?? 0.7} onChange={(e) => onUpdate({ temperature: parseFloat(e.target.value) })} aria-label={t('models.temperatureLabel')} />
-            <p className="text-xs text-muted-foreground">{t('models.temperatureHint')}</p>
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-              <Checkbox
-                checked={model.supportsVision !== false}
-                onChange={(e) => onUpdate({ supportsVision: e.target.checked })}
-                className="size-3.5"
-              />
-              {t('models.visionLabel')}
-            </label>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('models.maxTokensLabel')}</label>
-              <span className="text-xs text-muted-foreground">{t('models.optional')}</span>
-            </div>
-            <Input type="number" min="1" max="8192" className="font-mono" value={model.maxTokens || ''} onChange={(e) => onUpdate({ maxTokens: e.target.value ? parseInt(e.target.value, 10) : undefined })} placeholder={t('models.maxTokensPlaceholder')} />
-            <p className="text-xs text-muted-foreground">{t('models.maxTokensHint')}</p>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('models.systemPromptLabel')}</label>
-              <span className="text-xs text-muted-foreground">{t('models.optional')}</span>
-            </div>
-            <Textarea className="min-h-[96px] text-sm" value={model.systemPrompt || ''} onChange={(e) => onUpdate({ systemPrompt: e.target.value })} placeholder={t('models.systemPromptPlaceholder')} />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('models.priceLabel')}</label>
-              <span className="text-xs text-muted-foreground">{t('models.optional')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number" min="0" step="0.01" className="font-mono text-xs"
-                value={model.priceInPerM ?? ''}
-                onChange={(e) => onUpdate({ priceInPerM: e.target.value === '' ? undefined : Number(e.target.value) })}
-                placeholder={t('models.priceInPlaceholder')}
-              />
-              <Input
-                type="number" min="0" step="0.01" className="font-mono text-xs"
-                value={model.priceOutPerM ?? ''}
-                onChange={(e) => onUpdate({ priceOutPerM: e.target.value === '' ? undefined : Number(e.target.value) })}
-                placeholder={t('models.priceOutPlaceholder')}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">{t('models.priceHint')}</p>
-          </div>
+          )}
         </div>
       </div>
+
+      {selectedModel && (
+        <div className="mt-6 border-t border-border pt-5">
+          <div className="mb-5 flex items-center gap-2">
+            <SlidersHorizontal className="size-4 text-primary" />
+            <h3 className="text-sm font-medium text-foreground">
+              {t('models.advancedTitle')} · {selectedModel.name}
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('models.temperatureLabel')}</label>
+                <span className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-xs tabular-nums text-foreground">
+                  {selectedModel.temperature !== undefined ? selectedModel.temperature.toFixed(1) : '0.7'}
+                </span>
+              </div>
+              <input type="range" min="0.0" max="2.0" step="0.1" className="w-full accent-primary" value={selectedModel.temperature ?? 0.7} onChange={(e) => onUpdateModel(selectedModel.id, { temperature: parseFloat(e.target.value) })} aria-label={t('models.temperatureLabel')} />
+              <p className="text-xs text-muted-foreground">{t('models.temperatureHint')}</p>
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                <Checkbox
+                  checked={selectedModel.supportsVision !== false}
+                  onChange={(e) => onUpdateModel(selectedModel.id, { supportsVision: e.target.checked })}
+                  className="size-3.5"
+                />
+                {t('models.visionLabel')}
+              </label>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('models.maxTokensLabel')}</label>
+                <span className="text-xs text-muted-foreground">{t('models.optional')}</span>
+              </div>
+              <Input type="number" min="1" max="8192" className="font-mono" value={selectedModel.maxTokens || ''} onChange={(e) => onUpdateModel(selectedModel.id, { maxTokens: e.target.value ? parseInt(e.target.value, 10) : undefined })} placeholder={t('models.maxTokensPlaceholder')} />
+              <p className="text-xs text-muted-foreground">{t('models.maxTokensHint')}</p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('models.systemPromptLabel')}</label>
+                <span className="text-xs text-muted-foreground">{t('models.optional')}</span>
+              </div>
+              <Textarea className="min-h-[96px] text-sm" value={selectedModel.systemPrompt || ''} onChange={(e) => onUpdateModel(selectedModel.id, { systemPrompt: e.target.value })} placeholder={t('models.systemPromptPlaceholder')} />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('models.priceLabel')}</label>
+                <span className="text-xs text-muted-foreground">{t('models.optional')}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number" min="0" step="0.01" className="font-mono text-xs"
+                  value={selectedModel.priceInPerM ?? ''}
+                  onChange={(e) => onUpdateModel(selectedModel.id, { priceInPerM: e.target.value === '' ? undefined : Number(e.target.value) })}
+                  placeholder={t('models.priceInPlaceholder')}
+                />
+                <Input
+                  type="number" min="0" step="0.01" className="font-mono text-xs"
+                  value={selectedModel.priceOutPerM ?? ''}
+                  onChange={(e) => onUpdateModel(selectedModel.id, { priceOutPerM: e.target.value === '' ? undefined : Number(e.target.value) })}
+                  placeholder={t('models.priceOutPlaceholder')}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">{t('models.priceHint')}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {testResult && (
         <Alert
@@ -290,25 +337,15 @@ export const ProviderEditor: React.FC<ProviderEditorProps> = ({
         </Alert>
       )}
 
-      <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
-        <div className="text-xs text-muted-foreground">
-          {model.modelsLastFetched && (
-            <div className="flex items-center gap-1">
-              <Clock className="size-3.5" />
-              <span>{t('models.lastUpdated', { time: new Date(model.modelsLastFetched).toLocaleTimeString(i18n.language) })}</span>
-            </div>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={onFetchList} disabled={listLoading || !isModelConfigured(model)}>
-            {listLoading ? <Spinner className="size-4" /> : <List className="size-4" />}
-            {t('models.fetchList')}
-          </Button>
-          <Button variant="default" size="sm" onClick={onTest} disabled={testing}>
-            {testing ? <Spinner className="size-4" /> : <FlaskConical className="size-4" />}
-            {testing ? t('models.testing') : t('models.testNow')}
-          </Button>
-        </div>
+      <div className="mt-5 flex items-center justify-end gap-2 border-t border-border pt-4">
+        <Button variant="secondary" size="sm" onClick={onFetchList} disabled={listLoading || !isProviderConfigured(provider)}>
+          {listLoading ? <Spinner className="size-4" /> : <List className="size-4" />}
+          {t('models.fetchList')}
+        </Button>
+        <Button variant="default" size="sm" onClick={onTest} disabled={testing || !selectedModel || !isProviderConfigured(provider)}>
+          {testing ? <Spinner className="size-4" /> : <FlaskConical className="size-4" />}
+          {testing ? t('models.testing') : t('models.testNow')}
+        </Button>
       </div>
     </div>
   );

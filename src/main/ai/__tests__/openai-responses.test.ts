@@ -21,6 +21,7 @@ import { openAIResponsesAdapter, responsesUrl } from '../adapters/openai-respons
 const baseModel: ModelConfig = {
   id: 'r1',
   name: 'gpt',
+  providerId: 'p1',
   provider: 'openai-responses',
   presetId: 'openai-responses',
   endpoint: 'https://api.openai.com/v1',

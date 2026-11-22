@@ -158,6 +158,7 @@ export function localModelConfig(
   return {
     id: `local:${kind}:${modelName}`,
     name: `本地 · ${modelName}`,
+    providerId: `local:${kind}`,
     provider: kind === 'ollama' ? 'ollama' : 'openai-chat',
     endpoint: localChatEndpoint(endpoint, kind),
     modelName,

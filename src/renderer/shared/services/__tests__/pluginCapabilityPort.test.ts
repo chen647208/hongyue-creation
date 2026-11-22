@@ -120,6 +120,7 @@ describe('生产执行适配器（既有宿主契约，不依赖真实执行）'
         },
       ],
       activeProjectId: 'p',
+      providers: [],
       models: [],
       prompts: [],
       activeModelId: null,

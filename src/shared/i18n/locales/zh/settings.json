@@ -473,6 +473,7 @@
   },
   "factories": {
     "newModel": "新模型",
+    "newProvider": "新供应商",
     "newPolishTemplate": "新润色模板",
     "newEmbeddingModel": "新Embedding模型",
     "newCharacterTemplate": "新角色模板",

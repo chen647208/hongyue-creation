@@ -24,17 +24,21 @@ import TtsSettingsPanel from './TtsSettingsPanel';
 const SettingsTabContent: React.FC<SettingsTabContentProps> = (props) => {
   const {
   activeTab,
+  localProviders,
   localModels,
   activeId,
   setActiveId,
   testingId,
   testResults,
   modelListLoading,
+  addProvider,
+  removeProvider,
+  updateProvider,
+  addModel,
   removeModel,
   updateModel,
-  testModel,
+  testProvider,
   fetchModelList,
-  addModel,
   localPrompts,
   setLocalPrompts,
   updatePrompt,
@@ -95,17 +99,21 @@ const SettingsTabContent: React.FC<SettingsTabContentProps> = (props) => {
 
       {activeTab === 'models' && (
         <ModelSettingsPanel
+          localProviders={localProviders}
           localModels={localModels}
           activeId={activeId}
           setActiveId={setActiveId}
           testingId={testingId}
           testResults={testResults}
           modelListLoading={modelListLoading}
+          addProvider={addProvider}
+          removeProvider={removeProvider}
+          updateProvider={updateProvider}
+          addModel={addModel}
           removeModel={removeModel}
           updateModel={updateModel}
-          testModel={testModel}
+          testProvider={testProvider}
           fetchModelList={fetchModelList}
-          addModel={addModel}
         />
       )}
 
