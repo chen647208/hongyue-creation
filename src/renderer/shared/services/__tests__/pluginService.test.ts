@@ -32,6 +32,7 @@ description: 社区黄金三章扩展写法。触发词：社区开篇
 
 vi.mock('@/shared/services/repository', () => ({}));
 
+import { commandRegistry } from '../commandRegistry';
 import { bootstrapPlugins, readPluginCatalog, runPluginLogic,setTrustedPluginKeys } from '../pluginService';
 import { uiSlotRegistry } from '../uiSlots';
 
@@ -603,6 +604,163 @@ describe('可执行插件描述符接线（design/49 里程碑②）', () => {
     expect(status?.error?.message).toContain('read:secret');
     expect(renderers.size()).toBe(0);
     expect(scripts.size()).toBe(0);
+  });
+});
+
+describe('插件命令贡献（docs/design/04 §4.1）', () => {
+  const PLUGIN_ID = 'com.cmd.p';
+  const COMMAND_ID = '/p:写作.黄金三章';
+
+  function deps() {
+    return {
+      skillCatalog: new SkillCatalog(),
+      buildProfiles: new BuildProfileRegistry(),
+      events: new EventBus(),
+      formulas: new FormulaRegistry(),
+      renderers: new RendererRegistry(),
+      scripts: new ScriptRegistry(),
+    };
+  }
+
+  function root(
+    options: {
+      signed?: boolean;
+      commands?: unknown;
+      withLogic?: boolean;
+    } = {},
+  ): Record<string, string> {
+    const base = `/data/plugins/${PLUGIN_ID}`;
+    const files: Record<string, string> = {
+      [`${base}/plugin.json`]: JSON.stringify({
+        id: PLUGIN_ID,
+        name: 'cmd',
+        version: '1.0.0',
+        host: '^2.0.0',
+        license: 'MIT',
+        contributes: {
+          commands: ['./commands.json'],
+          ...(options.withLogic === false ? {} : { logic: ['./logic/'] }),
+        },
+        permissions: { write: ['ai'] },
+      }),
+      [`${base}/commands.json`]: typeof options.commands === 'string' ? options.commands : JSON.stringify(options.commands ?? []),
+    };
+    if (options.withLogic !== false) {
+      files[`${base}/logic/handler.js`] = 'function runGolden(input) { return input; }';
+    }
+    if (options.signed !== false) {
+      files[`${base}/plugin.sig`] = JSON.stringify({ algorithm: 'ed25519', signature: 's', publicKey: 'k' });
+    }
+    return files;
+  }
+
+  function stubPluginFs(files: Record<string, string>, sandboxRun: (request: unknown) => Promise<unknown>): void {
+    vi.stubGlobal('window', {
+      electronAPI: {
+        getAppDataPath: async () => '/data',
+        listDirectory: async (dir: string) =>
+          dir === '/data/plugins' ? [{ name: PLUGIN_ID, type: 'directory' }] : [],
+        pluginListDirectory: async (rootDir: string, rel: string) => {
+          const prefix = `${rootDir}/${rel}/`;
+          return Object.keys(files)
+            .filter((path) => path.startsWith(prefix))
+            .map((path) => ({ name: path.slice(prefix.length), type: 'file' }));
+        },
+        pluginReadBinary: async (rootDir: string, rel: string) => files[`${rootDir}/${rel}`] ?? '',
+        pluginReadFile: async (rootDir: string, rel: string) => {
+          const raw = files[`${rootDir}/${rel}`];
+          if (raw === undefined) throw new Error(`not found: ${rootDir}/${rel}`);
+          return raw;
+        },
+        pluginVerifySignature: async () => true,
+        pluginSandboxRun: sandboxRun,
+      },
+    });
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setTrustedPluginKeys([]);
+  });
+
+  it('签名插件激活：带 function 的命令注册进面板，点击走沙箱，停用后释放', async () => {
+    setTrustedPluginKeys(['k']);
+    const sandboxRun = vi.fn(async (request: unknown) => ({
+      ok: true,
+      output: (request as { input?: unknown }).input,
+    }));
+    stubPluginFs(
+      root({
+        commands: [
+          { id: '写作.黄金三章', title: '黄金三章', keywords: '开篇 三章', function: 'runGolden' },
+          { id: '空动作', title: '空动作' },
+        ],
+      }),
+      sandboxRun,
+    );
+
+    const host = await bootstrapPlugins(deps(), '2.0.0', []);
+    expect(host.list().find((status) => status.id === PLUGIN_ID)?.state).toBe('active');
+
+    const command = commandRegistry.get(COMMAND_ID);
+    expect(command?.title).toBe('黄金三章');
+    expect(command?.keywords).toBe('开篇 三章');
+    // 无 function 的声明跳过：命令面板没有禁用态，不注册空动作。
+    expect(commandRegistry.get('/p:空动作')).toBeUndefined();
+
+    command?.run();
+    await vi.waitFor(() => expect(sandboxRun).toHaveBeenCalledTimes(1));
+    const request = sandboxRun.mock.calls[0]?.[0] as { input?: unknown; code?: string };
+    expect(request.input).toEqual({});
+    expect(request.code).toContain('runGolden');
+
+    host.disable(PLUGIN_ID);
+    expect(commandRegistry.get(COMMAND_ID)).toBeUndefined();
+  });
+
+  it('未签名插件：带 function 的命令不注册（fail-closed）', async () => {
+    const sandboxRun = vi.fn(async () => ({ ok: true, output: null }));
+    stubPluginFs(
+      root({
+        signed: false,
+        commands: [{ id: '写作.黄金三章', title: '黄金三章', function: 'runGolden' }],
+      }),
+      sandboxRun,
+    );
+
+    const host = await bootstrapPlugins(deps(), '2.0.0', []);
+    expect(host.list().find((status) => status.id === PLUGIN_ID)?.state).toBe('active');
+    expect(commandRegistry.get(COMMAND_ID)).toBeUndefined();
+    expect(sandboxRun).not.toHaveBeenCalled();
+  });
+
+  it('命令声明 JSON 损坏：插件仍激活，命令不注册', async () => {
+    setTrustedPluginKeys(['k']);
+    stubPluginFs(
+      root({
+        commands: '[{',
+      }),
+      async () => ({ ok: true, output: null }),
+    );
+
+    const host = await bootstrapPlugins(deps(), '2.0.0', []);
+    const status = host.list().find((entry) => entry.id === PLUGIN_ID);
+    expect(status?.state, JSON.stringify(status?.error)).toBe('active');
+    expect(commandRegistry.list().filter((command) => command.id.startsWith('/p:'))).toEqual([]);
+  });
+
+  it('无 function 的命令：不注册，也不触碰沙箱', async () => {
+    const sandboxRun = vi.fn(async () => ({ ok: true, output: null }));
+    stubPluginFs(
+      root({
+        commands: [{ id: '空动作', title: '空动作' }],
+      }),
+      sandboxRun,
+    );
+
+    await bootstrapPlugins(deps(), '2.0.0', []);
+    expect(commandRegistry.get('/p:空动作')).toBeUndefined();
+    expect(sandboxRun).not.toHaveBeenCalled();
   });
 });
 

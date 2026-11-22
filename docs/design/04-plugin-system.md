@@ -21,7 +21,7 @@
     "types":        ["./types/"],               // 类型模板（03 篇）——资源型，零编译
     "skills":       ["./skills/"],              // SKILL.md 写法技能（05 篇）——资源型
     "buildProfiles":["./builds/"],              // Build Profile（07 篇）——资源型
-    "commands":     ["./commands.json"],        // 命令声明（含 UI 菜单位置）
+    "commands":     ["./commands.json"],        // 命令声明（JSON 数组；见 §4.1）
     "ui":           ["./ui.json"],              // 槽位贡献（§4）
     "mcpServers":   { "inline": { "graph-query": { "command": "..." } } },
     "hooks":        "./hooks.yml",              // 能力接缝装饰（§5）
@@ -105,7 +105,7 @@ dogfooding 样例。
 | 1 | **类型模板** | 资源（JSON/TS 声明） | **v0** |
 | 2 | **技能 SKILL.md** | 资源（Markdown） | **v0** |
 | 3 | **Build 渲染器/变换器** | 资源+逻辑 | **v0** |
-| 4 | 命令 + 菜单位置 | 声明 + 回调 | v1 |
+| 4 | 命令 + 菜单位置 | 声明（JSON）+ 沙箱具名函数 | v1（命令面板入口 + 沙箱动作） |
 | 5 | UI 槽位（见下） | 声明 + 沙箱组件 | v1 |
 | 6 | 编辑器扩展（TipTap/CM6） | 逻辑（worker） | v1 |
 | 7 | MCP server | 外部进程 | v1（内置先吃） |
@@ -113,6 +113,37 @@ dogfooding 样例。
 | 9 | 主题/字体/图标 | 资源 | v2 |
 
 **UI 槽位系统**（Trilium Launcher 模式扩展）：固定槽位枚举 `bookshelf-item | workspace-nav | sidebar-panel | editor-toolbar | editor-context | command-palette | status-bar | aux-window`。插件声明 `{slot, component, when?}`，宿主渲染；用户可在设置里对"可见/可用"两态增删（launcher 的可见性模型）。
+
+### 4.1 命令声明（commands.json）
+
+`contributes.commands` 是相对插件根的 JSON 文件路径清单，每个文件的内容是命令声明数组：
+
+```json
+[
+  {
+    "id": "写作.黄金三章",
+    "title": "黄金三章",
+    "keywords": "开篇 三章",
+    "function": "runGolden"
+  }
+]
+```
+
+字段与校验：
+
+1. `id`：必填，非空字符串，同一插件内唯一。全局命令 id 由 `commandId` 命名空间化：`/<插件短名>:<声明 id>`，上例是 `/golden3:写作.黄金三章`。
+2. `title`：必填，非空字符串，命令面板显示名。
+3. `keywords`：可选字符串，命令面板按 `title + keywords` 过滤。
+4. `function`：可选，必须是 logic 贡献里的合法具名函数名（字母、数字、`_`、`$`，且不以数字开头）。
+5. 文件路径过 `checkPluginRelPath`：拒绝绝对路径、`..` 越界与拒绝清单命中；扩展名必须是 `.json`。路径被拒时插件置 `failed`。文件缺失、JSON 损坏、不是数组、单条声明不合法时只跳过对应文件或声明并写日志，插件其余贡献照常激活。
+
+注册与执行语义：
+
+1. 命令在插件激活时注册进 `commandRegistry`，注册返回 `Disposable`；插件停用/卸载时由宿主 `unwind` 逆序撤销，面板中同步消失。未激活插件不产生命令。
+2. 只注册带 `function` 的声明。命令面板没有禁用态，不带 `function` 的声明不注册，日志给出跳过原因，避免出现"点了没反应"的空动作。
+3. 未签名插件不注册命令：命令动作经沙箱执行，与 logic 贡献同受来源认证签名约束（fail-closed）。
+4. 点击命令后调用 `runPluginLogic(pluginId, function, {})`：在沙箱内运行具名函数，输入为空对象。运行期仍要求插件处于激活状态并声明 `write:ai`；失败写日志并弹 toast，不静默。
+5. 当前只投影到命令面板；`contributes.commands` 的 `id/title/keywords/function` 之外不读取菜单位置字段。
 
 ## 5. 能力接缝（hooks，harness capability-seams 概念）
 

@@ -57,6 +57,7 @@ export interface PluginContribution {
   types?: string[];
   skills?: string[];
   buildProfiles?: string[];
+  /** 命令声明 JSON 文件（相对路径；格式与执行语义见 commands.ts / docs/design/04 §4.1）。 */
   commands?: string[];
   ui?: string[];
   mcpServers?: Record<string, { command: string; args?: string[] }>;
