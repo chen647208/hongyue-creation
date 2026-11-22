@@ -77,6 +77,8 @@ export interface WritingEditorProps {
   project: Project;
   initialChapterId?: string | null;
   onBack: () => void;
+  /** 回到书籍库；由应用层 view 状态提供。 */
+  onOpenBookshelf: () => void;
   onNavigateToCharacters?: () => void;
   onOpenSettings?: () => void;
 }
@@ -239,6 +241,8 @@ export interface WritingEditorToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   onBack: () => void;
+  /** 回到书籍库。 */
+  onOpenBookshelf: () => void;
   onTitleChange: (title: string) => void;
   onOpenExport: () => void;
   onOpenForeshadow: () => void;

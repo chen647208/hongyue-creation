@@ -297,6 +297,8 @@
   "toolbar": {
     "back": "Back to Structure",
     "backFocus": "Back to Structure (focus mode, Esc exits focus)",
+    "bookshelf": "Library",
+    "bookshelfTitle": "Back to bookshelf",
     "fullscreen": "Fullscreen",
     "typewriterOn": "Enable typewriter mode (cursor stays centered)",
     "typewriterOff": "Disable typewriter mode",
@@ -321,6 +323,7 @@
     "globalHistoryTitle": "Global AI history",
     "chapterHistory": "Chapter history",
     "chapterHistoryTitle": "View AI generation history and snapshots of this chapter",
+    "chapterHistoryEmptyTitle": "History appears after you save or AI revises this chapter",
     "focus": "Focus",
     "undoTitle": "Undo (Ctrl+Z)",
     "redoTitle": "Redo (Ctrl+Shift+Z)",

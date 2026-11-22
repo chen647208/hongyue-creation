@@ -297,6 +297,8 @@
   "toolbar": {
     "back": "返回结构页",
     "backFocus": "返回结构页（专注模式，Esc 退出专注）",
+    "bookshelf": "书架",
+    "bookshelfTitle": "返回书籍库",
     "fullscreen": "全屏",
     "typewriterOn": "开启打字机模式（光标居中跟随）",
     "typewriterOff": "关闭打字机模式",
@@ -321,6 +323,7 @@
     "globalHistoryTitle": "全局AI历史记录",
     "chapterHistory": "章节历史",
     "chapterHistoryTitle": "查看当前章节AI生成历史与快照",
+    "chapterHistoryEmptyTitle": "保存或 AI 改稿后会生成章节历史",
     "focus": "专注",
     "undoTitle": "撤销（Ctrl+Z）",
     "redoTitle": "重做（Ctrl+Shift+Z）",

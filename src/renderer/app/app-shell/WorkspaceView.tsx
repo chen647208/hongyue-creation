@@ -161,6 +161,7 @@ const WorkspaceSection: React.FC<WorkspaceViewProps> = ({
           project={activeProject}
           initialChapterId={editingChapterId}
           onBack={() => onSectionChange('structure', 'chapters')}
+          onOpenBookshelf={onOpenBookshelf}
           onNavigateToCharacters={() => onSectionChange('characters')}
           onOpenSettings={onOpenSettings}
         />

@@ -72,6 +72,43 @@ test('829px 窄窗口：正文列宽度不小于 320px，两侧栏不并排挤�
       .first()
       .evaluate((el) => el.getBoundingClientRect().width);
     expect(editorWidth).toBeGreaterThanOrEqual(320);
+
+    // 返回书籍库入口在 829px 覆盖层布局下仍完整落在视口内
+    const bookshelfExit = page.getByRole('button', { name: /返回书籍库|Back to bookshelf/ });
+    await expect(bookshelfExit).toBeVisible();
+    const exitBox = await bookshelfExit.boundingBox();
+    expect(exitBox).not.toBeNull();
+    expect(exitBox!.x).toBeGreaterThanOrEqual(0);
+    expect(exitBox!.x + exitBox!.width).toBeLessThanOrEqual(829);
+  } finally {
+    await app.close();
+    cleanupUserDataDir(userDataDir);
+  }
+});
+
+test('写作区可点「书架」返回书籍库，无历史时章节历史按钮可见但禁用', async () => {
+  const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-e2e-journey-'));
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    await createBook(page);
+    await page.keyboard.press('Control+5');
+    const createFirst = page.getByRole('button', { name: /新建第一章|Create first chapter/ }).first();
+    await expect(createFirst).toBeVisible({ timeout: 30_000 });
+    await createFirst.click();
+    await expect(page.locator('.ProseMirror').first()).toBeAttached({ timeout: 30_000 });
+
+    // 新章没有 AI 历史：按钮常驻但置灰，可访问名说明何时会产生历史
+    const chapterHistory = page.getByRole('button', { name: /保存或 AI 改稿后会生成章节历史|History appears after/ });
+    await expect(chapterHistory).toBeVisible({ timeout: 30_000 });
+    await expect(chapterHistory).toBeDisabled();
+
+    // 返回入口常驻、键盘可达：聚焦后回车回到书籍库
+    const bookshelf = page.getByRole('button', { name: /返回书籍库|Back to bookshelf/ });
+    await expect(bookshelf).toBeVisible();
+    await bookshelf.focus();
+    await expect(bookshelf).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: /新建书籍|New Book/ }).first()).toBeVisible({ timeout: 30_000 });
   } finally {
     await app.close();
     cleanupUserDataDir(userDataDir);
