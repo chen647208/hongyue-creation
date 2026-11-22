@@ -7,9 +7,11 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { beforeEach,describe, expect, it } from 'vitest';
+import { afterEach,beforeEach,describe, expect, it,vi } from 'vitest';
 
 import type { AppState } from '../../../../shared/types';
+import { dialogService } from '../dialogService';
+import { toast } from '../toastService';
 
 /**
  * 存储层 IPC 契约 + 往返测试。
@@ -110,6 +112,10 @@ describe('storage 往返（Electron 模式）', () => {
     (globalThis as any).localStorage = makeLocalStorage();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('saveState 写入 userData 下的状态文件', async () => {
     const { storage } = await import('../storage');
     await storage.saveState(sampleState());
@@ -133,5 +139,28 @@ describe('storage 往返（Electron 模式）', () => {
     await storage.saveState(sampleState());
     await storage.clearState();
     expect(electron.files.has('/appdata/novalist-data.json')).toBe(false);
+  });
+
+  it('exportCurrentBook 成功时发自动消失 toast 并带保存路径，不弹阻塞确认框', async () => {
+    const project = sampleState().projects[0]!;
+    const filePath = '/tmp/测试书-2026-11-22.json';
+    (globalThis as any).window = {
+      electronAPI: {
+        ...electron.api,
+        saveFileDialog: async () => ({ canceled: false, filePath }),
+      },
+    };
+    const successSpy = vi.spyOn(toast, 'success').mockReturnValue(1);
+    const alertSpy = vi.spyOn(dialogService, 'alert').mockImplementation(() => {});
+
+    const { storage } = await import('../storage');
+    await storage.exportCurrentBook(project);
+
+    expect(electron.files.get(filePath)).toBe(JSON.stringify(project));
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(successSpy).toHaveBeenCalledTimes(1);
+    const message = successSpy.mock.calls[0]![0];
+    expect(message).toContain('导出成功');
+    expect(message).toContain(filePath);
   });
 });
