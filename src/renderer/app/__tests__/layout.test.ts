@@ -14,6 +14,7 @@ import {
   MOBILE_MAX_WIDTH,
   resolveViewportTier,
   resolveWorkspaceChrome,
+  TABLET_MAX_WIDTH,
 } from '../../shared/utils/layout';
 
 describe('resolveViewportTier', () => {
@@ -23,10 +24,11 @@ describe('resolveViewportTier', () => {
     expect(resolveViewportTier(MOBILE_MAX_WIDTH)).toBe('mobile');
   });
 
-  it('越过手机阈值进入 tablet，再进入 desktop', () => {
+  it('越过手机阈值进入 tablet，到 1100px 才进入 desktop', () => {
     expect(resolveViewportTier(MOBILE_MAX_WIDTH + 1)).toBe('tablet');
-    expect(resolveViewportTier(1023)).toBe('tablet');
-    expect(resolveViewportTier(1024)).toBe('desktop');
+    expect(resolveViewportTier(829)).toBe('tablet');
+    expect(resolveViewportTier(TABLET_MAX_WIDTH)).toBe('tablet');
+    expect(resolveViewportTier(TABLET_MAX_WIDTH + 1)).toBe('desktop');
   });
 
   it('零宽与非法宽度按 desktop（测试/无窗口环境不塌缩）', () => {
@@ -47,11 +49,11 @@ describe('resolveWorkspaceChrome', () => {
     });
   });
 
-  it('平板：不落底栏，写作侧栏仍并排，仅顶栏收起', () => {
+  it('平板：不落底栏，但两侧栏都改覆盖层，正文独占一列', () => {
     const plan = resolveWorkspaceChrome('tablet');
     expect(plan.bottomNav).toBe(false);
-    expect(plan.assistantOverlay).toBe(false);
-    expect(plan.writingSidebarOverlay).toBe(false);
+    expect(plan.assistantOverlay).toBe(true);
+    expect(plan.writingSidebarOverlay).toBe(true);
     expect(plan.compactTopbar).toBe(true);
   });
 

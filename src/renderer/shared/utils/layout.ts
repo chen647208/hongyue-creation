@@ -17,8 +17,11 @@
 
 /** 手机档上限（含）：约 360–430px 机型与折叠屏外屏。 */
 export const MOBILE_MAX_WIDTH = 639;
-/** 平板档上限（含）。 */
-export const TABLET_MAX_WIDTH = 1023;
+/**
+ * 三栏并排的最小宽度（桌面档下限）：助手栏 380px + 写作左栏 320px 再加正文，
+ * 低于此宽度并排会把正文压到一行放不下十个字。窄于它时两侧栏改覆盖层，正文独占一列。
+ */
+export const TABLET_MAX_WIDTH = 1099;
 /** 触控命中区最小边长（px），对应设计稿 44px 要求。 */
 export const MIN_TOUCH_TARGET_PX = 44;
 
@@ -49,11 +52,13 @@ export function resolveViewportTier(width: number): ViewportTier {
 export function resolveWorkspaceChrome(tier: ViewportTier): WorkspaceChromePlan {
   const mobile = tier === 'mobile';
   const tablet = tier === 'tablet';
+  // 手机与平板档（< 1100px）都不做三栏并排：侧栏改覆盖层，正文独占一列。
+  const narrow = mobile || tablet;
   return {
-    compactTopbar: mobile || tablet,
+    compactTopbar: narrow,
     bottomNav: mobile,
-    assistantOverlay: mobile,
-    writingSidebarOverlay: mobile,
+    assistantOverlay: narrow,
+    writingSidebarOverlay: narrow,
     minTouchTarget: MIN_TOUCH_TARGET_PX,
   };
 }
