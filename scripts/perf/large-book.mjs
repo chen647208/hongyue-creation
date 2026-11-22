@@ -32,21 +32,19 @@
  *
  * 基线数字（2026-11-22，Windows 10 / Node 24.11 / better-sqlite3 3.53.4，
  * 1000 章 × 1 万字；同机多次运行取值区间）：
- *   - 首帧全量落盘 saveAll：约 9～15 秒（1000 章）—— 见下方“已知问题”；
- *   - 改一章落盘 saveProject：0.65～0.87 秒（1000 章），100 章约 0.06～0.09 秒，近似线性；
- *   - 冷启动 loadAll：0.57～0.66 秒；打开本书 loadBookContent：0.16～0.20 秒；
+ *   - 首帧全量落盘 saveAll：约 3.2 秒（1000 章），每章成本近似持平；
+ *   - 改一章落盘 saveProject：约 0.63 秒（1000 章），100 章约 0.06 秒，近似线性；
+ *   - 冷启动 loadAll：约 0.60 秒；打开本书 loadBookContent：约 0.17 秒；
  *   - 改一章时 computePersistDiff：0.0～0.1 毫秒（书级引用比较，与章数无关）；
  *   - JSON 后端整份序列化：28.8 MB / 约 28～37 毫秒（1000 万字）；
- *   - SQLite 库体积：100.6 MB；JSON 快照体积：28.8 MB。
+ *   - SQLite 库体积：100.7 MB；JSON 快照体积：28.8 MB。
  *
- * 已知问题（本脚本发现的唯一二次方，尚未修）：
- *   首帧全量落盘是 O(章数²)。根因在 nodes_fts：node_id 列是 UNINDEXED，
- *   `DELETE FROM nodes_fts WHERE node_id = ?` 只能全表扫描，FTS5 还要为扫到的行
- *   重新分词；saveAll 对每个节点先删后插一次，合计 N 次全表扫描。
- *   隔离验证（只跑这两条语句，file + WAL + FULL，正文 1 万字）：100 行约 0.06 秒、
- *   500 行约 0.45 秒、1000 行约 7.8 秒（机器空闲时；负载高时数值成倍上浮，
- *   但增长形状不变）。1000 章整书首写因此约 9～15 秒。
- *   日常改一章只删一行，仍在 1 秒内，不受这条影响。
+ * FTS 写入路径：
+ *   nodes_fts 的 node_id/book_id 是 UNINDEXED 列，直接按它们过滤会全表扫描；
+ *   写入与删除都经 fts_docs(node_id → rowid) 映射按 rowid 命中。
+ *   下方隔离验证复刻这条序列，用于确认每章成本不随整库体积上翘。
+ *   1000 章档单次可能上翘到 1.6 倍左右，隔离验证为线性，先按抖动处理：
+ *   连续跑两三次取稳定值，再看“每章成本”一栏。
  *
  * 怎么判断：看“每章成本”那一栏是否随规模持平。
  *   持平 = 线性；明显上升 = 有随书规模膨胀的二次方或高常数项。
@@ -253,12 +251,12 @@ async function loadModules() {
 }
 
 /**
- * 隔离验证：只跑 saveAll/saveProject 里对 nodes_fts 的那两条语句，其余全部剔除。
+ * 隔离验证：只跑 saveAll/saveProject 里对 nodes_fts 的写入序列，其余全部剔除。
  * 设置与生产一致：file + WAL + synchronous=FULL、正文长度同 CHAPTER_CHARS、
  * 每个节点先删后插、全部在单事务内。
  *
- * node_id 是 UNINDEXED，`DELETE ... WHERE node_id = ?` 只能全表扫描；
- * FTS5 还要为命中的行重新分词，扫描成本随全表内容体积（行数 × 每行字数）增长。
+ * nodes_fts 的 node_id/book_id 是 UNINDEXED 列，按它们过滤只能全表扫描；
+ * 写入路径经 fts_docs(node_id → rowid) 映射按 rowid 删除，本段复刻该序列。
  */
 function ftsWriteScaling(rowCount) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hongyue-perf-fts-'));
@@ -268,15 +266,19 @@ function ftsWriteScaling(rowCount) {
   db.pragma('busy_timeout = 5000');
   db.pragma('wal_autocheckpoint = 1000');
   db.exec(SQL_DDL_FTS);
-  const insert = db.prepare('INSERT INTO nodes_fts(book_id, node_id, type, title, content) VALUES(?,?,?,?,?)');
-  const del = db.prepare('DELETE FROM nodes_fts WHERE node_id = ?');
+  const docs = db.prepare('INSERT OR REPLACE INTO fts_docs(node_id, book_id) VALUES(?, ?)');
+  const del = db.prepare('DELETE FROM nodes_fts WHERE rowid IN (SELECT rowid FROM fts_docs WHERE node_id = ?)');
+  const insert = db.prepare(
+    'INSERT INTO nodes_fts(rowid, book_id, node_id, type, title, content) SELECT d.rowid, ?, ?, ?, ?, ? FROM fts_docs d WHERE d.node_id = ?',
+  );
   const body = makeBody(0, CHAPTER_CHARS);
   const t0 = nowMs();
   try {
     db.exec('BEGIN');
     for (let i = 0; i < rowCount; i += 1) {
+      docs.run(`n${i}`, 'b');
       del.run(`n${i}`);
-      insert.run('b', `n${i}`, 'novel.chapter', `第 ${i} 章`, body);
+      insert.run('b', `n${i}`, 'novel.chapter', `第 ${i} 章`, body, `n${i}`);
     }
     db.exec('COMMIT');
   } finally {
@@ -287,10 +289,18 @@ function ftsWriteScaling(rowCount) {
   return { rowCount, totalMs, perCallMs: totalMs / rowCount };
 }
 
-/** 与 shared/sql/catalog.ts 的 migration.v2.nodesFts 同形（UNINDEXED 是问题根因）。 */
-const SQL_DDL_FTS = `CREATE VIRTUAL TABLE nodes_fts USING fts5(
+/** 与 shared/sql/catalog.ts 的 migration.v2.nodesFts + migration.v6.ftsDocs 同形。 */
+const SQL_DDL_FTS = `
+CREATE VIRTUAL TABLE nodes_fts USING fts5(
   book_id UNINDEXED, node_id UNINDEXED, type UNINDEXED, title, content, tokenize = 'trigram'
-)`;
+);
+CREATE TABLE fts_docs (
+  rowid   INTEGER PRIMARY KEY,
+  node_id TEXT NOT NULL UNIQUE,
+  book_id TEXT NOT NULL
+);
+CREATE INDEX idx_fts_docs_book ON fts_docs(book_id);
+`;
 
 function dirBytes(files) {
   let total = 0;
@@ -509,7 +519,7 @@ function printScaling(rows) {
   }
   if (allFlags.length > 0) {
     console.log(
-      `  结论：首写全量是二次方。根因见下方隔离验证（nodes_fts 的 node_id 无索引，逐节点删除各扫全表）。`,
+      `  结论：首写全量存在超线性项（章数 ${allFlags.join(', ')} 档上翘），先看下方隔离验证定位。`,
     );
   } else {
     console.log('  结论：首写全量随章数近似线性。');
@@ -557,8 +567,8 @@ async function main() {
   console.log(
     `  行数 ×${ftsRowsRatio.toFixed(0)} → 总耗时 ×${ftsTimeRatio.toFixed(1)}（` +
       (ftsTimeRatio > ftsRowsRatio * 2
-        ? '明显超线性：全表扫描叠加重新分词，总成本随行数二次增长）'
-        : '近似线性：正文较短时全表扫描的常数项尚未放大）'),
+        ? '明显超线性：检查 fts_docs 映射是否命中、FTS 索引是否异常膨胀）'
+        : '近似线性：映射按 rowid 命中，成本随行数增长）'),
   );
 
   console.log('\n备注');
