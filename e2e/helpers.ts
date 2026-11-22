@@ -2,6 +2,15 @@ import { rmSync } from 'node:fs';
 import { expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 
 /**
+ * 等启动阶段结束：状态载入、差分基线建立、持久化桥就绪后才允许交互。
+ * 界面在载入完成前就能点，抢跑会让建书/改主题被随后灌入的磁盘状态覆盖。
+ * reload 之后同样要等，否则书卡还没投影出来。
+ */
+export const waitForBoot = async (page: Page): Promise<void> => {
+  await expect(page.locator('html[data-boot-state="ready"]')).toHaveCount(1, { timeout: 60_000 });
+};
+
+/**
  * E2E 共用启动与建书助手。
  * 用户数据隔离：--user-data-dir 指临时目录，绝不碰真实用户数据。
  * --lang 固定中文：CI 的 Linux 无头环境默认英文，中文选择器会全灭。
@@ -32,6 +41,7 @@ export const launchApp = async (userDataDir: string): Promise<{ app: ElectronApp
     }
   });
   await expect(page!.locator('body')).toBeVisible({ timeout: 30_000 });
+  await waitForBoot(page!);
   return { app, page: page! };
 };
 
@@ -52,8 +62,13 @@ export const flushPersistence = async (app: ElectronApplication): Promise<void> 
   await app.evaluate(({ ipcMain, BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0];
     if (!win) return Promise.resolve();
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        ipcMain.removeListener('app:flush-done', onDone);
+        reject(new Error('刷盘握手超时：渲染层 30 秒内未回应 app:flush-done'));
+      }, 30_000);
       const onDone = (): void => {
+        clearTimeout(timer);
         ipcMain.removeListener('app:flush-done', onDone);
         resolve();
       };

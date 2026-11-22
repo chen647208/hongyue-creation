@@ -140,6 +140,10 @@ export function useAppBootstrap(): void {
       } catch (error) {
         logger.error('Failed to load initial state:', error);
         dialogService.alert(dt('app:storage.loadFailed', { message: error instanceof Error ? error.message : String(error) }));
+      } finally {
+        // 启动阶段结束的可观测标记：e2e 等它再动手，避免在加载完成前建书/改主题，
+        // 被随后灌入的磁盘状态覆盖。加载失败也标记，损坏用例随后校验错误提示。
+        document.documentElement.dataset.bootState = 'ready';
       }
     })();
   }, []);
