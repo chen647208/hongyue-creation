@@ -9,6 +9,24 @@ test('朗读设置：系统引擎试听、切换引擎换配置项、保存后�
   const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-e2e-tts-'));
   const { app, page } = await launchApp(userDataDir);
   try {
+    // CI 的 Linux 容器没有系统语音包：speak 会立刻报错，试听按钮来不及显示「停止」。
+    // 这里换成可控的合成器桩，让「试听 → 停止」状态机在任意平台行为一致。
+    await page.evaluate(() => {
+      const synth = window.speechSynthesis;
+      const stubVoice = {
+        name: 'E2E Voice',
+        lang: 'zh-CN',
+        default: true,
+        localService: true,
+        voiceURI: 'e2e',
+      } as SpeechSynthesisVoice;
+      synth.getVoices = () => [stubVoice];
+      synth.speak = (utterance: SpeechSynthesisUtterance) => {
+        // 只报告开始，不报告结束：模拟持续朗读，直到调用方点「停止」
+        window.setTimeout(() => utterance.onstart?.(new Event('start') as unknown as SpeechSynthesisEvent), 0);
+      };
+      synth.cancel = () => undefined;
+    });
     await createBook(page);
     await page.keyboard.press('Control+1');
     await page.getByRole('button', { name: /^设置$|^Settings$/ }).first().click();

@@ -64,6 +64,10 @@ const TtsSettingsPanel: React.FC<TtsSettingsPanelProps> = ({ tts, onTtsChange })
   const handlePreview = (): void => {
     stopSpeech();
     setProbeError(null);
+    if (tts.provider === 'system' && !loadingVoices && voices.length === 0) {
+      setProbeError(t('tts.noVoices'));
+      return;
+    }
     const playback = startSpeech(previewText, tts, {
       onEnd: (error) => {
         setSpeaking(false);
