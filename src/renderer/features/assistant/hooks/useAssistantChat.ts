@@ -17,12 +17,14 @@ import { indexService } from '@core/index';
 import type { TFunction } from 'i18next';
 import { type Dispatch,type SetStateAction,useCallback, useEffect, useRef, useState } from 'react';
 
+import { useSettingsStore } from '@/app/stores/settingsStore';
 import { loadViewContextScope } from '@/app/viewContext';
 import { AICardCommandService } from '@/shared/services/cards/aiCardCommandService';
 import { AICardCreationService } from '@/shared/services/cards/aiCardCreationService';
 import { getDefaultCardPrompts } from '@/shared/services/cards/cardPromptService';
 import { getEditorContext } from '@/shared/services/editorContextService';
 import { resolveEffectiveModel } from '@/shared/services/localInferenceService';
+import { isTtsAvailable, startSpeech, stopSpeech } from '@/shared/services/ttsService';
 import { isModelUsable } from '@/shared/utils/modelReadiness';
 
 import { ATTACHMENT_TRUNCATE } from '../../../../shared/constants/chapters';
@@ -134,6 +136,8 @@ export function useAssistantChat({
   const { buildHistoryTurns } = useAssistantHistory({ messages, historySummary, setHistorySummary });
 
   const sendMessageInternal = async (text: string, attachments: KnowledgeItem[], images: AIMessageImage[] = []) => {
+    // 用户开始下一轮对话即停止当前朗读，避免旧答复继续念
+    stopSpeech();
     if (project && AICardCommandService.isValidCommand(text)) {
       setIsLoading(true);
 
@@ -323,14 +327,20 @@ export function useAssistantChat({
     }
     const citations = collectCitations(sessionEvents);
     setLastInjection(sessionManager.getLastInjection(result.sessionId));
+    const reply = result.ok ? result.reply : (result.error ?? t('chat.callFailedContent'));
     setMessages(prev => [...prev, {
       id: (Date.now() + 1).toString(),
       role: 'assistant' as const,
-      content: result.ok ? result.reply : (result.error ?? t('chat.callFailedContent')),
+      content: reply,
       timestamp: Date.now(),
       error: result.ok ? undefined : t('chat.callFailed'),
       citations: citations.length ? citations : undefined,
     }]);
+    // 自动朗读只念正常答复：错误提示与卡片结果不念
+    if (result.ok) {
+      const { tts } = useSettingsStore.getState();
+      if (tts.autoSpeak && isTtsAvailable(tts)) startSpeech(reply, tts);
+    }
     setIsLoading(false);
   };
 

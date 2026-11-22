@@ -716,6 +716,8 @@
     "preview": "Preview",
     "stop": "Stop",
     "previewHint": "Plays the text above with current settings. No audio is saved.",
+  "autoSpeakLabel": "Read assistant replies aloud",
+  "autoSpeakHint": "Speaks each assistant reply with the engine above; stops when you send the next message.",
     "unsupported": "This engine is unavailable here. Check your system voices or finish the settings above.",
   "noVoices": "No system voices are installed. Install a voice pack in your OS, or switch to a cloud engine.",
     "systemDefaultVoice": "System default voice"

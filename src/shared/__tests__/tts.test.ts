@@ -28,6 +28,12 @@ describe('normalizeTtsConfig', () => {
     expect(config.pitch).toBe(0.5);
   });
 
+  it('自动朗读默认关闭，只有显式 true 才开启', () => {
+    expect(normalizeTtsConfig(undefined).autoSpeak).toBe(false);
+    expect(normalizeTtsConfig({ autoSpeak: 'yes' as never }).autoSpeak).toBe(false);
+    expect(normalizeTtsConfig({ autoSpeak: true }).autoSpeak).toBe(true);
+  });
+
   it('保留合法云端配置', () => {
     const config = normalizeTtsConfig({ provider: 'openai', apiKey: 'vault:tts', voice: 'nova', rate: 1.25 });
     expect(config.provider).toBe('openai');

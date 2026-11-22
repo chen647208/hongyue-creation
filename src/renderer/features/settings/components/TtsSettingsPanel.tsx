@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { Input } from '@/shared/ui/Input';
 import { Label } from '@/shared/ui/Label';
 import { Select } from '@/shared/ui/Select';
+import { Switch } from '@/shared/ui/Switch';
 
 interface TtsSettingsPanelProps {
   tts: TtsConfig;
@@ -233,6 +234,18 @@ const TtsSettingsPanel: React.FC<TtsSettingsPanelProps> = ({ tts, onTtsChange })
                 className="w-full accent-primary"
               />
             </div>
+          </div>
+
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor="tts-autospeak">{t('tts.autoSpeakLabel')}</Label>
+              <p className={fieldHint}>{t('tts.autoSpeakHint')}</p>
+            </div>
+            <Switch
+              id="tts-autospeak"
+              checked={tts.autoSpeak}
+              onCheckedChange={(checked) => patch({ autoSpeak: checked })}
+            />
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

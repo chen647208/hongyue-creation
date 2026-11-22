@@ -47,8 +47,10 @@ test('朗读设置：系统引擎试听、切换引擎换配置项、保存后�
     await expect(page.locator('#tts-model')).toBeVisible();
     await expect(page.locator('#tts-apikey')).toBeVisible();
 
-    // 语速改到 1.5 后保存并退出
+    // 语速改到 1.5、打开自动朗读后保存并退出
     await page.locator('#tts-rate').fill('1.5');
+    await page.locator('#tts-autospeak').click();
+    await expect(page.locator('#tts-autospeak')).toHaveAttribute('data-state', 'checked');
     await dialog.getByRole('button', { name: /^应用并保存配置$|^Apply and save$/ }).click();
     await expect(dialog).toBeHidden({ timeout: 15_000 });
 
@@ -68,6 +70,7 @@ test('朗读设置：系统引擎试听、切换引擎换配置项、保存后�
       await dialog2.getByRole('button', { name: /^(朗读|Speech)$/ }).first().click();
       await expect(relaunched.page.locator('#tts-endpoint')).toBeVisible();
       await expect(relaunched.page.locator('#tts-rate')).toHaveValue('1.5');
+      await expect(relaunched.page.locator('#tts-autospeak')).toHaveAttribute('data-state', 'checked');
     } finally {
       await relaunched.app.close();
     }

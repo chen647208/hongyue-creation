@@ -30,6 +30,7 @@ const config = (over: Partial<TtsConfig> = {}): TtsConfig => ({
   voice: 'alloy',
   rate: 1,
   pitch: 1,
+  autoSpeak: false,
   ...over,
 });
 

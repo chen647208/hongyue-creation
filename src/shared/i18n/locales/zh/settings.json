@@ -716,6 +716,8 @@
     "preview": "试听",
     "stop": "停止",
     "previewHint": "使用上面的文本按当前配置试听，不会保存任何音频。",
+  "autoSpeakLabel": "自动朗读助手回复",
+  "autoSpeakHint": "助手每次给出答复后自动念出来；开始下一轮对话时停止。",
     "unsupported": "当前环境不支持该引擎，请检查系统语音或完善上方配置。",
   "noVoices": "系统里没有可用的语音包。请先在操作系统里安装语音，或改用云端引擎。",
     "systemDefaultVoice": "系统默认音色"

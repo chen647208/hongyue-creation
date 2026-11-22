@@ -45,6 +45,8 @@
 - 长文按句切段（`shared/constants/tts.ts` 的 `splitForSpeech`，单段 600 字、总量 6 万字上限），
   播放服务 `shared/services/ttsService.ts` 逐段播放并预取下一段；助手消息与写作区共用
   `shared/hooks/useSpeechPlayback`。
+- 自动朗读 `AppState.tts.autoSpeak`（默认关闭）：助手正常答复写入消息流后按当前引擎播放，
+  错误提示与卡片结果不念；发送下一轮对话时停止。
 
 ## 关联模块
 

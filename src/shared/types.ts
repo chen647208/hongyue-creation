@@ -1734,6 +1734,8 @@ export interface TtsConfig {
   rate: number;
   /** 音高倍率：0.5–2，1 为正常（仅 system/azure 生效）。 */
   pitch: number;
+  /** 助手每次给出答复后自动朗读；默认关闭。 */
+  autoSpeak: boolean;
 }
 
 /** 合成结果：每段一条 base64 mp3，失败带 error。 */
