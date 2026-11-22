@@ -35,6 +35,25 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ open, onOpenChange, com
     }
   }, [open]);
 
+  /**
+   * Esc 关闭：在窗口捕获阶段先处理。
+   *
+   * Radix 只把 Esc 交给它认定的最上层弹层，而面板刚挂载的一两帧里上层交接还没完成
+   * （设置弹层页签切换后尤其明显），这一次按键会被下面的设置弹层接走，面板留在原地。
+   * 窗口捕获早于 Radix 挂在 document 上的监听，保证 Esc 关闭面板、不误关下层。
+   */
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      onOpenChange(false);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [open, onOpenChange]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return commands;
