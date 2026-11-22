@@ -49,6 +49,7 @@ export const DEFAULT_TTS_CONFIG: TtsConfig = {
   voice: TTS_DEFAULT_VOICES.system,
   rate: 1,
   pitch: 1,
+  autoSpeak: false,
 };
 
 /** 归一化外部读入的配置（缺字段回退默认，越界值夹到区间内）。 */
@@ -65,6 +66,7 @@ export function normalizeTtsConfig(raw: Partial<TtsConfig> | null | undefined): 
     region: typeof raw?.region === 'string' && raw.region ? raw.region : undefined,
     rate: clamp(raw?.rate, TTS_RATE_RANGE, 1),
     pitch: clamp(raw?.pitch, TTS_PITCH_RANGE, 1),
+    autoSpeak: raw?.autoSpeak === true,
   };
 }
 
