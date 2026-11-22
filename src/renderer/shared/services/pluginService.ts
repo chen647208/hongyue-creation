@@ -28,7 +28,7 @@ import type {
   PluginStatus,
 } from '@core/plugin';
 import { formulaId, installExecutableDescriptors, installFormulas, installHooks, installTypeTemplates, loadPluginCatalog, PermissionDenied, PluginHost, type RendererRegistry, type ScriptExecutionPort, type ScriptRegistry, typeTemplateId } from '@core/plugin';
-import { adjudicateHandlerResult, checkPluginFileName, checkPluginRelPath, readPluginCommands, type SandboxRunResult } from '@core/plugin';
+import { adjudicateHandlerResult, assertPermission, checkPluginFileName, checkPluginRelPath, readPluginCommands, type SandboxRunResult } from '@core/plugin';
 import { builtinRegistry } from '@core/types-registry';
 import { STORAGE_KEYS } from '@shared/constants/storageKeys';
 import { parseSignatureEnvelope } from '@shared/pluginSignature';
@@ -71,6 +71,9 @@ let activeHost: PluginHost | null = null;
 
 /** 逻辑贡献源码：`<pluginId>:<file>` → 代码（调用时才进沙箱）。 */
 const logicHandlers = new Map<string, string>();
+
+/** 命令 id → 注册它的插件 id：同名命令碰撞时据此说明占用方。 */
+const commandOwners = new Map<string, string>();
 
 function logicKey(pluginId: string, file: string): string {
   return `${pluginId}:${file}`;
@@ -454,31 +457,60 @@ export function createContributionInstaller(deps: PluginDeps): ContributionInsta
     }
     if (commandDeclarations.commands.length > 0 && plugin.signed !== true) {
       logger.warn(`未签名插件 ${manifest.id}：跳过 command 贡献（可执行动作需要签名）`);
-    } else {
-      for (const command of commandDeclarations.commands) {
-        const fn = command.fn;
-        if (!fn) {
-          logger.warn(`插件 ${manifest.id} 命令「${command.declaredId}」跳过：未声明 function，命令面板没有禁用态`);
-          continue;
+    } else if (commandDeclarations.commands.length > 0) {
+      // 权限前置：命令执行走 runPluginLogic，要求插件声明 write:ai。
+      // 不具备就整批不注册并说明原因，否则命令会出现在面板、用户点击后才收到权限错误。
+      const hasExecutable = commandDeclarations.commands.some((command) => command.fn !== undefined);
+      let permitted = true;
+      if (hasExecutable) {
+        try {
+          assertPermission(manifest, 'write', 'ai');
+        } catch (error) {
+          permitted = false;
+          logger.warn(`插件 ${manifest.id}：跳过 command 贡献（${error instanceof Error ? error.message : String(error)}）`);
         }
-        const dispose = commandRegistry.register({
-          id: command.id,
-          title: command.title,
-          keywords: command.keywords,
-          run: () => {
-            const reportFailure = (message: string): void => {
-              const text = i18n.t('errors:plugins.commandFailed', { title: command.title, message });
-              logger.warn(`插件 ${manifest.id} 命令「${command.title}」执行失败：${message}`);
-              toast.error(text);
-            };
-            void runPluginLogic(manifest.id, fn, {})
-              .then((result) => {
-                if (!result.ok) reportFailure(result.error?.message ?? i18n.t('errors:plugins.installFailedGeneric'));
-              })
-              .catch((error: unknown) => reportFailure(error instanceof Error ? error.message : String(error)));
-          },
-        });
-        sink.add({ dispose });
+      }
+      if (permitted) {
+        for (const command of commandDeclarations.commands) {
+          const fn = command.fn;
+          if (!fn) {
+            logger.warn(`插件 ${manifest.id} 命令「${command.declaredId}」跳过：未声明 function，命令面板没有禁用态`);
+            continue;
+          }
+          // 同名命令碰撞：不同插件短名相同时，命名空间化后的 id 会重合。
+          // 后装配者跳过，不覆盖先注册者；否则先注册方卸载时会把后注册方的命令一并删掉。
+          if (commandRegistry.has(command.id)) {
+            const occupant = commandOwners.get(command.id);
+            logger.warn(
+              `插件 ${manifest.id} 命令「${command.declaredId}」跳过：id ${command.id} 已被${occupant ? `插件 ${occupant}` : '其他来源'}占用`,
+            );
+            continue;
+          }
+          const dispose = commandRegistry.register({
+            id: command.id,
+            title: command.title,
+            keywords: command.keywords,
+            run: () => {
+              const reportFailure = (message: string): void => {
+                const text = i18n.t('errors:plugins.commandFailed', { title: command.title, message });
+                logger.warn(`插件 ${manifest.id} 命令「${command.title}」执行失败：${message}`);
+                toast.error(text);
+              };
+              void runPluginLogic(manifest.id, fn, {})
+                .then((result) => {
+                  if (!result.ok) reportFailure(result.error?.message ?? i18n.t('errors:plugins.installFailedGeneric'));
+                })
+                .catch((error: unknown) => reportFailure(error instanceof Error ? error.message : String(error)));
+            },
+          });
+          commandOwners.set(command.id, manifest.id);
+          sink.add({
+            dispose: () => {
+              dispose();
+              if (commandOwners.get(command.id) === manifest.id) commandOwners.delete(command.id);
+            },
+          });
+        }
       }
     }
 
