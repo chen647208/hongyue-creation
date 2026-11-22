@@ -8,6 +8,7 @@
  */
 
 import { isEncryptedEnvelope } from '@core/crypto';
+import { ChevronsRight } from 'lucide-react';
 import React, { useCallback,useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -67,7 +68,7 @@ import {
 const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId, onBack, onNavigateToCharacters, onOpenSettings }) => {
   const { t } = useTranslation(['writing', 'steps']);
   // 窄视口侧栏改抽屉覆盖层：默认收起，避免挤压正文（docs/design/35 §2）
-  const isMobile = resolveWorkspaceChrome(useViewportTier()).writingSidebarOverlay;
+  const isNarrow = resolveWorkspaceChrome(useViewportTier()).writingSidebarOverlay;
   // 直读 store：模型/提示词/更新动作不再经 App→View 层层透传
   const prompts = useSettingsStore((s) => s.prompts);
   // 手写 bypass 下可能为 undefined，未填凭证的默认模型也不可用：AI 入口各自守卫，调用前收窄
@@ -86,7 +87,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
     });
   const [activeChapterId, setActiveChapterId] = useState<string | null>(initialChapterId || null);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => !isMobile);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => !isNarrow);
   const [lastSaved, setLastSaved] = useState<number>(Date.now());
   const [saveDirty, setSaveDirty] = useState(false);
   // 编辑器视觉态：专注模式 / 打字机 / 纸张 / 剧本格式，统一见 useWritingViewMode
@@ -626,9 +627,9 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
         onOpenSettings={onOpenSettings}
       />
 
-      {/* Sidebar & Editor Areas：手机档侧栏改抽屉覆盖层，桌面档保持并排分栏 */}
+      {/* Sidebar & Editor Areas：窄视口侧栏改抽屉覆盖层，宽屏保持并排分栏 */}
       {isSidebarOpen && !isFocusMode && (
-        isMobile ? (
+        isNarrow ? (
           <div className="fixed inset-0 z-overlay" role="dialog" aria-modal="true" aria-label={t('sidebar.title')}>
             <button
               type="button"
@@ -778,23 +779,61 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
         onClose={() => setIsForeshadowOpen(false)}
       />
 
-      <FeaturePanel
-        id="writing.tools"
-        isOpen={isToolsOpen}
-        project={project}
-        chapter={activeChapter ?? null}
-        onFormatChapter={handleFormatChapter}
-        onFormatAll={handleFormatAll}
-        onApplyProofread={handleApplyProofread}
-        onInsertSnippet={(text: string) => {
-          editorRef.current?.insertText(text);
-        }}
-        screenplayFormat={screenplayFormat}
-        onToggleScreenplayFormat={viewMode.setScreenplayFormat}
-        paper={paper}
-        onPaperChange={viewMode.setPaper}
-        onClose={() => setIsToolsOpen(false)}
-      />
+      {/* 写作工具：宽屏常驻右栏；窄视口改右侧抽屉，默认不占正文宽度 */}
+      {isNarrow ? (
+        isToolsOpen && (
+          <div className="fixed inset-0 z-overlay" role="dialog" aria-modal="true" aria-label={t('toolbar.toolsTitle')}>
+            <button
+              type="button"
+              aria-label={t('sidebar.close')}
+              className="absolute inset-0 bg-foreground/40"
+              onClick={() => setIsToolsOpen(false)}
+            />
+            <div className="absolute inset-y-0 right-0 w-[85vw] max-w-sm overflow-y-auto bg-card p-4 shadow-xl">
+              <div className="mb-2 flex justify-end">
+                <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={() => setIsToolsOpen(false)} aria-label={t('sidebar.close')}>
+                  <ChevronsRight className="size-4" />
+                </Button>
+              </div>
+              <FeaturePanel
+                id="writing.tools"
+                isOpen
+                project={project}
+                chapter={activeChapter ?? null}
+                onFormatChapter={handleFormatChapter}
+                onFormatAll={handleFormatAll}
+                onApplyProofread={handleApplyProofread}
+                onInsertSnippet={(text: string) => {
+                  editorRef.current?.insertText(text);
+                }}
+                screenplayFormat={screenplayFormat}
+                onToggleScreenplayFormat={viewMode.setScreenplayFormat}
+                paper={paper}
+                onPaperChange={viewMode.setPaper}
+                onClose={() => setIsToolsOpen(false)}
+              />
+            </div>
+          </div>
+        )
+      ) : (
+        <FeaturePanel
+          id="writing.tools"
+          isOpen={isToolsOpen}
+          project={project}
+          chapter={activeChapter ?? null}
+          onFormatChapter={handleFormatChapter}
+          onFormatAll={handleFormatAll}
+          onApplyProofread={handleApplyProofread}
+          onInsertSnippet={(text: string) => {
+            editorRef.current?.insertText(text);
+          }}
+          screenplayFormat={screenplayFormat}
+          onToggleScreenplayFormat={viewMode.setScreenplayFormat}
+          paper={paper}
+          onPaperChange={viewMode.setPaper}
+          onClose={() => setIsToolsOpen(false)}
+        />
+      )}
     </div>
   );
 };

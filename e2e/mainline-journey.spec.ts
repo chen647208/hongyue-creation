@@ -42,6 +42,42 @@ test('先手写看看跨重启保留：再次进写作区不再被模型拦截',
   }
 });
 
+test('829px 窄窗口：正文列宽度不小于 320px，两侧栏不并排挤压', async () => {
+  const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-e2e-journey-'));
+  const { app, page } = await launchApp(userDataDir);
+  try {
+    await createBook(page);
+    // 内容区固定 829×700（审计实测的窄窗口尺寸）。
+    // 开发模式 DevTools 停靠会先吃掉窗口宽度，产品窗口最小宽 1200：测试里先关 DevTools、
+    // 放宽最小尺寸，才能得到真实 829px 的 CSS 视口。
+    await app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (!win) return;
+      win.webContents.closeDevTools();
+      win.setMinimumSize(400, 400);
+      win.setContentSize(829, 700);
+    });
+    await expect
+      .poll(() => page.evaluate(() => window.innerWidth), { timeout: 15_000 })
+      .toBe(829);
+
+    await page.keyboard.press('Control+5');
+    const createFirst = page.getByRole('button', { name: /新建第一章|Create first chapter/ }).first();
+    await expect(createFirst).toBeVisible({ timeout: 30_000 });
+    await createFirst.click();
+    await expect(page.locator('.ProseMirror').first()).toBeAttached({ timeout: 30_000 });
+
+    const editorWidth = await page
+      .locator('.ProseMirror')
+      .first()
+      .evaluate((el) => el.getBoundingClientRect().width);
+    expect(editorWidth).toBeGreaterThanOrEqual(320);
+  } finally {
+    await app.close();
+    cleanupUserDataDir(userDataDir);
+  }
+});
+
 test('首启向导点「开始写」直接进工作台，不自动弹设置', async () => {
   const userDataDir = mkdtempSync(join(tmpdir(), 'hongyue-e2e-journey-'));
   const { app, page } = await launchApp(userDataDir);
