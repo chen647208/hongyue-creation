@@ -9,3 +9,4 @@
 | [28-doc-impl-gaps.md](28-doc-impl-gaps.md) | 2026-09 文档-实现对账快照；未做项记录于 `design/48-backlog.md` 文末（用户明确暂缓） |
 | [acceptance-report.md](acceptance-report.md) | 2026-09 设计验收报告；验收证据随提交保留，当前行为以 features 为准 |
 | [quality-audit-2026-09.md](quality-audit-2026-09.md) | 2026-09 代码质量审查快照；审查项全部处理完毕 |
+| [mainline-journey-audit-2026-11-22.md](mainline-journey-audit-2026-11-22.md) | 2026-11-22 主线旅程审计快照；P1/P2 卡点已在 #67、#68 修复 |
