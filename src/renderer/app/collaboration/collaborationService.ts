@@ -26,6 +26,7 @@ import { applyProjectToDoc, docToProjectPatch, getChapterFragment } from '@/feat
 import { parseViewLayout, serializeViewLayout } from '@/features/views/viewLayout';
 import { localStore } from '@/shared/services/localStore';
 import { logger } from '@/shared/utils/logger';
+import { createLocalIdentity, type PeerIdentity } from '@/shared/utils/peerIdentity';
 
 import { useGenericModelStore } from '../stores/genericModelStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -44,6 +45,8 @@ interface CollaborationSession {
   room: string;
   doc: Y.Doc;
   awareness: Awareness;
+  /** 本端身份：编辑器重挂载时回写给光标插件，避免它用默认值覆盖。 */
+  identity: PeerIdentity;
   transport: CollaborationTransport;
   unsubscribe: () => void;
   /** 视图存储订阅：本地画布布局变化推送进文档。 */
@@ -76,9 +79,6 @@ const adoptedCanvasViews = new Set<string>();
 /** 每个视图最近一次与文档对齐的 config（JSON）。store 触发的推送只在 config 真正变化时执行，
  * 否则「收到远程墓碑 → pull 完成前」的任何 store 触发都会用陈旧 config 把已删元素复活。 */
 const canvasSyncedConfigs = new Map<string, string>();
-
-/** 协作光标颜色池。 */
-const PEER_COLORS = ['#e5484d', '#0091ff', '#30a46c', '#f76b15', '#8e4ec6', '#e93d82'];
 
 /** 播种前的等待时间：给对端一个回包窗口，避免各自播种。 */
 const SEED_GRACE_MS = 400;
@@ -210,10 +210,11 @@ export function startCollaboration(projectId: string): void {
   let receivedRemote = false;
   const serverUrl = useCollaborationStore.getState().serverUrl.trim();
   const awareness = new Awareness(doc);
-  const localName = `用户-${crypto.randomUUID().slice(0, 4)}`;
-  awareness.setLocalStateField('user', { name: localName, color: PEER_COLORS[awareness.clientID % PEER_COLORS.length] });
+  const identity = createLocalIdentity(awareness.clientID);
+  awareness.setLocalStateField('user', identity);
   const transportOptions = {
     awareness,
+    name: identity.name,
     onPresence: (peers: CollaborationPeer[]) => useCollaborationStore.setState({ peers }),
     onRemoteUpdate: () => {
       receivedRemote = true;
@@ -250,7 +251,7 @@ export function startCollaboration(projectId: string): void {
     for (const view of state.views) pushCanvasView(doc, projectId, view.id, view.config);
   });
 
-  const current: CollaborationSession = { projectId, room, doc, awareness, transport, unsubscribe, unsubscribeCanvas };
+  const current: CollaborationSession = { projectId, room, doc, awareness, identity, transport, unsubscribe, unsubscribeCanvas };
   session = current;
   useCollaborationStore.setState({ sessionProjectId: projectId, sessionState: 'handshaking' });
 
@@ -285,16 +286,22 @@ export function stopCollaboration(): void {
   useCollaborationStore.setState({ peers: [], sessionProjectId: null, sessionState: 'off' });
 }
 
-/** 取某章节的协作绑定（片段 + 在线状态），未加入或不是当前作品时返回 null。 */
-export function getChapterCollab(projectId: string, chapterId: string | null): { fragment: Y.XmlFragment; awareness: Awareness } | null {
+/** 取某章节的协作绑定（片段 + 在线状态 + 本端身份），未加入或不是当前作品时返回 null。 */
+export function getChapterCollab(
+  projectId: string,
+  chapterId: string | null,
+): { fragment: Y.XmlFragment; awareness: Awareness; identity: PeerIdentity } | null {
   if (!session || session.projectId !== projectId || !chapterId) return null;
   const fragment = getChapterFragment(session.doc, chapterId);
   if (!fragment) return null;
-  return { fragment, awareness: session.awareness };
+  return { fragment, awareness: session.awareness, identity: session.identity };
 }
 
 /** 编辑器接线：会话与章节变化时返回当前章节的协作绑定。 */
-export function useChapterCollab(projectId: string | undefined, chapterId: string | null): { fragment: Y.XmlFragment; awareness: Awareness } | null {
+export function useChapterCollab(
+  projectId: string | undefined,
+  chapterId: string | null,
+): { fragment: Y.XmlFragment; awareness: Awareness; identity: PeerIdentity } | null {
   const enabled = useCollaborationStore((state) => state.enabled);
   const sessionProjectId = useCollaborationStore((state) => state.sessionProjectId);
   return useMemo(

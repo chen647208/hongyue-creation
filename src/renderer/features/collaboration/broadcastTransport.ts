@@ -14,6 +14,8 @@
 import { applyAwarenessUpdate, type Awareness,encodeAwarenessUpdate } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 
+import { guestPeerName } from '@/shared/utils/peerIdentity';
+
 export interface CollaborationPeer {
   id: string;
   name: string;
@@ -58,7 +60,7 @@ export function createBroadcastTransport(doc: Y.Doc, room: string, options: Broa
   const channel = new BroadcastChannel(channelName);
   const remoteOrigin = { source: channelName };
   const clientId = `peer:${crypto.randomUUID()}`;
-  const name = options.name?.trim() || `用户-${clientId.slice(5, 9)}`;
+  const name = options.name?.trim() || guestPeerName(clientId.slice(5, 9));
   let peers: CollaborationPeer[] = [];
 
   const notify = () => {

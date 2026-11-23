@@ -11,6 +11,8 @@
 import { applyAwarenessUpdate, type Awareness,encodeAwarenessUpdate } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 
+import { guestPeerName } from '@/shared/utils/peerIdentity';
+
 import { type CollaborationPeer, type CollaborationTransport,prunePeers } from './broadcastTransport';
 
 const HEARTBEAT_MS = 4000;
@@ -38,7 +40,7 @@ export function createIpcTransport(doc: Y.Doc, room: string, options: IpcTranspo
     return { room, getPeers: () => [], destroy: () => undefined };
   }
   const clientId = `peer:${crypto.randomUUID()}`;
-  const name = options.name?.trim() || `用户-${clientId.slice(5, 9)}`;
+  const name = options.name?.trim() || guestPeerName(clientId.slice(5, 9));
   const remoteOrigin = { source: 'collab-ipc' };
   let peers: CollaborationPeer[] = [];
   let connectionId: string | null = null;

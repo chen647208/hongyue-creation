@@ -15,6 +15,7 @@ import React, { forwardRef, useCallback,useEffect, useImperativeHandle, useMemo,
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils/cn';
+import { PEER_COLORS, PEER_LABEL_FOREGROUND } from '@/shared/utils/peerIdentity';
 
 import type { AnnotationAnchor } from '../../../../shared/types';
 import {
@@ -34,9 +35,9 @@ import { dslToPmDoc, pmDocToDsl, type PmNode } from '../../../editor/serializati
 import { paperInlineStyle } from '../services/writingToolsService';
 import type { EditorCollaboration, NovelEditorHandle, PaperStyle } from '../types';
 
-/** 远端光标渲染：竖线 + 名字标签。 */
+/** 远端光标渲染：竖线 + 名字标签。颜色来自 awareness 里对端写下的十六进制值。 */
 function renderRemoteCaret(user: { name?: string; color?: string }): HTMLElement {
-  const color = user.color ?? '#0091ff';
+  const color = user.color ?? PEER_COLORS[0];
   const caret = document.createElement('span');
   caret.style.borderLeft = `2px solid ${color}`;
   caret.style.marginLeft = '-1px';
@@ -49,7 +50,7 @@ function renderRemoteCaret(user: { name?: string; color?: string }): HTMLElement
   label.style.left = '-2px';
   label.style.top = '-1.1em';
   label.style.backgroundColor = color;
-  label.style.color = '#fff';
+  label.style.color = PEER_LABEL_FOREGROUND;
   label.style.fontSize = '10px';
   label.style.lineHeight = '1.2';
   label.style.padding = '0 3px';
@@ -60,7 +61,8 @@ function renderRemoteCaret(user: { name?: string; color?: string }): HTMLElement
 }
 
 function renderRemoteSelection(user: { color?: string }): { nodeName: string; class: string; style: string } {
-  return { nodeName: 'span', class: 'collaboration-selection', style: `background-color: ${user.color ?? '#0091ff'}33` };
+  const color = user.color ?? PEER_COLORS[0];
+  return { nodeName: 'span', class: 'collaboration-selection', style: `background-color: ${color}33` };
 }
 
 interface TipTapCanvasProps {
@@ -137,6 +139,7 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
   // 协作模式另加 y-prosemirror 同步/光标/撤销插件，并关闭 StarterKit 的 History。
   const fragment = collaboration?.fragment;
   const awareness = collaboration?.awareness;
+  const identity = collaboration?.identity;
   const extensions = useMemo(
     () => [
       ...(collaborative
@@ -144,19 +147,20 @@ const TipTapCanvas = forwardRef<NovelEditorHandle, TipTapCanvasProps>(function T
         : createNovelExtensions({ resolveBlock: stableResolveBlock, onOpenSource: stableOnOpenSource, getAnnotations: stableGetAnnotations, onAnnotationClick: stableOnAnnotationClick })),
       ...createWritingPrimitives({ onNewChapter: () => onNewChapterRef.current?.() }),
       ...(screenplayFormat ? [createScreenplayFormatting()] : []),
-      ...(fragment && awareness
+      ...(fragment && awareness && identity
         ? [
             Collaboration.configure({ fragment }),
+            // 光标插件在挂载时把 user 写进 awareness；传会话身份，避免覆盖成占位值。
             CollaborationCaret.configure({
               provider: { awareness },
-              user: { name: '协作者', color: '#0091ff' },
+              user: identity,
               render: renderRemoteCaret,
               selectionRender: renderRemoteSelection,
             }),
           ]
         : []),
     ],
-    [collaborative, fragment, awareness, screenplayFormat, stableResolveBlock, stableOnOpenSource, stableGetAnnotations, stableOnAnnotationClick],
+    [collaborative, fragment, awareness, identity, screenplayFormat, stableResolveBlock, stableOnOpenSource, stableGetAnnotations, stableOnAnnotationClick],
   );
 
   const editor = useEditor(
