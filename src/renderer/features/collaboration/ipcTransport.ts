@@ -13,7 +13,7 @@ import * as Y from 'yjs';
 
 import { guestPeerName } from '@/shared/utils/peerIdentity';
 
-import { type CollaborationPeer, type CollaborationTransport,prunePeers } from './broadcastTransport';
+import { type CollaborationPeer, type CollaborationTransport,prunePeers, upsertPeer } from './broadcastTransport';
 
 const HEARTBEAT_MS = 4000;
 const PEER_TTL_MS = 12000;
@@ -53,7 +53,7 @@ export function createIpcTransport(doc: Y.Doc, room: string, options: IpcTranspo
 
   const heartbeat = () => {
     const at = Date.now();
-    peers = prunePeers([...peers, { id: clientId, name, at }], at, PEER_TTL_MS);
+    peers = prunePeers(upsertPeer(peers, { id: clientId, name, at }), at, PEER_TTL_MS);
     notify();
     post({ type: 'presence', peer: { id: clientId, name, at } });
   };
@@ -83,7 +83,7 @@ export function createIpcTransport(doc: Y.Doc, room: string, options: IpcTranspo
       heartbeat();
     } else if (message.type === 'presence' && message.peer) {
       const incoming = message.peer;
-      peers = prunePeers([...peers.filter((peer) => peer.id !== incoming.id), incoming], Date.now(), PEER_TTL_MS);
+      peers = prunePeers(upsertPeer(peers, incoming), Date.now(), PEER_TTL_MS);
       notify();
     }
   };

@@ -330,6 +330,9 @@ export interface WritingSidebarProps {
   selectedSummaryPromptId: string;
   isExtractingSummary: boolean;
   hasModel: boolean;
+  /** 侧栏宽度（px）；由编辑器持有并持久化。 */
+  width: number;
+  onWidthChange: (width: number) => void;
   onClose: () => void;
   onChapterSummaryChange: (summary: string) => void;
   onContentSummaryChange: (contentSummary: string) => void;

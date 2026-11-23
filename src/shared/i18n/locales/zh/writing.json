@@ -30,12 +30,14 @@
   },
   "tools": {
     "tabs": {
-      "format": "一键排版",
-      "proofread": "自动纠错",
+      "format": "排版",
+      "proofread": "纠错",
       "snippets": "快捷词",
-      "preview": "多平台预览"
+      "preview": "预览"
     },
     "format": {
+      "applyTitle": "正文排版",
+      "pageTitle": "页面与朗读",
       "indent": "段落首行缩进两个全角空格",
       "screenplay": "剧本自动格式化（场景头/角色/括号/转场）",
       "paper": "纸张",
@@ -332,7 +334,7 @@
     "findTitle": "查找替换（Ctrl+F）",
     "finalTitle": "定稿锁定（正文只读）",
     "unfinalTitle": "取消定稿（恢复编辑）",
-    "toolsTitle": "写作工具（排版/纠错/快捷词/预览）",
+    "toolsTitle": "写作工具",
     "splitChapterTitle": "从光标处拆分为新章",
     "mergeChapterTitle": "与下一章合并",
     "exitFocus": "退出专注",
@@ -443,6 +445,7 @@
   "sidebar": {
     "title": "创作参考面板",
     "close": "收起参考面板",
+    "resize": "拖动调整侧栏宽度",
     "charactersTitle": "关键角色设定",
     "noCharacters": "暂无角色信息",
     "goCharacters": "去角色页建卡",

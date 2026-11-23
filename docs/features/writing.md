@@ -146,15 +146,17 @@
 
 ## 写作工具
 
-- 入口：编辑器工具栏「写作工具」按钮，面板为 `src/renderer/features/writing/components/WritingToolsPanel.tsx`，四个页签。
-- 一键排版：`services/writingToolsService.ts` 的 `autoFormatContent` 规范省略号与破折号、合并空行、去行尾空格，可选段落首行缩进；作用于当前章或全书。
+- 入口：编辑器工具栏「写作工具」按钮，面板为 `src/renderer/features/writing/components/WritingToolsPanel.tsx`，四个页签：排版、纠错、快捷词、预览。
+- 面板外框：左栏与写作工具共用 `shared/ui/SidePanel.tsx`，提供标题栏、关闭按钮与拖宽手柄。宽度按 240～560px 限制，记在 `localStorage`（`writing.sidebar.width` / `writing.tools.width`），重开保持；手柄支持键盘：方向键每次 16px，Home / End 到上下限。
+- 排版：`services/writingToolsService.ts` 的 `autoFormatContent` 规范省略号与破折号、合并空行、去行尾空格，可选段落首行缩进；作用于当前章或全书。
 - 自动纠错：`findProofreadIssues` 按规则检出常见错别字与重复标点（内置成语/易混词表），`applyProofreadFixes` 从后向前一次替换；另支持用户自备**敏感词表**（本地持久化，仅提示不自动替换）。
 - 纸张与朗读：编辑器纸张可选 纯色/网格/横线/羊皮（本地持久化）；支持朗读当前章，
   按句切段逐段播放，显示「第 N/M 段」进度、可随时停止。引擎在「设置 → 朗读」选择（见 settings.md）。
 - 快捷词：`services/snippetStore.ts` 用 `localStore` 持久化片段，面板可增删与插入到光标处（`NovelEditorHandle.insertText`）。
 - 多平台预览：`components/ReaderPreview.tsx` 用编译产出的 HTML 在桌面/平板/手机宽度下渲染当前章节。
 - 画布宽度：视口窄于 1100px 时 AI 助手栏与写作左栏改为覆盖层，正文独占一列；
-  正文画布保持 320px 最小宽度，仍放不下时横向滚动，不塌缩为零宽。
+  正文画布保持 320px 最小宽度，仍放不下时横向滚动，不塌缩为零宽。宽屏并排时正文列最小 400px：
+  两侧面板都拖到上限后窗口放不下，面板按 flex 收缩到各自下限，正文不会被挤没。
 - 自动滚屏：打字机模式按最近的滚动祖先容器把光标定位到视口约 40% 高度。
 
 ## 结构页：计划与分组
