@@ -14,6 +14,8 @@
 import { applyAwarenessUpdate, type Awareness,encodeAwarenessUpdate } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 
+import { guestPeerName } from '@/shared/utils/peerIdentity';
+
 export interface CollaborationPeer {
   id: string;
   name: string;
@@ -42,6 +44,11 @@ export function prunePeers(peers: CollaborationPeer[], now: number, ttl = PEER_T
   return peers.filter((peer) => now - peer.at <= ttl);
 }
 
+/** 心跳合并：同一 id 只留最新一条，避免每次心跳往列表里追加重复项。 */
+export function upsertPeer(peers: CollaborationPeer[], peer: CollaborationPeer): CollaborationPeer[] {
+  return [...peers.filter((item) => item.id !== peer.id), peer];
+}
+
 export interface BroadcastTransportOptions {
   name?: string;
   awareness?: Awareness;
@@ -58,7 +65,7 @@ export function createBroadcastTransport(doc: Y.Doc, room: string, options: Broa
   const channel = new BroadcastChannel(channelName);
   const remoteOrigin = { source: channelName };
   const clientId = `peer:${crypto.randomUUID()}`;
-  const name = options.name?.trim() || `用户-${clientId.slice(5, 9)}`;
+  const name = options.name?.trim() || guestPeerName(clientId.slice(5, 9));
   let peers: CollaborationPeer[] = [];
 
   const notify = () => {
@@ -67,7 +74,7 @@ export function createBroadcastTransport(doc: Y.Doc, room: string, options: Broa
 
   const heartbeat = () => {
     const at = Date.now();
-    peers = prunePeers([...peers, { id: clientId, name, at }], at);
+    peers = prunePeers(upsertPeer(peers, { id: clientId, name, at }), at);
     notify();
     channel.postMessage({ type: 'presence', peer: { id: clientId, name, at } } satisfies TransportMessage);
   };
@@ -98,7 +105,7 @@ export function createBroadcastTransport(doc: Y.Doc, room: string, options: Broa
       heartbeat();
     } else if (data?.type === 'presence' && data.peer) {
       const incoming = data.peer;
-      peers = prunePeers([...peers.filter((peer) => peer.id !== incoming.id), incoming], Date.now());
+      peers = prunePeers(upsertPeer(peers, incoming), Date.now());
       notify();
     }
   };

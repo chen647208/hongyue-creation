@@ -7,11 +7,11 @@
  * 商业闭源使用需另行获取授权，详见 docs/guides/licensing.md。
  */
 
-import { ChevronsLeft } from 'lucide-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/shared/ui/Button';
+import SidePanel from '@/shared/ui/SidePanel';
 import Slot from '@/shared/ui/Slot';
 import { Textarea } from '@/shared/ui/Textarea';
 
@@ -31,6 +31,8 @@ const WritingSidebar: React.FC<WritingSidebarProps> = ({
   selectedSummaryPromptId,
   isExtractingSummary,
   hasModel,
+  width,
+  onWidthChange,
   onClose,
   onChapterSummaryChange,
   onContentSummaryChange,
@@ -47,17 +49,17 @@ const WritingSidebar: React.FC<WritingSidebarProps> = ({
 }) => {
   const { t } = useTranslation('writing');
   return (
-    <div className="flex h-full w-80 shrink-0 flex-col border-r border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border bg-muted/30 p-4">
-        <h3 className="text-sm font-medium">{t('sidebar.title')}</h3>
-        <div className="flex items-center gap-1">
-          <Slot id="sidebar.actions" />
-          <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" onClick={onClose} aria-label={t('sidebar.close')}>
-            <ChevronsLeft className="size-4" />
-          </Button>
-        </div>
-      </div>
-      <div className=" flex-1 space-y-6 overflow-y-auto p-4">
+    <SidePanel
+      title={t('sidebar.title')}
+      side="left"
+      width={width}
+      onWidthChange={onWidthChange}
+      onClose={onClose}
+      closeLabel={t('sidebar.close')}
+      resizeLabel={t('sidebar.resize')}
+      contentClassName="space-y-6"
+      actions={<Slot id="sidebar.actions" />}
+    >
         <WritingEntityPanel project={project} activeChapter={activeChapter} onInsertEntity={onInsertEntity} />
 
         {project.characters.length === 0 && onNavigateToCharacters && (
@@ -99,8 +101,7 @@ const WritingSidebar: React.FC<WritingSidebarProps> = ({
         <WritingBlockRefsPanel {...blockRefs} />
 
         <WritingAnnotationsPanel {...annotationPanel} />
-      </div>
-    </div>
+    </SidePanel>
   );
 };
 

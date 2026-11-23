@@ -630,6 +630,7 @@
     "waiting": "等待打开作品",
     "inactive": "未开启",
     "online": "在线 {{count}} 人",
+    "guestName": "用户-{{id}}",
     "serverLabel": "中转地址（跨设备，可留空）",
     "serverHint": "留空仅同机多窗口同步；填写 ws:// 或 wss:// 且各端连同一服务时跨设备同步。"
   },

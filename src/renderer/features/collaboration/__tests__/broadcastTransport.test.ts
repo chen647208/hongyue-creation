@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { prunePeers } from '../broadcastTransport';
+import { prunePeers, upsertPeer } from '../broadcastTransport';
 
 describe('broadcastTransport', () => {
   it('prunePeers 剔除超时未心跳的对端', () => {
@@ -18,5 +18,18 @@ describe('broadcastTransport', () => {
       { id: 'b', name: 'B', at: 5000 },
     ];
     expect(prunePeers(peers, 6000, 2000).map((peer) => peer.id)).toEqual(['b']);
+  });
+});
+
+describe('upsertPeer', () => {
+  it('同一 id 重复心跳只留一条，时间戳取最新', () => {
+    const first = upsertPeer([], { id: 'a', name: '甲', at: 1000 });
+    const second = upsertPeer(first, { id: 'a', name: '甲', at: 5000 });
+    expect(second).toEqual([{ id: 'a', name: '甲', at: 5000 }]);
+  });
+
+  it('不同 id 各留一条，顺序按加入先后', () => {
+    const peers = upsertPeer(upsertPeer([], { id: 'a', name: '甲', at: 1 }), { id: 'b', name: '乙', at: 2 });
+    expect(peers.map((peer) => peer.id)).toEqual(['a', 'b']);
   });
 });

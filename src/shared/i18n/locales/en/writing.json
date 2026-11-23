@@ -30,12 +30,14 @@
   },
   "tools": {
     "tabs": {
-      "format": "Auto-format",
+      "format": "Format",
       "proofread": "Proofread",
       "snippets": "Snippets",
-      "preview": "Platform preview"
+      "preview": "Preview"
     },
     "format": {
+      "applyTitle": "Body text",
+      "pageTitle": "Page and reading",
       "indent": "Indent paragraphs with two em spaces",
       "screenplay": "Screenplay auto-format (scene headings / cues / parentheses / transitions)",
       "paper": "Paper",
@@ -332,7 +334,7 @@
     "findTitle": "Find & replace (Ctrl+F)",
     "finalTitle": "Finalize and lock (read-only body)",
     "unfinalTitle": "Unfinalize (editable again)",
-    "toolsTitle": "Writing tools (format / proofread / snippets / preview)",
+    "toolsTitle": "Writing tools",
     "splitChapterTitle": "Split into a new chapter at cursor",
     "mergeChapterTitle": "Merge with next chapter",
     "exitFocus": "Exit focus",
@@ -443,6 +445,7 @@
   "sidebar": {
     "title": "Writing Reference Panel",
     "close": "Close reference panel",
+    "resize": "Drag to resize sidebar",
     "charactersTitle": "Key Characters",
     "noCharacters": "No characters yet",
     "goCharacters": "Open Characters",

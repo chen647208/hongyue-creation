@@ -18,6 +18,7 @@ import { useSettingsStore, useUsableModel } from '@/app/stores/settingsStore';
 import { buildBlockTextMap, resolveAnnotation } from '@/editor/annotations';
 import { buildBlockRefIndex, resolveBlockProjection } from '@/editor/blockRefs';
 import { useViewportTier } from '@/shared/hooks/useViewportTier';
+import { useViewPreference } from '@/shared/hooks/useViewPreference';
 import { dialogService } from '@/shared/services/dialogService';
 import { resetEditorContext, setEditorContext } from '@/shared/services/editorContextService';
 import { onEditorOps } from '@/shared/services/editorOps';
@@ -311,6 +312,14 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
 
   const [isForeshadowOpen, setIsForeshadowOpen] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
+  // 两侧栏宽度记在视图偏好里：同一台机器上重开编辑器保持上次拖到的位置。
+  const [sidebarWidthPref, setSidebarWidthPref] = useViewPreference<string>('writing.sidebar.width', '320');
+  const [toolsWidthPref, setToolsWidthPref] = useViewPreference<string>('writing.tools.width', '320');
+  const clampWidth = (raw: string, fallback: number): number => Math.min(560, Math.max(240, Number.parseInt(raw, 10) || fallback));
+  const sidebarWidth = clampWidth(sidebarWidthPref, 320);
+  const toolsWidth = clampWidth(toolsWidthPref, 320);
+  const setSidebarWidth = (value: number): void => setSidebarWidthPref(String(Math.round(value)));
+  const setToolsWidth = (value: number): void => setToolsWidthPref(String(Math.round(value)));
 
   // 章节字段写回统一见 useChapterMutations
   const { handleUpdateChapter, updateChapterContent, updateChapterSummary, updateChapterContentSummary, updateActiveChapterTitle } = useChapterMutations({
@@ -498,6 +507,8 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
   const sidebarNode = (
     <WritingSidebar
       project={project}
+      width={sidebarWidth}
+      onWidthChange={setSidebarWidth}
       activeChapter={activeChapter}
       activeChapterId={activeChapterId}
       chapters={project.chapters}
@@ -644,7 +655,7 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
         )
       )}
 
-      <div className="relative flex h-full min-w-0 flex-1 flex-col bg-muted/30">
+      <div className="relative flex h-full min-w-[400px] flex-1 flex-col bg-muted/30">
       {find.open && project.chapters.length > 0 && (
         <FindBar
           query={find.query}
@@ -832,6 +843,8 @@ const WritingEditor: React.FC<WritingEditorProps> = ({ project, initialChapterId
           onToggleScreenplayFormat={viewMode.setScreenplayFormat}
           paper={paper}
           onPaperChange={viewMode.setPaper}
+          width={toolsWidth}
+          onWidthChange={setToolsWidth}
           onClose={() => setIsToolsOpen(false)}
         />
       )}

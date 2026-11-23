@@ -29,8 +29,13 @@ export interface TabBarProps<T extends string> {
 /** 受控页签条：展示型；内容由调用方按 value 条件渲染。 */
 export function TabBar<T extends string>({ value, onChange, items, className, variant = 'underline' }: TabBarProps<T>): React.ReactElement {
   if (variant === 'block') {
+    // 等分网格：页签数量固定，永远铺满且不出现横向滚动条。
     return (
-      <div role="tablist" className={cn('flex shrink-0 overflow-x-auto border-b border-border bg-card', className)}>
+      <div
+        role="tablist"
+        className={cn('grid shrink-0 border-b border-border bg-card', className)}
+        style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+      >
         {items.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -39,7 +44,7 @@ export function TabBar<T extends string>({ value, onChange, items, className, va
             aria-selected={value === id}
             onClick={() => onChange(id)}
             className={cn(
-              'touch-target flex min-w-[60px] flex-1 flex-col items-center gap-1 border-b-2 py-3 text-2xs transition-colors',
+              'touch-target flex min-w-0 flex-col items-center gap-1 border-b-2 px-1 py-3 text-2xs transition-colors',
               value === id
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground',

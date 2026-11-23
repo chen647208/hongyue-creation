@@ -11,7 +11,9 @@
 import { applyAwarenessUpdate, type Awareness,encodeAwarenessUpdate } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 
-import { type CollaborationPeer, type CollaborationTransport,prunePeers } from './broadcastTransport';
+import { guestPeerName } from '@/shared/utils/peerIdentity';
+
+import { type CollaborationPeer, type CollaborationTransport,prunePeers, upsertPeer } from './broadcastTransport';
 
 const HEARTBEAT_MS = 4000;
 const PEER_TTL_MS = 12000;
@@ -38,7 +40,7 @@ export function createIpcTransport(doc: Y.Doc, room: string, options: IpcTranspo
     return { room, getPeers: () => [], destroy: () => undefined };
   }
   const clientId = `peer:${crypto.randomUUID()}`;
-  const name = options.name?.trim() || `用户-${clientId.slice(5, 9)}`;
+  const name = options.name?.trim() || guestPeerName(clientId.slice(5, 9));
   const remoteOrigin = { source: 'collab-ipc' };
   let peers: CollaborationPeer[] = [];
   let connectionId: string | null = null;
@@ -51,7 +53,7 @@ export function createIpcTransport(doc: Y.Doc, room: string, options: IpcTranspo
 
   const heartbeat = () => {
     const at = Date.now();
-    peers = prunePeers([...peers, { id: clientId, name, at }], at, PEER_TTL_MS);
+    peers = prunePeers(upsertPeer(peers, { id: clientId, name, at }), at, PEER_TTL_MS);
     notify();
     post({ type: 'presence', peer: { id: clientId, name, at } });
   };
@@ -81,7 +83,7 @@ export function createIpcTransport(doc: Y.Doc, room: string, options: IpcTranspo
       heartbeat();
     } else if (message.type === 'presence' && message.peer) {
       const incoming = message.peer;
-      peers = prunePeers([...peers.filter((peer) => peer.id !== incoming.id), incoming], Date.now(), PEER_TTL_MS);
+      peers = prunePeers(upsertPeer(peers, incoming), Date.now(), PEER_TTL_MS);
       notify();
     }
   };

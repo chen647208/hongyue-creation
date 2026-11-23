@@ -39,10 +39,12 @@ export interface ExportCompileOptions {
 /** 编辑器纸张样式。 */
 export type PaperStyle = 'plain' | 'grid' | 'lined' | 'sepia';
 
-/** 协作绑定：当前章节的 Y.XmlFragment 与在线状态。 */
+/** 协作绑定：当前章节的 Y.XmlFragment、在线状态，以及本端身份。 */
 export interface EditorCollaboration {
   fragment: Y.XmlFragment;
   awareness: Awareness;
+  /** 本端名字与光标颜色。光标插件在挂载时会把它写入 awareness，覆盖会话里的同名字段。 */
+  identity: { name: string; color: string };
 }
 
 /** 导出格式（单源，避免 types↔utils 循环）。 */
@@ -328,6 +330,9 @@ export interface WritingSidebarProps {
   selectedSummaryPromptId: string;
   isExtractingSummary: boolean;
   hasModel: boolean;
+  /** 侧栏宽度（px）；由编辑器持有并持久化。 */
+  width: number;
+  onWidthChange: (width: number) => void;
   onClose: () => void;
   onChapterSummaryChange: (summary: string) => void;
   onContentSummaryChange: (contentSummary: string) => void;

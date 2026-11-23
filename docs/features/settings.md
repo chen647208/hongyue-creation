@@ -119,6 +119,7 @@
 - 网络面：渲染层不直接建连，WebSocket 由主进程持有并经 IPC 收发，仅接受 `ws://` 与 `wss://`；中转服务见 `scripts/collab-server.mjs`（按房间广播，不持久化）。
 - 播种握手：加入者先请求对端状态，收到远端状态即采用；等待窗口内无对端才用本地作品播种，避免两端各自播种产生重复章节。
 - 在线状态：对端心跳每 4 秒一次，超过 12 秒未心跳即剔除；面板显示在线成员。
+- 对端身份：名字与光标颜色由 `shared/utils/peerIdentity.ts` 生成，颜色按客户端编号从固定调色板取，会话建立时写入 awareness。光标插件挂载时会把编辑器传入的身份回写 awareness，因此编辑器取会话身份而不是自带占位值。
 - 模型：章节列表为 `Y.Array<Y.Map>`，正文为 `Y.XmlFragment`；编辑器经 `@tiptap/extension-collaboration`（底层 `@tiptap/y-tiptap`）绑定该片段，DSL 与片段互转在 `features/collaboration/editorBinding.ts`。远端改动实时合并，撤销由协作扩展的 `yUndoPlugin` 接管；远端光标经 `@tiptap/extension-collaboration-caret` 与 `y-protocols/awareness` 渲染，awareness 增量随同一传输通道同步。
 - 持久化：协作副本不单独落盘；编辑器变更经 `pmDocToDsl` 序列化回 `projectStore`，仍走既有差分落盘。
 - 边界：跨设备协作需主进程通道（后续接入）；同一段落的并发编辑按 CRDT 规则收敛，不做字符级同文档绑定（`y-prosemirror` 属后续）。

@@ -19,6 +19,7 @@ import { Button } from '@/shared/ui/Button';
 import { Checkbox } from '@/shared/ui/Checkbox';
 import { Input } from '@/shared/ui/Input';
 import { Select } from '@/shared/ui/Select';
+import SidePanel from '@/shared/ui/SidePanel';
 import { TabBar } from '@/shared/ui/TabBar';
 import { Textarea } from '@/shared/ui/Textarea';
 
@@ -40,6 +41,10 @@ interface WritingToolsPanelProps {
   onToggleScreenplayFormat: (value: boolean) => void;
   paper: PaperStyle;
   onPaperChange: (value: PaperStyle) => void;
+  /** 宽屏：面板自带外框（标题栏 + 关闭 + 拖宽）；窄视口抽屉里由调用方给外框。 */
+  width?: number;
+  onWidthChange?: (width: number) => void;
+  onClose: () => void;
 }
 
 const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
@@ -53,6 +58,9 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
   onToggleScreenplayFormat,
   paper,
   onPaperChange,
+  width,
+  onWidthChange,
+  onClose,
 }) => {
   const { t } = useTranslation('writing');
   const [tab, setTab] = useState<ToolsTab>('format');
@@ -73,12 +81,12 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
     saveSnippets(next);
   };
 
-  return (
+  const body = (
     <div className="space-y-4">
       <TabBar<ToolsTab>
         value={tab}
         onChange={setTab}
-        variant="underline"
+        variant="block"
         items={[
           { id: 'format', label: t('tools.tabs.format') },
           { id: 'proofread', label: t('tools.tabs.proofread') },
@@ -88,43 +96,50 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
       />
 
       {tab === 'format' && (
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={indent} onChange={(event) => setIndent(event.target.checked)} />
-            {t('tools.format.indent')}
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={screenplayFormat} onChange={(event) => onToggleScreenplayFormat(event.target.checked)} />
-            {t('tools.format.screenplay')}
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">{t('tools.format.paper')}</span>
-            <Select value={paper} onChange={(event) => onPaperChange(event.target.value as PaperStyle)} className="h-8 w-28 text-xs" aria-label={t('tools.format.paper')}>
-              <option value="plain">{t('tools.format.paperPlain')}</option>
-              <option value="grid">{t('tools.format.paperGrid')}</option>
-              <option value="lined">{t('tools.format.paperLined')}</option>
-              <option value="sepia">{t('tools.format.paperSepia')}</option>
-            </Select>
-            {speech.supported &&
-              (speech.speaking ? (
-                <Button size="sm" variant="outline" onClick={speech.stop}>
-                  {t('tools.format.stopRead')}
-                  {speech.progress && <span className="tabular-nums text-muted-foreground">{speech.progress.index}/{speech.progress.total}</span>}
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" disabled={!chapter?.content.trim()} onClick={() => chapter && speech.start(chapter.content)}>
-                  {t('tools.format.readAloud')}
-                </Button>
-              ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" disabled={!chapter} onClick={() => chapter && onFormatChapter(chapter.id, indent)}>
-              {t('tools.format.current')}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => onFormatAll(indent)}>
-              {t('tools.format.all')}
-            </Button>
-          </div>
+        <div className="space-y-4">
+          <section className="space-y-2">
+            <h4 className="text-xs font-medium text-muted-foreground">{t('tools.format.applyTitle')}</h4>
+            <label className="flex items-start gap-2 text-sm">
+              <Checkbox className="mt-0.5" checked={indent} onChange={(event) => setIndent(event.target.checked)} />
+              <span>{t('tools.format.indent')}</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" disabled={!chapter} onClick={() => chapter && onFormatChapter(chapter.id, indent)}>
+                {t('tools.format.current')}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => onFormatAll(indent)}>
+                {t('tools.format.all')}
+              </Button>
+            </div>
+          </section>
+
+          <section className="space-y-2 border-t border-border pt-4">
+            <h4 className="text-xs font-medium text-muted-foreground">{t('tools.format.pageTitle')}</h4>
+            <div className="flex items-center gap-2">
+              <span className="sr-only">{t('tools.format.paper')}</span>
+              <Select value={paper} onChange={(event) => onPaperChange(event.target.value as PaperStyle)} className="h-8 flex-1 text-xs" aria-label={t('tools.format.paper')}>
+                <option value="plain">{t('tools.format.paperPlain')}</option>
+                <option value="grid">{t('tools.format.paperGrid')}</option>
+                <option value="lined">{t('tools.format.paperLined')}</option>
+                <option value="sepia">{t('tools.format.paperSepia')}</option>
+              </Select>
+              {speech.supported &&
+                (speech.speaking ? (
+                  <Button size="sm" variant="outline" onClick={speech.stop}>
+                    {t('tools.format.stopRead')}
+                    {speech.progress && <span className="tabular-nums text-muted-foreground">{speech.progress.index}/{speech.progress.total}</span>}
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" disabled={!chapter?.content.trim()} onClick={() => chapter && speech.start(chapter.content)}>
+                    {t('tools.format.readAloud')}
+                  </Button>
+                ))}
+            </div>
+            <label className="flex items-start gap-2 text-sm">
+              <Checkbox className="mt-0.5" checked={screenplayFormat} onChange={(event) => onToggleScreenplayFormat(event.target.checked)} />
+              <span>{t('tools.format.screenplay')}</span>
+            </label>
+          </section>
         </div>
       )}
 
@@ -208,6 +223,23 @@ const WritingToolsPanel: React.FC<WritingToolsPanelProps> = ({
 
       {tab === 'preview' && <ReaderPreview project={project} chapter={chapter} />}
     </div>
+  );
+
+  // 窄视口抽屉由调用方提供外框与关闭按钮；宽屏面板自带外框。
+  if (width === undefined || !onWidthChange) return body;
+
+  return (
+    <SidePanel
+      title={t('toolbar.toolsTitle')}
+      side="right"
+      width={width}
+      onWidthChange={onWidthChange}
+      onClose={onClose}
+      closeLabel={t('sidebar.close')}
+      resizeLabel={t('sidebar.resize')}
+    >
+      {body}
+    </SidePanel>
   );
 };
 
